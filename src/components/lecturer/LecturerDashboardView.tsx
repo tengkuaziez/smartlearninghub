@@ -73,7 +73,7 @@ export const LecturerDashboardView: React.FC<LecturerDashboardViewProps> = ({
             Platform ini digunakan bersama oleh tim dua dosen pengampu untuk mengelola materi, daftar email mahasiswa, presensi QR kelas, dan penilaian tugas terpadu.
           </p>
 
-          <div className="pt-2 flex flex-wrap gap-3">
+          <div className="pt-2 flex flex-wrap gap-2.5 sm:gap-3">
             {courses.length > 0 && (
               <button
                 onClick={() => onOpenCourse(courses[0].id)}
@@ -83,21 +83,13 @@ export const LecturerDashboardView: React.FC<LecturerDashboardViewProps> = ({
               </button>
             )}
 
-            {activeSession ? (
+            {activeSession && (
               <button
                 onClick={() => onOpenQrBroadcast(activeSession)}
-                className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm flex items-center gap-2"
+                className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm flex items-center gap-2 animate-pulse"
               >
                 <QrCode className="w-4 h-4" />
-                <span>Buka Proyektor QR Aktif</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => courses.length > 0 && onOpenCourse(courses[0].id)}
-                className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-xs flex items-center gap-2"
-              >
-                <QrCode className="w-4 h-4" />
-                <span>Buka Sesi Presensi QR</span>
+                <span>Buka Proyektor Sesi #{activeSession.meetingNumber} (LIVE)</span>
               </button>
             )}
 
@@ -118,81 +110,81 @@ export const LecturerDashboardView: React.FC<LecturerDashboardViewProps> = ({
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         {/* Classes */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+        <div className="p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">
-              Mata Kuliah Diampu
+            <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 truncate">
+              Mata Kuliah
             </span>
-            <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-              <BookOpen className="w-5 h-5" />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+              <BookOpen className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
+          <div className="mt-2.5 sm:mt-3 flex items-baseline gap-1.5 sm:gap-2">
+            <span className="text-xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
               {totalCourses}
             </span>
-            <span className="text-xs text-slate-400">kelas aktif</span>
+            <span className="text-[11px] sm:text-xs text-slate-400">kelas aktif</span>
           </div>
-          <p className="mt-1 text-[11px] text-blue-600 dark:text-blue-400 font-medium">
+          <p className="mt-1 text-[11px] text-blue-600 dark:text-blue-400 font-medium truncate">
             Tim 2 Dosen Pengampu
           </p>
         </div>
 
         {/* Total Enrolled Students */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+        <div className="p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">
-              Total Mahasiswa Terdaftar
+            <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 truncate">
+              Mahasiswa
             </span>
-            <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-              <Users className="w-5 h-5" />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+              <Users className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
+          <div className="mt-2.5 sm:mt-3 flex items-baseline gap-1.5 sm:gap-2">
+            <span className="text-xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
               {totalEnrolledSeats}
             </span>
-            <span className="text-xs text-slate-400">kursi terisi</span>
+            <span className="text-[11px] sm:text-xs text-slate-400">terdaftar</span>
           </div>
-          <p className="mt-1 text-[11px] text-indigo-600 dark:text-indigo-400 font-medium">
+          <p className="mt-1 text-[11px] text-indigo-600 dark:text-indigo-400 font-medium truncate">
             Whitelist email dosen
           </p>
         </div>
 
         {/* Submissions Needing Grading */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+        <div className="p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">
-              Tugas Perlu Dikoreksi
+            <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 truncate">
+              Koreksi Tugas
             </span>
-            <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-              <FileCheck2 className="w-5 h-5" />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+              <FileCheck2 className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
+          <div className="mt-2.5 sm:mt-3 flex items-baseline gap-1.5 sm:gap-2">
+            <span className="text-xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
               {pendingGrading.length}
             </span>
-            <span className="text-xs text-slate-400">berkas tugas</span>
+            <span className="text-[11px] sm:text-xs text-slate-400">berkas tugas</span>
           </div>
-          <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400 font-medium">
-            Menunggu review & nilai
+          <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400 font-medium truncate">
+            Menunggu review
           </p>
         </div>
 
         {/* QR Session */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+        <div className="p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">
-              Presensi Tatap Muka
+            <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 truncate">
+              Presensi Kelas
             </span>
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-              <QrCode className="w-5 h-5" />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <QrCode className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
+          <div className="mt-2.5 sm:mt-3 flex items-baseline gap-1.5 sm:gap-2">
             <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
               {activeSession ? 'Aktif' : 'Tutup'}
             </span>

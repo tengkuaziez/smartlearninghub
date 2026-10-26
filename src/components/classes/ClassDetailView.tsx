@@ -453,8 +453,34 @@ export const ClassDetailView: React.FC<ClassDetailViewProps> = ({
                         <span className="text-xs font-mono font-medium text-slate-500">
                           {formatIndonesianDate(meeting.date)} • {meeting.startTime} - {meeting.endTime} WIB
                         </span>
+                        {(() => {
+                          const user = studentService.getCurrentUser();
+                          const rec = classAttendance.find(
+                            (r) =>
+                              (r.meetingId === meeting.id || r.meetingNumber === meeting.meetingNumber) &&
+                              r.studentEmail?.toLowerCase() === user.email.toLowerCase()
+                          );
+                          const isLive = studentService.getAttendanceSessions().some(
+                            (s) => s.courseId === course.id && s.meetingId === meeting.id && s.isOpen
+                          );
+                          if (rec) {
+                            return (
+                              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" /> Hadir Sah
+                              </span>
+                            );
+                          }
+                          if (isLive) {
+                            return (
+                              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/70 border border-amber-300 dark:border-amber-800 px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Presensi QR Dibuka
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
                         {meeting.isCompletedByStudent && (
-                          <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded flex items-center gap-1">
+                          <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950 px-2 py-0.5 rounded flex items-center gap-1">
                             <CheckCircle2 className="w-3 h-3" /> Dipelajari
                           </span>
                         )}

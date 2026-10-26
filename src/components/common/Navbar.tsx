@@ -84,35 +84,34 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Right Action Icons & Profile */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3">
           {/* Google Drive & Backup Trigger Button */}
           {onOpenGoogleModal && (
             <button
               onClick={onOpenGoogleModal}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-xs border bg-slate-100 hover:bg-emerald-50 dark:bg-slate-800 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
+              className="flex items-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-xl text-xs font-semibold transition-all shadow-xs border bg-slate-100 hover:bg-emerald-50 dark:bg-slate-800 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
               title="Kelola Integrasi Google Drive & Pencadangan Google Spreadsheet"
             >
-              <Cloud className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span className="hidden sm:inline">Drive & Sheets</span>
+              <Cloud className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span className="hidden md:inline">Drive & Sheets</span>
             </button>
           )}
 
-          {/* Quick Role Switcher (Convenient for local server testing as requested!) */}
+          {/* Quick Role Switcher (Convenient for testing) */}
           <button
             onClick={onQuickToggleRole}
-            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs border bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
-            title="Klik untuk langsung berganti peran antara Dosen dan Mahasiswa saat pengujian lokal"
+            className="flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs border bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
+            title="Klik untuk langsung berganti peran antara Dosen dan Mahasiswa"
           >
-            <ArrowLeftRight className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-            <span className="hidden sm:inline">Peran:</span>
+            <ArrowLeftRight className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
             <span
-              className={`px-2 py-0.5 rounded-md font-mono ${
+              className={`px-1.5 py-0.5 rounded-md font-mono text-[10px] sm:text-xs ${
                 currentUser.role === 'dosen'
                   ? 'bg-indigo-600 text-white'
                   : 'bg-blue-600 text-white'
               }`}
             >
-              {currentUser.role === 'dosen' ? 'Dosen' : 'Mahasiswa'}
+              {currentUser.role === 'dosen' ? 'Dosen' : 'Mhs'}
             </span>
           </button>
 

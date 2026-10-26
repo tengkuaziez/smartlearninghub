@@ -147,6 +147,76 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({
           </span>
         </div>
 
+        {/* Meeting-Specific Official Attendance Status */}
+        {(() => {
+          const user = studentService.getCurrentUser();
+          const records = studentService.getAttendanceRecords(course.id);
+          const myRecord = records.find(
+            (r) =>
+              (r.meetingId === meeting.id || r.meetingNumber === meeting.meetingNumber) &&
+              r.studentEmail?.toLowerCase() === user.email.toLowerCase()
+          );
+          const sessions = studentService.getAttendanceSessions();
+          const activeSess = sessions.find(
+            (s) => s.courseId === course.id && s.meetingId === meeting.id && s.isOpen
+          );
+
+          if (myRecord) {
+            return (
+              <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <div>
+                    <span className="font-bold text-emerald-900 dark:text-emerald-200 block">
+                      Status Kehadiran Pertemuan #{meeting.meetingNumber}: {myRecord.status.toUpperCase()}
+                    </span>
+                    <span className="text-[11px] text-emerald-700 dark:text-emerald-400">
+                      Terverifikasi pada {myRecord.checkInTime ? new Date(myRecord.checkInTime).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : 'Sesi Kuliah'}
+                    </span>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 font-bold shrink-0">
+                  Hadir Sah
+                </span>
+              </div>
+            );
+          }
+
+          if (activeSess) {
+            return (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-transparent border border-emerald-300 dark:border-emerald-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-3 h-3 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                  <div>
+                    <span className="font-bold text-emerald-900 dark:text-emerald-200 block">
+                      Presensi QR Pertemuan #{meeting.meetingNumber} SEDANG LIVE DIBUKA
+                    </span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Token Sesi: <strong className="font-mono text-emerald-600 dark:text-emerald-300">{activeSess.sessionToken}</strong> • Buka kamera untuk memindai proyektor dosen
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={onOpenAttendanceCheckIn}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs flex items-center justify-center gap-2 transition-all hover:scale-105 shrink-0"
+                >
+                  <QrCode className="w-4 h-4" />
+                  <span>Pindai QR Presensi Sesi Ini &rarr;</span>
+                </button>
+              </div>
+            );
+          }
+
+          return (
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+              <span className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-slate-400" />
+                <span>Presensi resmi Pertemuan #{meeting.meetingNumber} belum dibuka / sudah ditutup oleh dosen.</span>
+              </span>
+            </div>
+          );
+        })()}
+
         {/* Distinction Banner: Personal Progress vs Official Attendance */}
         <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
           <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />

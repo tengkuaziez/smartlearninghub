@@ -121,100 +121,100 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* Summary Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         {/* Active Classes */}
         <div 
           onClick={() => onNavigate('kelas')}
-          className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-blue-400 dark:hover:border-blue-600 transition-all cursor-pointer group"
+          className="p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-blue-400 dark:hover:border-blue-600 transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">
+            <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 truncate">
               Kelas Saya
             </span>
-            <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <BookOpen className="w-5 h-5" />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+              <BookOpen className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
+          <div className="mt-2.5 sm:mt-3 flex items-baseline gap-1.5 sm:gap-2">
+            <span className="text-xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
               {activeCoursesCount}
             </span>
-            <span className="text-xs text-slate-500 dark:text-slate-400">mata kuliah</span>
+            <span className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">matkul</span>
           </div>
           <p className="mt-1 text-[11px] text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1">
-            Lihat mata kuliah &rarr;
+            Lihat kelas &rarr;
           </p>
         </div>
 
         {/* Pending Tasks */}
         <div 
           onClick={() => onNavigate('tugas')}
-          className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-amber-400 dark:hover:border-amber-600 transition-all cursor-pointer group"
+          className="p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-amber-400 dark:hover:border-amber-600 transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">
-              Tugas Belum Selesai
+            <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 truncate">
+              Tugas Aktif
             </span>
-            <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Clock className="w-5 h-5" />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+              <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
+          <div className="mt-2.5 sm:mt-3 flex items-baseline gap-1.5 sm:gap-2">
+            <span className="text-xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
               {pendingAssignments.length}
             </span>
-            <span className="text-xs text-slate-500 dark:text-slate-400">tugas</span>
+            <span className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">tugas</span>
           </div>
           <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
-            Kumpulkan jawaban &rarr;
+            Kerjakan &rarr;
           </p>
         </div>
 
         {/* Upcoming Meetings */}
         <div 
           onClick={() => onNavigate('kalender')}
-          className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-emerald-400 dark:hover:border-emerald-600 transition-all cursor-pointer group"
+          className="p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-emerald-400 dark:hover:border-emerald-600 transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">
+            <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 truncate">
               Sesi Kuliah
             </span>
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Calendar className="w-5 h-5" />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
+          <div className="mt-2.5 sm:mt-3 flex items-baseline gap-1.5 sm:gap-2">
+            <span className="text-xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
               {upcomingMeetings.length}
             </span>
-            <span className="text-xs text-slate-500 dark:text-slate-400">pertemuan</span>
+            <span className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">pertemuan</span>
           </div>
           <p className="mt-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-            Buka kalender &rarr;
+            Jadwal kelas &rarr;
           </p>
         </div>
 
-        {/* Task Evaluation Summary */}
+        {/* Grade Average */}
         <div 
           onClick={() => onNavigate('nilai')}
-          className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-indigo-400 dark:hover:border-indigo-600 transition-all cursor-pointer group"
+          className="p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-cyan-400 dark:hover:border-cyan-600 transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">
-              Tugas Dinilai Dosen
+            <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 truncate">
+              Rata-rata Nilai
             </span>
-            <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Award className="w-5 h-5" />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400 flex items-center justify-center shrink-0">
+              <Award className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
-              {submissions.filter((s) => s.grade !== undefined).length}
+          <div className="mt-2.5 sm:mt-3 flex items-baseline gap-1.5 sm:gap-2">
+            <span className="text-xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
+              {gradeStats.publishedCount > 0 ? gradeStats.averageScore : '-'}
             </span>
-            <span className="text-xs text-slate-500 dark:text-slate-400">tugas selesai</span>
+            <span className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">skala 100</span>
           </div>
-          <p className="mt-1 text-[11px] text-indigo-600 dark:text-indigo-400 font-medium flex items-center gap-1">
-            Lihat nilai & tugas per matkul &rarr;
+          <p className="mt-1 text-[11px] text-cyan-600 dark:text-cyan-400 font-medium flex items-center gap-1">
+            Buka nilai &rarr;
           </p>
         </div>
       </div>
