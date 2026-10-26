@@ -76,7 +76,7 @@ export const googleDriveService = {
     if (fromEnv && typeof fromEnv === 'string' && fromEnv.trim().length > 0) {
       return fromEnv.trim();
     }
-    return '';
+    return 'https://script.google.com/macros/s/AKfycbwDzcpOCO9Npm0sH8DM9maCOEtDo_LWaHMX4K7JY6RPle_5En0fG5s59sEHRJ9UZ45W/exec';
   },
 
   /**
