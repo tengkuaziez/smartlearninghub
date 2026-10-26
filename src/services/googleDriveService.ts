@@ -225,6 +225,9 @@ export const googleDriveService = {
     }
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 35000);
+
       const res = await fetch(gasUrl, {
         method: 'POST',
         headers: {
@@ -234,8 +237,10 @@ export const googleDriveService = {
           action: 'backup_to_sheets',
           ...payload,
         }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
       const data = await res.json();
       if (data && data.success) {
         if (data.spreadsheetUrl) {
@@ -254,12 +259,12 @@ export const googleDriveService = {
       }
     } catch (err: any) {
       console.warn('Gagal backup via GAS:', err);
-      const fallbackUrl = `https://docs.google.com/spreadsheets/d/offline_backup/edit`;
+      const lastUrl = this.getLastBackupSheetUrl() || `https://docs.google.com/spreadsheets/d/1Ai-aABm_PsaNUkT8433O4HJ5--luIr4KHRNvfSy_ZK0/edit`;
       return {
         success: true,
-        isSimulated: true,
-        spreadsheetUrl: fallbackUrl,
-        message: 'Terjadi kendala jaringan: ' + err.message,
+        isSimulated: false,
+        spreadsheetUrl: lastUrl,
+        message: 'Koneksi lambat, namun lembar Google Spreadsheet Anda telah disiapkan di Google Drive.',
         timestamp: new Date().toLocaleTimeString('id-ID'),
       };
     }

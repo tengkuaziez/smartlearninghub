@@ -45,6 +45,7 @@ export const GoogleIntegrationModal: React.FC<GoogleIntegrationModalProps> = ({
   // Backup to Sheets State
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [backupResult, setBackupResult] = useState<SpreadsheetBackupResult | null>(null);
+  const [backupError, setBackupError] = useState<string | null>(null);
 
   // Supabase check state
   const [supabaseStatus, setSupabaseStatus] = useState<{ checked: boolean; connected: boolean; message: string }>({
@@ -107,78 +108,85 @@ export const GoogleIntegrationModal: React.FC<GoogleIntegrationModalProps> = ({
   const handleRunBackup = async () => {
     setIsBackingUp(true);
     setBackupResult(null);
+    setBackupError(null);
 
-    // Compile academic data for backup
-    const courses = studentService.getAllCourses();
-    const students = studentService.getAllPreRegisteredStudents();
-    const attendance = studentService.getAttendanceRecords();
-    const submissions = studentService.getSubmissions();
-    const assignments = studentService.getAssignments();
-    const user = studentService.getCurrentUser();
+    try {
+      // Compile academic data for backup
+      const courses = studentService.getAllCourses();
+      const students = studentService.getAllPreRegisteredStudents();
+      const attendance = studentService.getAttendanceRecords();
+      const submissions = studentService.getSubmissions();
+      const assignments = studentService.getAssignments();
+      const user = studentService.getCurrentUser();
 
-    // Prepare Attendance Matrix
-    const attendanceRecap = students.map((std) => {
-      const studentRecords = attendance.filter((r) => r.studentEmail.toLowerCase() === std.email.toLowerCase());
-      const hadirCount = studentRecords.filter((r) => r.status === 'hadir').length;
-      const total = 16;
-      const percentage = Math.round((hadirCount / total) * 100);
+      // Prepare Attendance Matrix
+      const attendanceRecap = students.map((std) => {
+        const studentRecords = attendance.filter((r) => r.studentEmail.toLowerCase() === std.email.toLowerCase());
+        const hadirCount = studentRecords.filter((r) => r.status === 'hadir').length;
+        const total = 16;
+        const percentage = Math.round((hadirCount / total) * 100);
 
-      const pData: Record<string, string> = {};
-      for (let i = 1; i <= 16; i++) {
-        const rec = studentRecords.find((r) => {
-          const meeting = studentService.getMeetingById(r.meetingId);
-          return meeting?.meetingNumber === i;
-        });
-        pData[`p${i}`] = rec ? rec.status.toUpperCase() : '-';
-      }
+        const pData: Record<string, string> = {};
+        for (let i = 1; i <= 16; i++) {
+          const rec = studentRecords.find((r) => {
+            const meeting = studentService.getMeetingById(r.meetingId);
+            return meeting?.meetingNumber === i;
+          });
+          pData[`p${i}`] = rec ? rec.status.toUpperCase() : '-';
+        }
 
-      return {
+        return {
+          nim: std.nim,
+          studentName: std.name,
+          studentEmail: std.email,
+          courseCode: std.enrolledCourseCodes.join(', '),
+          ...pData,
+          totalHadir: hadirCount,
+          percentage,
+        };
+      });
+
+      // Prepare Submissions Recap
+      const submissionsRecap = submissions.map((sub) => {
+        const asg = assignments.find((a) => a.id === sub.assignmentId);
+        const crs = asg ? courses.find((c) => c.id === asg.courseId) : null;
+        return {
+          studentName: sub.studentName,
+          studentEmail: sub.studentEmail,
+          courseCode: crs?.code || '-',
+          assignmentTitle: asg?.title || 'Tugas Kuliah',
+          submittedAt: new Date(sub.submittedAt).toLocaleString('id-ID'),
+          isLate: sub.isLate,
+          grade: sub.grade ?? null,
+          feedback: sub.feedback,
+          fileUrl: sub.fileUrl,
+        };
+      });
+
+      // Prepare Students List
+      const studentsList = students.map((std) => ({
         nim: std.nim,
-        studentName: std.name,
-        studentEmail: std.email,
-        courseCode: std.enrolledCourseCodes.join(', '),
-        ...pData,
-        totalHadir: hadirCount,
-        percentage,
-      };
-    });
+        name: std.name,
+        email: std.email,
+        enrolledCourses: std.enrolledCourseCodes.join(', '),
+        isRegistered: Boolean(std.registeredAt),
+      }));
 
-    // Prepare Submissions Recap
-    const submissionsRecap = submissions.map((sub) => {
-      const asg = assignments.find((a) => a.id === sub.assignmentId);
-      const crs = asg ? courses.find((c) => c.id === asg.courseId) : null;
-      return {
-        studentName: sub.studentName,
-        studentEmail: sub.studentEmail,
-        courseCode: crs?.code || '-',
-        assignmentTitle: asg?.title || 'Tugas Kuliah',
-        submittedAt: new Date(sub.submittedAt).toLocaleString('id-ID'),
-        isLate: sub.isLate,
-        grade: sub.grade ?? null,
-        feedback: sub.feedback,
-        fileUrl: sub.fileUrl,
-      };
-    });
+      const result = await googleDriveService.backupToSpreadsheet({
+        backupBy: `${user.name} (${user.email})`,
+        note: 'Pencadangan manual melalui Portal Dosen Smart Learning Hub',
+        attendanceRecap,
+        submissionsRecap,
+        studentsList,
+      });
 
-    // Prepare Students List
-    const studentsList = students.map((std) => ({
-      nim: std.nim,
-      name: std.name,
-      email: std.email,
-      enrolledCourses: std.enrolledCourseCodes.join(', '),
-      isRegistered: Boolean(std.registeredAt),
-    }));
-
-    const result = await googleDriveService.backupToSpreadsheet({
-      backupBy: `${user.name} (${user.email})`,
-      note: 'Pencadangan manual melalui Portal Dosen Smart Learning Hub',
-      attendanceRecap,
-      submissionsRecap,
-      studentsList,
-    });
-
-    setIsBackingUp(false);
-    setBackupResult(result);
+      setBackupResult(result);
+    } catch (err: any) {
+      console.error('Backup error:', err);
+      setBackupError(err.message || 'Terjadi kesalahan saat menyinkronkan data.');
+    } finally {
+      setIsBackingUp(false);
+    }
   };
 
   const handleTestSupabase = async () => {
@@ -392,6 +400,13 @@ export const GoogleIntegrationModal: React.FC<GoogleIntegrationModalProps> = ({
                 </a>
               )}
             </div>
+
+            {backupError && (
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{backupError}</span>
+              </div>
+            )}
 
             {backupResult && (
               <div className="p-4 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 space-y-2">

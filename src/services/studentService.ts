@@ -386,6 +386,40 @@ export const studentService = {
     };
   },
 
+  getAllPreRegisteredStudents(): Array<{
+    email: string;
+    name: string;
+    nim: string;
+    enrolledCourseCodes: string[];
+    registeredAt?: string;
+  }> {
+    const courses = this.getAllCourses();
+    const studentsMap = new Map<string, { email: string; name: string; nim: string; enrolledCourseCodes: string[]; registeredAt?: string }>();
+
+    courses.forEach((course) => {
+      (course.enrolledStudentEmails || []).forEach((email) => {
+        const clean = email.toLowerCase().trim();
+        const info = getStudentRosterInfo(clean);
+
+        if (!studentsMap.has(clean)) {
+          studentsMap.set(clean, {
+            email: clean,
+            name: info.name,
+            nim: info.nim,
+            enrolledCourseCodes: [course.code],
+          });
+        } else {
+          const item = studentsMap.get(clean)!;
+          if (!item.enrolledCourseCodes.includes(course.code)) {
+            item.enrolledCourseCodes.push(course.code);
+          }
+        }
+      });
+    });
+
+    return Array.from(studentsMap.values());
+  },
+
   // Meetings
   getMeetings(courseId?: string): Meeting[] {
     let meetings = getStorage<Meeting[]>(STORAGE_KEYS.MEETINGS, initialMeetings);
