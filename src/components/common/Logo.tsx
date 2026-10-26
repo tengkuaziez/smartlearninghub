@@ -46,11 +46,11 @@ export const Logo: React.FC<LogoProps> = ({
       </div>
 
       {showText && (
-        <div className="flex flex-col leading-none">
-          <span className={textClassName}>
+        <div className="flex flex-col leading-tight min-w-0">
+          <span className={`${textClassName} whitespace-nowrap`}>
             Smart Learning Hub
           </span>
-          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+          <span className="hidden sm:block text-[11px] font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">
             Portal Mahasiswa
           </span>
         </div>

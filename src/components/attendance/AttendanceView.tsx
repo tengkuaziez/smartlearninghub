@@ -101,39 +101,39 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       )}
 
       {/* Overall Attendance Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs text-center">
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Tingkat Kehadiran Total</span>
-          <p className="text-3xl font-extrabold text-blue-600 dark:text-blue-400 mt-1">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+        <div className="p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs text-center flex flex-col justify-center">
+          <span className="text-[11px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 truncate">Tingkat Kehadiran Total</span>
+          <p className="text-2xl sm:text-3xl font-extrabold text-blue-600 dark:text-blue-400 my-0.5 sm:mt-1">
             {overallStats.percentage}%
           </p>
-          <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+          <span className="text-[10px] sm:text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
             {overallStats.statusLabel}
           </span>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs text-center">
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Hadir Tepat Waktu</span>
-          <p className="text-3xl font-extrabold text-emerald-600 mt-1">
+        <div className="p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs text-center flex flex-col justify-center">
+          <span className="text-[11px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 truncate">Hadir Tepat Waktu</span>
+          <p className="text-2xl sm:text-3xl font-extrabold text-emerald-600 my-0.5 sm:mt-1">
             {overallStats.hadir}
           </p>
-          <span className="text-[11px] text-slate-400">pertemuan</span>
+          <span className="text-[10px] sm:text-[11px] text-slate-400">pertemuan</span>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs text-center">
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Izin / Sakit Terverifikasi</span>
-          <p className="text-3xl font-extrabold text-amber-600 mt-1">
+        <div className="p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs text-center flex flex-col justify-center">
+          <span className="text-[11px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 truncate">Izin / Sakit</span>
+          <p className="text-2xl sm:text-3xl font-extrabold text-amber-600 my-0.5 sm:mt-1">
             {overallStats.izin + overallStats.sakit}
           </p>
-          <span className="text-[11px] text-slate-400">pertemuan</span>
+          <span className="text-[10px] sm:text-[11px] text-slate-400">pertemuan</span>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs text-center">
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Alpa (Tanpa Keterangan)</span>
-          <p className="text-3xl font-extrabold text-rose-600 mt-1">
+        <div className="p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs text-center flex flex-col justify-center">
+          <span className="text-[11px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 truncate">Alpa</span>
+          <p className="text-2xl sm:text-3xl font-extrabold text-rose-600 my-0.5 sm:mt-1">
             {overallStats.alpa}
           </p>
-          <span className="text-[11px] text-slate-400">pertemuan</span>
+          <span className="text-[10px] sm:text-[11px] text-slate-400">pertemuan</span>
         </div>
       </div>
 

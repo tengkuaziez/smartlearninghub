@@ -17,7 +17,6 @@ export type LecturerNavTab =
   | 'beranda'
   | 'kelas'
   | 'koreksi'
-  | 'presensi'
   | 'pengumuman'
   | 'profil';
 
@@ -55,11 +54,6 @@ export const LecturerSidebar: React.FC<LecturerSidebarProps> = ({
       icon: FileCheck2,
       badge: pendingGradingCount > 0 ? `${pendingGradingCount}` : undefined,
       badgeColor: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
-    },
-    {
-      id: 'presensi' as LecturerNavTab,
-      label: 'Presensi QR Kelas',
-      icon: QrCode,
     },
     {
       id: 'pengumuman' as LecturerNavTab,

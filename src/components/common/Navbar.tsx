@@ -54,17 +54,21 @@ export const Navbar: React.FC<NavbarProps> = ({
     <header className="sticky top-0 z-30 w-full h-16 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
       <div className="h-full px-4 sm:px-6 flex items-center justify-between gap-4">
         {/* Left: Mobile Menu Toggle & Brand (on mobile) */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button
             onClick={onToggleMobileMenu}
-            className="md:hidden p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="md:hidden p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 shrink-0"
             aria-label={isMobileMenuOpen ? 'Tutup menu' : 'Buka menu navigasi'}
           >
             {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
 
-          <div className="md:hidden">
-            <Logo size={28} showText={true} textClassName="text-sm font-bold text-slate-900 dark:text-white" />
+          <div className="md:hidden flex items-center min-w-0">
+            <Logo 
+              size={28} 
+              showText={true} 
+              textClassName="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate max-w-[120px] xs:max-w-[160px]" 
+            />
           </div>
 
           {/* Desktop Search Trigger Bar */}
@@ -84,12 +88,12 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Right Action Icons & Profile */}
-        <div className="flex items-center gap-1.5 sm:gap-3">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           {/* Google Drive & Backup Trigger Button */}
           {onOpenGoogleModal && (
             <button
               onClick={onOpenGoogleModal}
-              className="flex items-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-xl text-xs font-semibold transition-all shadow-xs border bg-slate-100 hover:bg-emerald-50 dark:bg-slate-800 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
+              className="flex items-center gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-xl text-xs font-semibold transition-all shadow-xs border bg-slate-100 hover:bg-emerald-50 dark:bg-slate-800 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
               title="Kelola Integrasi Google Drive & Pencadangan Google Spreadsheet"
             >
               <Cloud className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
@@ -100,12 +104,12 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Quick Role Switcher (Convenient for testing) */}
           <button
             onClick={onQuickToggleRole}
-            className="flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs border bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
+            className="flex items-center gap-1 px-1.5 py-1 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs border bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
             title="Klik untuk langsung berganti peran antara Dosen dan Mahasiswa"
           >
             <ArrowLeftRight className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
             <span
-              className={`px-1.5 py-0.5 rounded-md font-mono text-[10px] sm:text-xs ${
+              className={`px-1.5 py-0.5 rounded-md font-mono text-[10px] sm:text-xs font-bold ${
                 currentUser.role === 'dosen'
                   ? 'bg-indigo-600 text-white'
                   : 'bg-blue-600 text-white'
@@ -118,14 +122,14 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Theme Toggle */}
           <button
             onClick={onToggleTheme}
-            className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-1.5 sm:p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             aria-label={theme === 'dark' ? 'Ganti ke mode terang' : 'Ganti ke mode gelap'}
             title={theme === 'dark' ? 'Mode Terang' : 'Mode Gelap'}
           >
             {theme === 'dark' ? (
-              <Sun className="w-5 h-5 text-amber-400" />
+              <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
             ) : (
-              <Moon className="w-5 h-5 text-slate-600" />
+              <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600" />
             )}
           </button>
 
@@ -133,12 +137,12 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="relative">
             <button
               onClick={onOpenNotifications}
-              className="relative p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="relative p-1.5 sm:p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               aria-label={`Notifikasi (${unreadCount} belum dibaca)`}
             >
-              <Bell className="w-5 h-5" />
+              <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
               {unreadCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-blue-600 ring-2 ring-white dark:ring-slate-900 animate-pulse" />
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-blue-600 ring-2 ring-white dark:ring-slate-900 animate-pulse" />
               )}
             </button>
           </div>

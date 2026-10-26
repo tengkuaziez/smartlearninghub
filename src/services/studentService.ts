@@ -358,6 +358,113 @@ export const studentService = {
     };
   },
 
+  // Lecturer Action: Create New Course
+  createCourse(data: {
+    code: string;
+    title: string;
+    description: string;
+    room: string;
+    scheduleDay: string;
+    scheduleTime: string;
+    semester?: string;
+  }): CourseClass {
+    const courses = this.getAllCourses();
+    const currentLecturer = this.getCurrentUser();
+    const newCourseId = `course_${Date.now()}`;
+    const cleanCode = data.code.toUpperCase().trim();
+    const cleanTitle = data.title.trim();
+
+    const newCourse: CourseClass = {
+      id: newCourseId,
+      code: cleanCode,
+      title: cleanTitle,
+      description: data.description.trim() || `Mata kuliah ${cleanTitle} semester ini diampu oleh tim dosen.`,
+      teacher: {
+        id: currentLecturer.id,
+        name: currentLecturer.name,
+        title: currentLecturer.title || 'Dosen Pengampu',
+        email: currentLecturer.email,
+        avatarUrl: currentLecturer.avatarUrl,
+        department: currentLecturer.department || 'Teknik Informatika',
+      },
+      semester: data.semester || 'Semester 5',
+      academicYear: '2026/2027 Ganjil',
+      room: data.room || 'Lab Komputasi A-302',
+      scheduleTime: data.scheduleTime || '08:00 - 10:30 WIB',
+      scheduleDay: data.scheduleDay || 'Senin',
+      totalMeetings: 16,
+      completedMeetings: 0,
+      colorScheme: 'blue',
+      enrolledStudentEmails: ['altaf.aziz16@student.ac.id'],
+    };
+
+    // Auto generate 16 meetings for OBE matrix
+    const allMeetings = this.getMeetings();
+    const newMeetings: Meeting[] = Array.from({ length: 16 }, (_, i) => ({
+      id: `mtg_${newCourseId}_${i + 1}`,
+      courseId: newCourseId,
+      meetingNumber: i + 1,
+      title: `Pertemuan 0${i + 1}: ${i === 0 ? 'Kontrak Kuliah & Pengantar' : i === 7 ? 'Evaluasi Tengah Semester (UTS)' : i === 15 ? 'Presentasi Proyek Akhir (UAS)' : `Modul ${i + 1} Perkuliahan`}`,
+      topic: `Pembahasan materi dan studi kasus perkuliahan pertemuan ke-${i + 1}.`,
+      date: `2026-09-${String(Math.min(30, 1 + i * 7)).padStart(2, '0')}`,
+      startTime: data.scheduleTime?.split('-')[0]?.trim() || '08:00',
+      endTime: data.scheduleTime?.split('-')[1]?.trim() || '10:30',
+      room: data.room || 'Lab Komputasi A-302',
+      isCompleted: false,
+      materials: [],
+      assignments: [],
+    }));
+
+    setStorage(STORAGE_KEYS.COURSES, [...courses, newCourse]);
+    setStorage(STORAGE_KEYS.MEETINGS, [...allMeetings, ...newMeetings]);
+
+    this.addActivity({
+      title: 'Mata Kuliah Baru Dibuat',
+      description: `Dosen menambahkan kelas baru ${newCourse.code} - ${newCourse.title} (16 Pertemuan).`,
+      type: 'course',
+      courseTitle: newCourse.title,
+    });
+
+    return newCourse;
+  },
+
+  // Lecturer Action: Delete Course
+  deleteCourse(courseId: string): void {
+    const courses = this.getAllCourses().filter((c) => c.id !== courseId);
+    setStorage(STORAGE_KEYS.COURSES, courses);
+    const meetings = this.getMeetings().filter((m) => m.courseId !== courseId);
+    setStorage(STORAGE_KEYS.MEETINGS, meetings);
+  },
+
+  // Lecturer Action: Register Student with Details and enroll to course
+  registerStudentWithDetails(data: {
+    name: string;
+    nim: string;
+    email: string;
+    courseId: string;
+  }): { success: boolean; message: string } {
+    const cleanEmail = data.email.trim().toLowerCase();
+    const cleanName = data.name.trim();
+    const cleanNim = data.nim.trim();
+
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return { success: false, message: 'Format email tidak valid.' };
+    }
+    if (!cleanName) {
+      return { success: false, message: 'Nama mahasiswa wajib diisi.' };
+    }
+
+    const customRoster = getStorage<Record<string, { name: string; nim: string; email: string }>>('slh_custom_roster', {});
+    customRoster[cleanEmail] = {
+      name: cleanName,
+      nim: cleanNim || `22081010${Math.floor(100 + Math.random() * 900)}`,
+      email: cleanEmail,
+    };
+    setStorage('slh_custom_roster', customRoster);
+
+    return this.addStudentEmailToCourse(data.courseId, cleanEmail);
+  },
+
   // Lecturer Action: Remove Student Email from Course Roster
   removeStudentEmailFromCourse(courseId: string, studentEmailInput: string): {
     success: boolean;
@@ -399,7 +506,8 @@ export const studentService = {
     courses.forEach((course) => {
       (course.enrolledStudentEmails || []).forEach((email) => {
         const clean = email.toLowerCase().trim();
-        const info = getStudentRosterInfo(clean);
+        const customRoster = getStorage<Record<string, { name: string; nim: string; email: string }>>('slh_custom_roster', {});
+        const info = customRoster[clean] || getStudentRosterInfo(clean);
 
         if (!studentsMap.has(clean)) {
           studentsMap.set(clean, {

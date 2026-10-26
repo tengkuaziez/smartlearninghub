@@ -23,6 +23,7 @@ import { ProfileView } from './components/profile/ProfileView.tsx';
 
 // Lecturer views
 import { LecturerDashboardView } from './components/lecturer/LecturerDashboardView.tsx';
+import { LecturerClassManagementView } from './components/lecturer/LecturerClassManagementView.tsx';
 import { LecturerClassDetailView } from './components/lecturer/LecturerClassDetailView.tsx';
 import { LecturerQrBroadcastModal } from './components/lecturer/LecturerQrBroadcastModal.tsx';
 
@@ -214,7 +215,7 @@ export default function App() {
       } else if (tab === 'tugas' || tab === 'koreksi') {
         handleSelectLecturerTab('koreksi');
       } else if (tab === 'absensi' || tab === 'presensi') {
-        handleSelectLecturerTab('presensi');
+        handleSelectLecturerTab('kelas');
       } else if (tab === 'pengumuman') {
         handleSelectLecturerTab('pengumuman');
       } else {
@@ -371,40 +372,15 @@ export default function App() {
                       onDataUpdated={reloadData}
                     />
                   ) : (
-                    <div className="space-y-6">
-                      <div className="pb-2 border-b border-slate-200 dark:border-slate-800">
-                        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">
-                          Manajemen Mata Kuliah Tim Dosen
-                        </h1>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                          Pilih mata kuliah untuk mengelola whitelist email mahasiswa, materi, sesi presensi proyektor, dan tugas.
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                        {allLecturerCourses.map((c) => (
-                          <div
-                            key={c.id}
-                            onClick={() => handleOpenCourse(c.id)}
-                            className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-blue-500 cursor-pointer transition-all space-y-3"
-                          >
-                            <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-                              {c.code}
-                            </span>
-                            <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                              {c.title}
-                            </h3>
-                            <p className="text-xs text-slate-500 line-clamp-2">
-                              {c.description}
-                            </p>
-                            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
-                              <span>{c.enrolledStudentEmails?.length || 0} Mahasiswa Terdaftar</span>
-                              <span className="font-semibold text-blue-600">Buka Kelas &rarr;</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    <LecturerClassManagementView
+                      courses={allLecturerCourses}
+                      meetings={meetings}
+                      assignments={assignments}
+                      submissions={submissions}
+                      attendanceRecords={attendanceRecords}
+                      onOpenCourse={handleOpenCourse}
+                      onDataUpdated={reloadData}
+                    />
                   )}
                 </>
               )}
@@ -475,53 +451,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* Lecturer View 4: Presensi Proyektor */}
-              {lecturerTab === 'presensi' && (
-                <div className="space-y-6">
-                  <div className="pb-2 border-b border-slate-200 dark:border-slate-800">
-                    <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">
-                      Presensi QR di Kelas (Tampilan Proyektor)
-                    </h1>
-                    <p className="text-sm text-slate-500 mt-1">
-                      Pilih kelas yang sedang berlangsung untuk memproyeksikan kode QR presensi tatap muka.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {allLecturerCourses.map((crs) => {
-                      const sess = attendanceSessions.find((s) => s.courseId === crs.id);
-                      return (
-                        <div
-                          key={crs.id}
-                          className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3"
-                        >
-                          <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-                            {crs.code}
-                          </span>
-                          <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                            {crs.title}
-                          </h3>
-                          <p className="text-xs text-slate-500">
-                            {crs.scheduleDay}, {crs.scheduleTime} ({crs.room})
-                          </p>
-                          <button
-                            onClick={() => {
-                              const s = sess || studentService.toggleAttendanceSession(crs.id, true);
-                              reloadData();
-                              setBroadcastSession(s);
-                            }}
-                            className="w-full py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs flex items-center justify-center gap-2"
-                          >
-                            <span>Buka Proyektor QR</span>
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Lecturer View 5: Pengumuman */}
+              {/* Lecturer View 4: Pengumuman */}
               {lecturerTab === 'pengumuman' && (
                 <AnnouncementsView
                   announcements={announcements}
