@@ -21,6 +21,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { studentService, getInitialsAvatar } from '../../services/studentService.ts';
+import { myJourneySyncService } from '../../services/myJourneySyncService.ts';
 import type { MasterStudent, CourseClass } from '../../types/index.ts';
 
 interface LecturerStudentManagementViewProps {
@@ -126,6 +127,11 @@ export const LecturerStudentManagementView: React.FC<LecturerStudentManagementVi
         enrolledCourseCodes: formSelectedCourses,
       });
 
+      // Otomatis sinkronkan data mahasiswa terbaru ke Cloud
+      try {
+        myJourneySyncService.triggerDebouncedAutoSync();
+      } catch {}
+
       setIsStudentModalOpen(false);
       onDataUpdated();
       setNotification(`Mahasiswa "${formName}" berhasil disimpan ke database.`);
@@ -138,16 +144,19 @@ export const LecturerStudentManagementView: React.FC<LecturerStudentManagementVi
   const handleDeleteStudent = (id: string, name: string) => {
     if (window.confirm(`Yakin ingin menghapus data mahasiswa "${name}" dari basis data?`)) {
       studentService.deleteMasterStudent(id);
+      try {
+        myJourneySyncService.triggerDebouncedAutoSync();
+      } catch {}
       onDataUpdated();
       setNotification(`Mahasiswa "${name}" telah dihapus.`);
       setTimeout(() => setNotification(null), 3000);
     }
   };
 
-  const handleSyncMyJourney = () => {
+  const handleSyncMyJourney = async () => {
     setIsSyncing(true);
     try {
-      const res = studentService.syncStudentsFromMyJourney();
+      const res = await studentService.syncAllFromMyJourneyCloud();
       onDataUpdated();
       setNotification(res.message);
       setTimeout(() => setNotification(null), 5000);

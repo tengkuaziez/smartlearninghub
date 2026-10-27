@@ -438,6 +438,25 @@ export const studentService = {
     const registeredUsers = this.getRegisteredUsers().filter((u) => u.role === 'mahasiswa');
     const courses = this.getAllCourses();
 
+    // Pastikan mahasiswa yang sudah terdaftar akun otomatis muncul di database dosen (tidak ada celah data hilang)
+    registeredUsers.forEach((reg) => {
+      const exists = students.find((s) => s.email.toLowerCase() === reg.email.toLowerCase());
+      if (!exists) {
+        students.push({
+          id: reg.id,
+          name: reg.name,
+          nim: reg.nim || '10123000',
+          email: reg.email,
+          major: reg.department || 'Pendidikan Geografi',
+          classSection: 'Kelas A',
+          enrolledCourseCodes: [],
+          avatarUrl: reg.avatarUrl || getInitialsAvatar(reg.name, false),
+          isRegistered: true,
+          registeredAt: reg.registeredAt || new Date().toISOString(),
+        });
+      }
+    });
+
     if (students.length === 0) {
       return [];
     }
@@ -462,7 +481,7 @@ export const studentService = {
   saveMasterStudent(student: MasterStudent): MasterStudent {
     const list = getStorage<MasterStudent[]>(STORAGE_KEYS.MASTER_STUDENTS, []);
     const cleanEmail = student.email.trim().toLowerCase();
-    const idx = list.findIndex((s) => s.email.trim().toLowerCase() === cleanEmail || s.id === student.id);
+    const idx = list.findIndex((s) => s.email.trim().toLowerCase() === cleanEmail || (student.id && s.id === student.id));
 
     const updated: MasterStudent = {
       ...student,
@@ -470,7 +489,7 @@ export const studentService = {
       email: cleanEmail,
       name: student.name.trim(),
       nim: student.nim.trim(),
-      major: student.major || 'Informatika',
+      major: student.major || 'Pendidikan Geografi',
       classSection: student.classSection || 'Kelas A',
       enrolledCourseCodes: student.enrolledCourseCodes || [],
       avatarUrl: student.avatarUrl || getInitialsAvatar(student.name, false),
@@ -482,6 +501,15 @@ export const studentService = {
       list.push(updated);
     }
     setStorage(STORAGE_KEYS.MASTER_STUDENTS, list);
+
+    // Simpan juga ke custom roster agar dapat diakses oleh query kehadiran & nilai
+    const custom = getStorage<Record<string, any>>(STORAGE_KEYS.CUSTOM_ROSTER, {});
+    custom[cleanEmail] = {
+      name: updated.name,
+      nim: updated.nim,
+      email: cleanEmail,
+    };
+    setStorage(STORAGE_KEYS.CUSTOM_ROSTER, custom);
 
     // Sync student to courses
     if (updated.enrolledCourseCodes && updated.enrolledCourseCodes.length > 0) {
@@ -603,6 +631,22 @@ export const studentService = {
     // 3. Check in Custom Roster
     const custom = getStorage<Record<string, any>>(STORAGE_KEYS.CUSTOM_ROSTER, {});
     if (custom[clean]) return true;
+
+    // 4. Check in Registered Users
+    const registered = this.getRegisteredUsers();
+    if (registered.some((u) => u.email.toLowerCase() === clean)) {
+      return true;
+    }
+
+    // 5. Otorisasi domain email akademik / kampus (*.unimed.ac.id, @mhs.*, @student.*, *.ac.id, *.edu)
+    if (
+      clean.includes('@mhs.') ||
+      clean.includes('@student.') ||
+      clean.endsWith('.ac.id') ||
+      clean.endsWith('.edu')
+    ) {
+      return true;
+    }
 
     return false;
   },
@@ -1069,6 +1113,21 @@ export const studentService = {
         masterRecord.isRegistered = true;
         masterRecord.registeredAt = new Date().toISOString();
         this.saveMasterStudent(masterRecord);
+      } else {
+        // Otomatis daftarkan ke database mahasiswa master dosen agar selalu muncul di data dosen
+        const newMaster: MasterStudent = {
+          id: `mstd_${Date.now()}`,
+          name: cleanName,
+          email: normalized,
+          nim: studentNim || data.nim?.trim() || '10123000',
+          major: studentMajor || 'Pendidikan Geografi',
+          classSection: 'Kelas A',
+          enrolledCourseCodes: [],
+          avatarUrl,
+          isRegistered: true,
+          registeredAt: new Date().toISOString(),
+        };
+        this.saveMasterStudent(newMaster);
       }
     }
 

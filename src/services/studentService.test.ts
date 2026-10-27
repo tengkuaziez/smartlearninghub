@@ -182,3 +182,21 @@ test('Courses: syncCoursesFromSupabase method exists and returns a promise resul
   assert.equal(typeof res.success, 'boolean');
   assert.equal(typeof res.count, 'number');
 });
+
+test('Whitelist & Auto-Provision: aziz.student@mhs.unimed.ac.id registers and appears in master students', () => {
+  const res = studentService.register({
+    name: 'Aziz',
+    email: 'aziz.student@mhs.unimed.ac.id',
+    nim: '1234567',
+    password: 'securePass123',
+  });
+  assert.equal(res.success, true);
+  assert.equal(res.user?.email, 'aziz.student@mhs.unimed.ac.id');
+  assert.equal(res.user?.nim, '1234567');
+
+  const masterList = studentService.getMasterStudents();
+  const found = masterList.find((s) => s.email.toLowerCase() === 'aziz.student@mhs.unimed.ac.id');
+  assert.ok(found);
+  assert.equal(found?.name, 'Aziz');
+  assert.equal(found?.nim, '1234567');
+});
