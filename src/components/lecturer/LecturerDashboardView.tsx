@@ -14,6 +14,7 @@ import {
   Cloud,
   FileSpreadsheet
 } from 'lucide-react';
+import { MiniCalendarWidget } from '../common/MiniCalendarWidget.tsx';
 import type { 
   AuthUser, 
   CourseClass, 
@@ -58,55 +59,39 @@ export const LecturerDashboardView: React.FC<LecturerDashboardViewProps> = ({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      {/* Welcome Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 p-6 sm:p-8 text-white shadow-lg border border-slate-800">
-        <div className="relative z-10 max-w-2xl space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-200 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
-            <span>Portal Manajemen Tim Dosen</span>
-          </div>
+      {/* Top Section: Welcome Banner & Mini Calendar with Realtime Date/Clock */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div className="lg:col-span-7 xl:col-span-8 flex flex-col justify-between">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 p-6 sm:p-8 text-white shadow-lg border border-slate-800 h-full flex flex-col justify-center">
+            <div className="relative z-10 max-w-xl space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-200 text-xs font-semibold">
+                <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
+                <span>Portal Manajemen Tim Dosen</span>
+              </div>
 
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            Selamat Datang, {user.name}!
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-            Platform ini digunakan bersama oleh tim dua dosen pengampu untuk mengelola materi, daftar email mahasiswa, presensi QR kelas, dan penilaian tugas terpadu.
-          </p>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                Selamat Datang, {user.name}!
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                Platform ini digunakan bersama oleh tim dua dosen pengampu untuk mengelola materi, daftar email mahasiswa, dan penilaian tugas terpadu.
+              </p>
 
-          <div className="pt-2 flex flex-wrap gap-2.5 sm:gap-3">
-            {courses.length > 0 && (
-              <button
-                onClick={() => onOpenCourse(courses[0].id)}
-                className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-sm transition-all"
-              >
-                Kelola Mahasiswa Kelas &rarr;
-              </button>
-            )}
+              <div className="pt-1 flex items-center gap-2 text-xs text-indigo-200 font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                <span>Presensi QR dibuka secara terikat langsung di tiap sesi pertemuan kelas.</span>
+              </div>
+            </div>
 
-            {activeSession && (
-              <button
-                onClick={() => onOpenQrBroadcast(activeSession)}
-                className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm flex items-center gap-2 animate-pulse"
-              >
-                <QrCode className="w-4 h-4" />
-                <span>Buka Proyektor Sesi #{activeSession.meetingNumber} (LIVE)</span>
-              </button>
-            )}
-
-            {onOpenGoogleModal && (
-              <button
-                onClick={onOpenGoogleModal}
-                className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-400/30 flex items-center gap-2 transition-all"
-                title="Integrasi Google Drive & Backup Spreadsheet"
-              >
-                <Cloud className="w-4 h-4 text-emerald-300" />
-                <span>Drive & Backup Sheets</span>
-              </button>
-            )}
+            <div className="absolute -right-8 -bottom-12 w-64 h-64 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
           </div>
         </div>
 
-        <div className="absolute -right-8 -bottom-12 w-64 h-64 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
+        <div className="lg:col-span-5 xl:col-span-4">
+          <MiniCalendarWidget 
+            courses={courses} 
+            onOpenCourse={onOpenCourse} 
+          />
+        </div>
       </div>
 
       {/* Summary Cards */}

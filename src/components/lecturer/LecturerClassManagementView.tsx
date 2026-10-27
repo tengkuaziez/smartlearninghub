@@ -22,7 +22,6 @@ import {
   Mail,
   ShieldCheck,
   ChevronRight,
-  Flame,
   X
 } from 'lucide-react';
 import { studentService } from '../../services/studentService.ts';
@@ -183,14 +182,10 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
     }
   };
 
-  // Realtime date & time string
-  const todayStr = 'Senin, 26 Oktober 2026';
-  const timeStr = '17:15 WIB';
-
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* 1. Header (Modeled directly after My Journey) */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+      <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
             Teaching
@@ -198,22 +193,6 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
             Administrasi perkuliahan, RPS & materi.
           </p>
-        </div>
-
-        {/* Top Right Status Badges */}
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 dark:bg-amber-950/50 border border-amber-200/80 dark:border-amber-800/60 text-amber-800 dark:text-amber-300 font-semibold shadow-xs">
-            <Flame className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 fill-amber-500" />
-            <span>OBE Matrix 2026</span>
-          </div>
-
-          <div className="px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-medium shadow-xs">
-            {todayStr}
-          </div>
-
-          <div className="px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/50 border border-blue-200/80 dark:border-blue-800/60 text-blue-700 dark:text-blue-300 font-mono font-bold shadow-xs">
-            {timeStr}
-          </div>
         </div>
       </div>
 
