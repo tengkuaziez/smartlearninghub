@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Mail, 
@@ -10,17 +10,19 @@ import {
   AlertCircle, 
   Sparkles,
   KeyRound,
-  RotateCcw,
-  GraduationCap
+  GraduationCap,
+  Award
 } from 'lucide-react';
 import { Logo } from '../common/Logo.tsx';
-import { studentService } from '../../services/studentService.ts';
-import type { AuthUser } from '../../types/index.ts';
+import { studentService, type RegisteredUser } from '../../services/studentService.ts';
+import { LECTURER_WHITELIST_EMAILS } from '../../data/mockData.ts';
+import type { AuthUser, UserRole } from '../../types/index.ts';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLoginSuccess: (user: AuthUser) => void;
+  initialMode?: 'login' | 'register' | 'forgot_password';
 }
 
 type AuthMode = 'login' | 'register' | 'forgot_password';
@@ -29,19 +31,48 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
   onClose,
   onLoginSuccess,
+  initialMode = 'login',
 }) => {
-  const [mode, setMode] = useState<AuthMode>('login');
+  const [mode, setMode] = useState<AuthMode>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
+  const [role, setRole] = useState<UserRole>('dosen');
   const [nim, setNim] = useState('');
+  const [nidn, setNidn] = useState('');
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [savedUsers, setSavedUsers] = useState<RegisteredUser[]>([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSavedUsers(studentService.getRegisteredUsers());
+      setMode(initialMode);
+      setError(null);
+      setSuccess(null);
+    }
+  }, [isOpen, initialMode]);
+
+  // Auto-detect lecturer whitelist
+  useEffect(() => {
+    const clean = email.toLowerCase().trim();
+    if (LECTURER_WHITELIST_EMAILS.map((e) => e.toLowerCase()).includes(clean)) {
+      setRole('dosen');
+      if (!name) {
+        setName(clean.includes('miftah') ? 'Miftahur Ridlo, M.Kom.' : 'Tengku Abdillah Aziz, S.Pd.');
+      }
+      if (!nidn) {
+        setNidn(clean.includes('miftah') ? '0412088501' : '0419058902');
+      }
+    }
+  }, [email, name, nidn]);
 
   if (!isOpen) return null;
+
+  const isLecturerEmail = LECTURER_WHITELIST_EMAILS.map((e) => e.toLowerCase()).includes(email.toLowerCase().trim());
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,11 +88,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setTimeout(() => {
           onLoginSuccess(res.user!);
           onClose();
-        }, 800);
+        }, 600);
       } else {
         setError(res.message);
       }
-    }, 500);
+    }, 400);
   };
 
   const handleRegister = (e: React.FormEvent) => {
@@ -69,7 +100,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setError(null);
     setSuccess(null);
 
-    if (password !== confirmPassword) {
+    if (password && confirmPassword && password !== confirmPassword) {
       setError('Konfirmasi kata sandi tidak cocok.');
       return;
     }
@@ -81,7 +112,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const res = studentService.register({
         name,
         email,
-        nim,
+        role,
+        nim: role === 'mahasiswa' ? nim : undefined,
+        nidn: role === 'dosen' ? nidn : undefined,
         password,
       });
 
@@ -90,11 +123,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setTimeout(() => {
           onLoginSuccess(res.user!);
           onClose();
-        }, 1200);
+        }, 900);
       } else {
         setError(res.message);
       }
-    }, 600);
+    }, 500);
   };
 
   const handleForgotPassword = (e: React.FormEvent) => {
@@ -111,28 +144,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       } else {
         setError(res.message);
       }
-    }, 500);
+    }, 400);
   };
 
-  const handleQuickLogin = (targetEmail: string) => {
-    setEmail(targetEmail);
-    const res = studentService.login(targetEmail);
-    if (res.success && res.user) {
-      onLoginSuccess(res.user);
-      onClose();
-    }
+  const handleDirectSelectUser = (u: RegisteredUser) => {
+    studentService.setCurrentUser(u);
+    onLoginSuccess(u);
+    onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md">
       <div
-        className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+        className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col"
         role="dialog"
         aria-modal="true"
         aria-labelledby="auth-title"
       >
         {/* Header */}
-        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
           <Logo size={28} showText={true} textClassName="text-sm font-bold text-slate-900 dark:text-white" />
           <button
             onClick={onClose}
@@ -143,8 +173,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </button>
         </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-5">
+        {/* Content Body (Scrollable) */}
+        <div className="p-6 space-y-5 overflow-y-auto">
           {/* Tabs */}
           <div className="flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 text-xs font-semibold">
             <button
@@ -156,7 +186,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               className={`flex-1 py-2 rounded-lg transition-all ${
                 mode === 'login'
                   ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-bold'
-                  : 'text-slate-500 hover:text-slate-900'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'
               }`}
             >
               Masuk
@@ -170,10 +200,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               className={`flex-1 py-2 rounded-lg transition-all ${
                 mode === 'register'
                   ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-bold'
-                  : 'text-slate-500 hover:text-slate-900'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'
               }`}
             >
-              Daftar Akun
+              Daftar Akun Baru
             </button>
             <button
               onClick={() => {
@@ -184,7 +214,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               className={`flex-1 py-2 rounded-lg transition-all ${
                 mode === 'forgot_password'
                   ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-bold'
-                  : 'text-slate-500 hover:text-slate-900'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'
               }`}
             >
               Lupa Password
@@ -196,7 +226,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Email Terdaftar (Mahasiswa / Dosen)
+                  Email Akun
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -204,7 +234,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="email@student.ac.id atau email dosen"
+                    placeholder="nama@email.com"
                     className="w-full pl-9 pr-3 py-2.5 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500"
                     required
                   />
@@ -235,7 +265,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     className="w-full pl-9 pr-3 py-2.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-                    required
                   />
                 </div>
               </div>
@@ -268,74 +297,131 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {/* REGISTER FORM */}
           {mode === 'register' && (
             <form onSubmit={handleRegister} className="space-y-3">
-              <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 text-[11px] text-blue-900 dark:text-blue-200 space-y-0.5">
-                <p className="font-bold">Ketentuan Registrasi Mahasiswa:</p>
-                <p>Email wajib merupakan email yang sudah didaftarkan oleh Tim Dosen di kelas. Mahasiswa bebas menentukan kata sandi sendiri.</p>
-              </div>
+              {/* Role Indicator Banner */}
+              {isLecturerEmail ? (
+                <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-900 dark:text-indigo-200 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                  <span>Terdeteksi sebagai <strong>Akun Dosen Pengampu</strong> (Tersambung My Journey).</span>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Pilih Peran Akun
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setRole('dosen')}
+                      className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                        role === 'dosen'
+                          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 shadow-xs'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <Award className="w-4 h-4" />
+                      <span>Dosen Pengampu</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRole('mahasiswa')}
+                      className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                        role === 'mahasiswa'
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 shadow-xs'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <GraduationCap className="w-4 h-4" />
+                      <span>Mahasiswa</span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Nama Lengkap
                 </label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Nama Lengkap Mahasiswa"
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
-                  required
-                />
+                <div className="relative">
+                  <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Contoh: Miftahur Ridlo, M.Kom."
+                    className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                    required
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  NIM
+                  Email Akun
                 </label>
-                <input
-                  type="text"
-                  value={nim}
-                  onChange={(e) => setNim(e.target.value)}
-                  placeholder="Nomor Induk Mahasiswa"
-                  className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
-                  required
-                />
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="miftahurridlo.688@gmail.com atau email mahasiswa"
+                    className="w-full pl-9 pr-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                    required
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Email yang Didaftarkan Dosen
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="email@student.ac.id"
-                  className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
-                  required
-                />
-              </div>
+              {role === 'dosen' ? (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    NIDN Dosen (Opsional)
+                  </label>
+                  <input
+                    type="text"
+                    value={nidn}
+                    onChange={(e) => setNidn(e.target.value)}
+                    placeholder="Nomor Induk Dosen Nasional (misal 0412088501)"
+                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    NIM Mahasiswa
+                  </label>
+                  <input
+                    type="text"
+                    value={nim}
+                    onChange={(e) => setNim(e.target.value)}
+                    placeholder="Nomor Induk Mahasiswa"
+                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Password Baru
+                    Kata Sandi
                   </label>
                   <input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
                     required
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Ulangi Password
+                    Ulangi Sandi
                   </label>
                   <input
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
                     required
                   />
@@ -361,7 +447,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 disabled={isLoading}
                 className="w-full py-2.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm flex items-center justify-center gap-2"
               >
-                {isLoading ? 'Mengecek Whitelist Email...' : 'Daftar Akun Mahasiswa'}
+                {isLoading ? 'Mendaftarkan Akun...' : 'Daftarkan Akun Sekarang'}
               </button>
             </form>
           )}
@@ -389,7 +475,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="nama@student.ac.id"
+                  placeholder="nama@email.com"
                   className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
                   required
                 />
@@ -419,37 +505,39 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </form>
           )}
 
-          {/* Local Testing Quick Switcher Pills */}
-          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-              Akses Cepat Pengujian Lokal:
-            </span>
-            <div className="flex flex-col gap-1.5">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('miftahurridlo.688@gmail.com')}
-                className="w-full p-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-900 dark:text-indigo-200 text-left text-xs font-semibold flex items-center justify-between border border-indigo-200 dark:border-indigo-800 transition-colors"
-              >
-                <span>Masuk sebagai <strong>Dosen Utama</strong> (Miftahur Ridlo, M.Kom.)</span>
-                <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded-md font-mono">Dosen</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('altaf.aziz16@gmail.com')}
-                className="w-full p-2.5 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 text-purple-900 dark:text-purple-200 text-left text-xs font-semibold flex items-center justify-between border border-purple-200 dark:border-purple-800 transition-colors"
-              >
-                <span>Masuk sebagai <strong>Dosen Partner</strong> (Tengku Abdillah Aziz, S.Pd.)</span>
-                <span className="text-[10px] bg-purple-600 text-white px-2 py-0.5 rounded-md font-mono">Dosen</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('rafi.alamsyah@student.ac.id')}
-                className="w-full p-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-900 dark:text-blue-200 text-left text-xs font-semibold flex items-center justify-between border border-blue-200 dark:border-blue-800 transition-colors"
-              >
-                <span>Masuk sebagai <strong>Mahasiswa</strong> (Rafi Alamsyah - Kelas GEO-301)</span>
-                <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-md font-mono">Mahasiswa</span>
-              </button>
+          {/* Registered Users on This Device (Only if any exist) */}
+          {savedUsers.length > 0 && (
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                Akun Terdaftar di Perangkat Ini:
+              </span>
+              <div className="flex flex-col gap-1.5">
+                {savedUsers.map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => handleDirectSelectUser(u)}
+                    className="w-full p-2.5 rounded-xl bg-slate-50 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-left text-xs font-semibold flex items-center justify-between border border-slate-200 dark:border-slate-700 transition-colors"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <p className="text-slate-900 dark:text-white truncate">{u.name}</p>
+                      <p className="text-[10px] text-slate-400 font-mono truncate">{u.email}</p>
+                    </div>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-md font-mono shrink-0 ${
+                      u.role === 'dosen' ? 'bg-indigo-600 text-white' : 'bg-blue-600 text-white'
+                    }`}>
+                      {u.role === 'dosen' ? 'Dosen' : 'Mhs'}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
+          )}
+
+          {/* Lecturer Quick Guide Notice */}
+          <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 space-y-1">
+            <p className="font-bold text-slate-700 dark:text-slate-300">Akun Resmi Tim Dosen Pengampu:</p>
+            <p>Daftarkan akun dengan email <strong>miftahurridlo.688@gmail.com</strong> atau <strong>altaf.aziz16@gmail.com</strong> untuk otomatis mengaktifkan hak akses Dosen Pengampu & sinkronisasi My Journey.</p>
           </div>
         </div>
       </div>

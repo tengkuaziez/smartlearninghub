@@ -8,7 +8,8 @@ import {
   UserCheck, 
   ChevronRight,
   ShieldCheck,
-  GraduationCap
+  GraduationCap,
+  LogOut
 } from 'lucide-react';
 import { Logo } from '../common/Logo.tsx';
 import type { AuthUser } from '../../types/index.ts';
@@ -27,6 +28,7 @@ interface LecturerSidebarProps {
   onCloseMobile: () => void;
   user: AuthUser;
   pendingGradingCount: number;
+  onLogout?: () => void;
 }
 
 export const LecturerSidebar: React.FC<LecturerSidebarProps> = ({
@@ -36,6 +38,7 @@ export const LecturerSidebar: React.FC<LecturerSidebarProps> = ({
   onCloseMobile,
   user,
   pendingGradingCount,
+  onLogout,
 }) => {
   const navItems = [
     {
@@ -146,14 +149,23 @@ export const LecturerSidebar: React.FC<LecturerSidebarProps> = ({
       </nav>
 
       {/* Footer Info */}
-      <div className="p-4 mx-3 mb-4 rounded-xl bg-slate-800/40 border border-slate-800 text-xs text-slate-400 space-y-1">
+      <div className="p-4 mx-3 mb-4 rounded-xl bg-slate-800/40 border border-slate-800 text-xs text-slate-400 space-y-2">
         <div className="flex items-center gap-1.5 text-slate-300 font-semibold">
           <GraduationCap className="w-3.5 h-3.5 text-blue-400" />
           <span>Sistem Kelas Mandiri</span>
         </div>
         <p className="text-[11px] text-slate-400 leading-relaxed">
-          Semua matkul dikelola langsung oleh tim kami berdua. Tidak ada pendaftaran mandiri oleh mahasiswa tanpa whitelist.
+          Semua matkul dikelola langsung oleh tim kami berdua. Tersinkronisasi dengan profil My Journey.
         </p>
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="w-full mt-2 pt-2 border-t border-slate-700/60 text-xs font-semibold text-rose-400 hover:text-rose-300 hover:underline flex items-center justify-center gap-1.5 transition-colors"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Keluar (Logout)</span>
+          </button>
+        )}
       </div>
     </div>
   );

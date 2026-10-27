@@ -1,4 +1,14 @@
 import React, { useState, useEffect, useTransition } from 'react';
+import { 
+  Sparkles, 
+  Award, 
+  GraduationCap, 
+  ArrowRight, 
+  CheckCircle2, 
+  BookOpen, 
+  Users, 
+  Layers 
+} from 'lucide-react';
 import { Navbar } from './components/common/Navbar.tsx';
 import { Sidebar, type NavTab } from './components/common/Sidebar.tsx';
 import { LecturerSidebar, type LecturerNavTab } from './components/lecturer/LecturerSidebar.tsx';
@@ -53,8 +63,9 @@ import type {
 export default function App() {
   const [, startTransition] = useTransition();
 
-  // Current logged in user (determines Dosen vs Mahasiswa portal)
-  const [currentUser, setCurrentUser] = useState<AuthUser>(() => studentService.getCurrentUser());
+  // Current logged in user (determines Dosen vs Mahasiswa portal, or null if guest)
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => studentService.getCurrentUser());
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
   // Navigation Tabs
   const [studentTab, setStudentTab] = useState<NavTab>('beranda');
@@ -83,7 +94,7 @@ export default function App() {
 
   // Data state loaded from service
   const [profile, setProfile] = useState<StudentProfile>(() => studentService.getProfile());
-  const [courses, setCourses] = useState<CourseClass[]>(() => studentService.getEnrolledCourses(currentUser.email));
+  const [courses, setCourses] = useState<CourseClass[]>(() => currentUser ? studentService.getEnrolledCourses(currentUser.email) : []);
   const [allLecturerCourses, setAllLecturerCourses] = useState<CourseClass[]>(() => studentService.getAllCourses());
   const [meetings, setMeetings] = useState<Meeting[]>(() => studentService.getMeetings());
   const [assignments, setAssignments] = useState<Assignment[]>(() => studentService.getAssignments());
@@ -97,7 +108,11 @@ export default function App() {
 
   // Reload data helper
   const reloadData = () => {
-    setCourses(studentService.getEnrolledCourses(currentUser.email));
+    if (currentUser) {
+      setCourses(studentService.getEnrolledCourses(currentUser.email));
+    } else {
+      setCourses([]);
+    }
     setAllLecturerCourses(studentService.getAllCourses());
     setMeetings(studentService.getMeetings());
     setAssignments(studentService.getAssignments());
@@ -135,10 +150,10 @@ export default function App() {
 
   // Background Auto-sync Teaching ke Google Sheets & My Journey saat Dosen Aktif
   useEffect(() => {
-    if (currentUser.role === 'dosen') {
+    if (currentUser?.role === 'dosen') {
       myJourneySyncService.triggerDebouncedAutoSync();
     }
-  }, [currentUser.role]);
+  }, [currentUser?.role]);
 
   const handleToggleTheme = () => {
     setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
@@ -146,15 +161,18 @@ export default function App() {
 
   // Quick Role Toggle for local prototype testing as requested by user
   const handleQuickToggleRole = () => {
+    if (!currentUser) return;
     if (currentUser.role === 'dosen') {
-      studentService.setCurrentUser(defaultStudentUser);
-      setCurrentUser(defaultStudentUser);
+      const student = studentService.getRegisteredUsers().find((u) => u.role === 'mahasiswa') || defaultStudentUser;
+      studentService.setCurrentUser(student);
+      setCurrentUser(student);
       setSelectedCourseId(null);
       setSelectedMeetingId(null);
       setStudentTab('beranda');
     } else {
-      studentService.setCurrentUser(defaultLecturerUser);
-      setCurrentUser(defaultLecturerUser);
+      const lecturer = studentService.getRegisteredLecturers()[0] || defaultLecturerUser;
+      studentService.setCurrentUser(lecturer);
+      setCurrentUser(lecturer);
       setSelectedCourseId(null);
       setSelectedMeetingId(null);
       setLecturerTab('beranda');
@@ -171,6 +189,15 @@ export default function App() {
     } else {
       setStudentTab('beranda');
     }
+    reloadData();
+  };
+
+  const handleLogout = () => {
+    studentService.logout();
+    setCurrentUser(null);
+    setSelectedCourseId(null);
+    setSelectedMeetingId(null);
+    setActiveAssignmentId(null);
     reloadData();
   };
 
@@ -195,7 +222,7 @@ export default function App() {
     startTransition(() => {
       setSelectedCourseId(courseId);
       setSelectedMeetingId(null);
-      if (currentUser.role === 'dosen') {
+      if (currentUser?.role === 'dosen') {
         setLecturerTab('kelas');
       } else {
         setStudentTab('kelas');
@@ -217,7 +244,7 @@ export default function App() {
   };
 
   const handleGlobalNavigate = (tab: string, contextId?: string) => {
-    if (currentUser.role === 'dosen') {
+    if (currentUser?.role === 'dosen') {
       if (tab === 'kelas') {
         if (contextId) handleOpenCourse(contextId);
         else handleSelectLecturerTab('kelas');
@@ -286,42 +313,46 @@ export default function App() {
     ? allLecturerCourses.find((c) => c.id === activeAssignment.courseId)
     : undefined;
 
-  const activeAssignmentSubmission = activeAssignment
+  const activeAssignmentSubmission = activeAssignment && currentUser
     ? submissions.find((s) => s.assignmentId === activeAssignment.id && s.studentEmail?.toLowerCase() === currentUser.email.toLowerCase())
     : undefined;
 
   // Counts
-  const pendingTasksCount = assignments.filter((a) => {
+  const pendingTasksCount = currentUser ? assignments.filter((a) => {
     if (!courses.some((c) => c.id === a.courseId)) return false;
     const sub = submissions.find((s) => s.assignmentId === a.id && s.studentEmail?.toLowerCase() === currentUser.email.toLowerCase());
     return !sub || sub.status === 'terlambat' || sub.status === 'perlu_revisi';
-  }).length;
+  }).length : 0;
 
   const unreadAnnouncementsCount = announcements.filter((a) => !a.isRead).length;
   const pendingGradingCount = submissions.filter((s) => s.grade === undefined).length;
 
   return (
     <div className="min-h-screen flex bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans transition-colors">
-      {/* Dynamic Sidebar based on User Role */}
-      {currentUser.role === 'dosen' ? (
-        <LecturerSidebar
-          activeTab={lecturerTab}
-          onSelectTab={handleSelectLecturerTab}
-          isMobileOpen={isMobileMenuOpen}
-          onCloseMobile={() => setIsMobileMenuOpen(false)}
-          user={currentUser}
-          pendingGradingCount={pendingGradingCount}
-        />
-      ) : (
-        <Sidebar
-          activeTab={studentTab}
-          onSelectTab={handleSelectStudentTab}
-          isMobileOpen={isMobileMenuOpen}
-          onCloseMobile={() => setIsMobileMenuOpen(false)}
-          profile={profile}
-          pendingTasksCount={pendingTasksCount}
-          unreadAnnouncementsCount={unreadAnnouncementsCount}
-        />
+      {/* Dynamic Sidebar based on User Role (Only shown when logged in) */}
+      {currentUser && (
+        currentUser.role === 'dosen' ? (
+          <LecturerSidebar
+            activeTab={lecturerTab}
+            onSelectTab={handleSelectLecturerTab}
+            isMobileOpen={isMobileMenuOpen}
+            onCloseMobile={() => setIsMobileMenuOpen(false)}
+            user={currentUser}
+            pendingGradingCount={pendingGradingCount}
+            onLogout={handleLogout}
+          />
+        ) : (
+          <Sidebar
+            activeTab={studentTab}
+            onSelectTab={handleSelectStudentTab}
+            isMobileOpen={isMobileMenuOpen}
+            onCloseMobile={() => setIsMobileMenuOpen(false)}
+            profile={profile}
+            pendingTasksCount={pendingTasksCount}
+            unreadAnnouncementsCount={unreadAnnouncementsCount}
+            onLogout={handleLogout}
+          />
+        )
       )}
 
       {/* Main Content Container */}
@@ -337,17 +368,129 @@ export default function App() {
           onNavigate={(tab) => handleGlobalNavigate(tab)}
           isMobileMenuOpen={isMobileMenuOpen}
           onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
-          onOpenAuthModal={() => setIsAuthModalOpen(true)}
-          onQuickToggleRole={handleQuickToggleRole}
-          onOpenGoogleModal={() => setIsGoogleModalOpen(true)}
+          onOpenAuthModal={(m) => {
+            setAuthMode(m || 'login');
+            setIsAuthModalOpen(true);
+          }}
+          onQuickToggleRole={currentUser ? handleQuickToggleRole : undefined}
+          onOpenGoogleModal={currentUser?.role === 'dosen' ? () => setIsGoogleModalOpen(true) : undefined}
+          onLogout={handleLogout}
         />
 
         {/* Page Content Body */}
         <main className="flex-1 p-3 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           {/* ========================================================= */}
+          {/* 0. UNREGISTERED / GUEST LANDING VIEW */}
+          {/* ========================================================= */}
+          {!currentUser && (
+            <div className="py-6 sm:py-12 max-w-4xl mx-auto space-y-8 animate-in fade-in duration-200">
+              {/* Hero Banner */}
+              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 p-8 sm:p-12 text-white shadow-xl border border-slate-800 text-center sm:text-left">
+                <div className="relative z-10 max-w-2xl space-y-4">
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-200 text-xs font-semibold">
+                    <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
+                    <span>Smart Learning Hub — Portal Pembelajaran Mandiri</span>
+                  </div>
+                  <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight">
+                    Mulai Perkuliahan Bersama Tim Dosen
+                  </h1>
+                  <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+                    Sistem portal perkuliahan terpadu berbasis kurikulum OBE, presensi QR proyektor, dan modul pengajaran tersinkronisasi. Silakan daftar atau masuk untuk mulai mengelola kelas.
+                  </p>
+                  <div className="pt-2 flex flex-wrap items-center justify-center sm:justify-start gap-3">
+                    <button
+                      onClick={() => {
+                        setAuthMode('register');
+                        setIsAuthModalOpen(true);
+                      }}
+                      className="px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md transition-all flex items-center gap-2"
+                    >
+                      <span>Daftar Akun Baru</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAuthMode('login');
+                        setIsAuthModalOpen(true);
+                      }}
+                      className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm backdrop-blur-xs border border-white/20 transition-all"
+                    >
+                      Masuk ke Akun
+                    </button>
+                  </div>
+                </div>
+                <div className="absolute -right-10 -bottom-10 w-72 h-72 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
+              </div>
+
+              {/* 2 Role Options */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Lecturer Registration Card */}
+                <div className="p-6 sm:p-7 rounded-3xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-900/60 shadow-xs flex flex-col justify-between space-y-4">
+                  <div className="space-y-3">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
+                      <Award className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                        Daftar sebagai Dosen Pengampu
+                      </h3>
+                      <p className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold mt-0.5">
+                        Tersambung dengan Akun My Journey
+                      </p>
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                      Daftarkan akun Anda dengan email <strong>miftahurridlo.688@gmail.com</strong> atau <strong>altaf.aziz16@gmail.com</strong> untuk otomatis mengaktifkan peran Dosen Pengampu, pembuatan kelas mandiri, dan integrasi Google Sheets.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setAuthMode('register');
+                      setIsAuthModalOpen(true);
+                    }}
+                    className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2 shadow-xs transition-colors"
+                  >
+                    <span>Daftar Akun Dosen Pengampu</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Student Login/Register Card */}
+                <div className="p-6 sm:p-7 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between space-y-4">
+                  <div className="space-y-3">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
+                      <GraduationCap className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                        Akses Portal Mahasiswa
+                      </h3>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold mt-0.5">
+                        Ruang Kelas, Bahan Ajar & Tugas
+                      </p>
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                      Mahasiswa dapat mendaftarkan akun menggunakan NIM dan email kampus untuk mengakses materi RPS yang dibagikan dosen, presensi QR kelas, dan pengumpulan tugas.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setAuthMode('login');
+                      setIsAuthModalOpen(true);
+                    }}
+                    className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <span>Masuk / Daftar Mahasiswa</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
           {/* A. LECTURER PORTAL VIEWS */}
           {/* ========================================================= */}
-          {currentUser.role === 'dosen' && (
+          {currentUser && currentUser.role === 'dosen' && (
             <>
               {/* Lecturer View 1: Beranda Dosen */}
               {lecturerTab === 'beranda' && (
@@ -496,7 +639,7 @@ export default function App() {
           {/* ========================================================= */}
           {/* B. STUDENT PORTAL VIEWS */}
           {/* ========================================================= */}
-          {currentUser.role === 'mahasiswa' && (
+          {currentUser && currentUser.role === 'mahasiswa' && (
             <>
               {/* TAB 1: Beranda */}
               {studentTab === 'beranda' && (
@@ -668,7 +811,7 @@ export default function App() {
       {broadcastSession && (
         <LecturerQrBroadcastModal
           session={broadcastSession}
-          course={allLecturerCourses.find((c) => c.id === broadcastSession.courseId) || allLecturerCourses[0]}
+          course={allLecturerCourses.find((c) => c.id === broadcastSession.courseId) || allLecturerCourses[0] || ({ id: broadcastSession.courseId, code: 'KELAS', title: 'Perkuliahan', room: 'Ruang Kuliah', teacher: { name: 'Dosen' } } as any)}
           records={attendanceRecords}
           isOpen={true}
           onClose={() => setBroadcastSession(null)}
@@ -702,6 +845,7 @@ export default function App() {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         onLoginSuccess={handleLoginSuccess}
+        initialMode={authMode}
       />
 
       {/* Google Drive & Google Spreadsheet Integration Modal */}

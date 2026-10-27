@@ -17,7 +17,7 @@ import {
   Award,
 } from 'lucide-react';
 import { studentService } from '../../services/studentService.ts';
-import { mockLecturerUsers } from '../../data/mockData.ts';
+import { LECTURER_WHITELIST_EMAILS } from '../../data/mockData.ts';
 import { myJourneySyncService } from '../../services/myJourneySyncService.ts';
 import type { AuthUser, CourseClass } from '../../types/index.ts';
 
@@ -167,119 +167,156 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {mockLecturerUsers.map((lecturer) => {
-            const isActive = currentUser.email.toLowerCase() === lecturer.email.toLowerCase();
-            const isPrimary = lecturer.email === 'miftahurridlo.688@gmail.com';
+          {(() => {
+            const registered = studentService.getRegisteredLecturers();
+            const lecturerList: AuthUser[] = [
+              registered.find((l) => l.email.toLowerCase() === 'miftahurridlo.688@gmail.com') || {
+                id: 'dos_01',
+                name: currentUser.email.toLowerCase() === 'miftahurridlo.688@gmail.com' ? currentUser.name : 'Miftahur Ridlo, M.Kom.',
+                email: 'miftahurridlo.688@gmail.com',
+                role: 'dosen' as const,
+                nidn: '0412088501',
+                title: 'Dosen Pengampu Utama',
+                department: 'Sistem Informasi Geografis & Geomatika',
+                avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+                registeredAt: '2026-08-01',
+              },
+              registered.find((l) => l.email.toLowerCase() === 'altaf.aziz16@gmail.com') || {
+                id: 'dos_02',
+                name: currentUser.email.toLowerCase() === 'altaf.aziz16@gmail.com' ? currentUser.name : 'Tengku Abdillah Aziz, S.Pd.',
+                email: 'altaf.aziz16@gmail.com',
+                role: 'dosen' as const,
+                nidn: '0419058902',
+                title: 'Dosen Pengampu Partner',
+                department: 'Rekayasa Perangkat Lunak & Geoinformatika',
+                avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
+                registeredAt: '2026-08-01',
+              },
+            ];
 
-            return (
-              <div
-                key={lecturer.id}
-                className={`p-6 rounded-3xl bg-white dark:bg-slate-900 border transition-all ${
-                  isActive
-                    ? 'border-indigo-500 shadow-md ring-2 ring-indigo-500/20'
-                    : 'border-slate-200 dark:border-slate-800 shadow-xs hover:border-slate-300 dark:hover:border-slate-700'
-                }`}
-              >
-                {/* Active Indicator & Master Badge */}
-                <div className="flex items-center justify-between gap-2 mb-4">
-                  <div className="flex items-center gap-1.5">
-                    {isPrimary ? (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                        <Award className="w-3 h-3 text-indigo-600" />
-                        Dosen Pengampu Utama
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                        <Award className="w-3 h-3 text-purple-600" />
-                        Dosen Pengampu Partner
-                      </span>
-                    )}
-                    <span className="text-[10px] text-slate-400 font-mono">
-                      NIDN: {lecturer.nidn}
-                    </span>
-                  </div>
+            return lecturerList.map((lecturer) => {
+              const isActive = currentUser.email.toLowerCase() === lecturer.email.toLowerCase();
+              const isPrimary = lecturer.email === 'miftahurridlo.688@gmail.com';
 
-                  {isActive ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                      <CheckCircle2 className="w-3 h-3" />
-                      Aktif Sekarang
-                    </span>
-                  ) : null}
-                </div>
-
-                {/* Profile Avatar & Details */}
-                <div className="flex items-start gap-4 mb-4">
-                  <img
-                    src={lecturer.avatarUrl}
-                    alt={lecturer.name}
-                    className="w-16 h-16 rounded-2xl object-cover ring-2 ring-slate-200 dark:ring-slate-700 shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">
-                      {lecturer.name}
-                    </h3>
-                    <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">
-                      {lecturer.title}
-                    </p>
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500 font-mono mt-1">
-                      <Mail className="w-3 h-3 text-slate-400 shrink-0" />
-                      <span className="truncate">{lecturer.email}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
-                      <Building className="w-3 h-3 text-slate-400 shrink-0" />
-                      <span className="truncate">{lecturer.department}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Profile Bio */}
-                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/80 text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
-                  {isPrimary
-                    ? 'Dosen Pengampu Sistem Informasi Geografis Lanjut & Metodologi Penelitian Komputasi. Koordinator kurikulum OBE dan penanggung jawab sinkronisasi My Journey.'
-                    : 'Workspace terpadu riset, mengajar, dan freelance. Pengampu mata kuliah Rekayasa Perangkat Lunak Berbasis Komponen dan arsitektur microservices terdistribusi.'}
-                </div>
-
-                {/* Taught Classes Pill List */}
-                <div className="space-y-1.5 mb-5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                    Mata Kuliah Diampu:
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {courses.map((crs) => {
-                      const teaches =
-                        crs.teacher.email === lecturer.email ||
-                        crs.secondaryTeacher?.email === lecturer.email;
-                      if (!teaches) return null;
-
-                      return (
-                        <span
-                          key={crs.id}
-                          className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
-                        >
-                          <strong>{crs.code}</strong> - {crs.title.split('&')[0]}
+              return (
+                <div
+                  key={lecturer.id}
+                  className={`p-6 rounded-3xl bg-white dark:bg-slate-900 border transition-all ${
+                    isActive
+                      ? 'border-indigo-500 shadow-md ring-2 ring-indigo-500/20'
+                      : 'border-slate-200 dark:border-slate-800 shadow-xs hover:border-slate-300 dark:hover:border-slate-700'
+                  }`}
+                >
+                  {/* Active Indicator & Master Badge */}
+                  <div className="flex items-center justify-between gap-2 mb-4">
+                    <div className="flex items-center gap-1.5">
+                      {isPrimary ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                          <Award className="w-3 h-3 text-indigo-600" />
+                          Dosen Pengampu Utama
                         </span>
-                      );
-                    })}
-                  </div>
-                </div>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                          <Award className="w-3 h-3 text-purple-600" />
+                          Dosen Pengampu Partner
+                        </span>
+                      )}
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        NIDN: {lecturer.nidn}
+                      </span>
+                    </div>
 
-                {/* Switch Account Action */}
-                {!isActive ? (
-                  <button
-                    onClick={() => handleSwitchLecturer(lecturer.email)}
-                    className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <span>Gunakan Akun Ini</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                ) : (
-                  <div className="w-full py-2.5 px-4 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 text-xs font-bold text-center">
-                    ✓ Akun Aktif di Perangkat Ini
+                    {isActive ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Aktif Sekarang
+                      </span>
+                    ) : null}
                   </div>
-                )}
-              </div>
-            );
-          })}
+
+                  {/* Profile Avatar & Details */}
+                  <div className="flex items-start gap-4 mb-4">
+                    <img
+                      src={lecturer.avatarUrl}
+                      alt={lecturer.name}
+                      className="w-16 h-16 rounded-2xl object-cover ring-2 ring-slate-200 dark:ring-slate-700 shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">
+                        {lecturer.name}
+                      </h3>
+                      <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">
+                        {lecturer.title}
+                      </p>
+                      <div className="flex items-center gap-1.5 text-xs text-slate-500 font-mono mt-1">
+                        <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span className="truncate">{lecturer.email}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
+                        <Building className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span className="truncate">{lecturer.department}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Profile Bio */}
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/80 text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
+                    {isPrimary
+                      ? 'Dosen Pengampu Utama Smart Learning Hub & My Journey. Koordinator kurikulum OBE dan penanggung jawab sinkronisasi pengajaran.'
+                      : 'Dosen Pengampu Partner Smart Learning Hub & My Journey. Pengampu kelas komputasi dan penanggung jawab materi praktikum.'}
+                  </div>
+
+                  {/* Taught Classes Pill List */}
+                  <div className="space-y-1.5 mb-5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                      Mata Kuliah Diampu:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {courses.map((crs) => {
+                        const teaches =
+                          crs.teacher.email === lecturer.email ||
+                          crs.secondaryTeacher?.email === lecturer.email;
+                        if (!teaches) return null;
+
+                        return (
+                          <span
+                            key={crs.id}
+                            className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                          >
+                            <strong>{crs.code}</strong> - {crs.title.split('&')[0]}
+                          </span>
+                        );
+                      })}
+                      {courses.filter(
+                        (crs) =>
+                          crs.teacher.email === lecturer.email ||
+                          crs.secondaryTeacher?.email === lecturer.email
+                      ).length === 0 && (
+                        <span className="text-xs text-slate-400 italic">
+                          Belum ada kelas perkuliahan aktif.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Switch Account Action */}
+                  {!isActive ? (
+                    <button
+                      onClick={() => handleSwitchLecturer(lecturer.email)}
+                      className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      <span>Gunakan Akun Ini</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <div className="w-full py-2.5 px-4 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 text-xs font-bold text-center">
+                      ✓ Akun Aktif di Perangkat Ini
+                    </div>
+                  )}
+                </div>
+              );
+            });
+          })()}
         </div>
       </div>
 

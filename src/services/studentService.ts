@@ -37,6 +37,7 @@ import { validateEmailAccess } from '../utils/academicCalculations.ts';
 const STORAGE_KEYS = {
   DATA_VERSION: 'slh_data_version',
   CURRENT_USER: 'slh_current_user',
+  REGISTERED_USERS: 'slh_registered_users',
   PROFILE: 'slh_student_profile',
   COURSES: 'slh_student_courses',
   MEETINGS: 'slh_student_meetings',
@@ -51,15 +52,15 @@ const STORAGE_KEYS = {
   CUSTOM_ROSTER: 'slh_custom_roster',
 };
 
-const CURRENT_DATA_VERSION = 'v_myjourney_sync_2026_10_27_r2';
+const CURRENT_DATA_VERSION = 'v_kosongan_clean_slate_2026_10_27_r4';
 
 // Automatic migration & purge of outdated dummy data
 if (typeof window !== 'undefined') {
   try {
     const savedVer = localStorage.getItem(STORAGE_KEYS.DATA_VERSION);
     if (savedVer !== CURRENT_DATA_VERSION) {
-      console.log('[Smart Learning Hub] Sinkronisasi Data My Journey: Mengosongkan data dummy lama...');
-      // Clear old demo keys to ensure fresh My Journey courses, students, and sessions
+      console.log('[Smart Learning Hub] Mengosongkan semua data dummy lama untuk memulai kosongan...');
+      // Clear old dummy keys to start completely empty
       [
         STORAGE_KEYS.COURSES,
         STORAGE_KEYS.MEETINGS,
@@ -72,19 +73,10 @@ if (typeof window !== 'undefined') {
         STORAGE_KEYS.NOTIFICATIONS,
         STORAGE_KEYS.ACTIVITIES,
         STORAGE_KEYS.CUSTOM_ROSTER,
+        STORAGE_KEYS.PROFILE,
+        STORAGE_KEYS.CURRENT_USER,
+        STORAGE_KEYS.REGISTERED_USERS,
       ].forEach((key) => localStorage.removeItem(key));
-
-      // Reset profile to Rafi Alamsyah if it was still Altaf as a student
-      const rawProf = localStorage.getItem(STORAGE_KEYS.PROFILE);
-      if (rawProf && rawProf.includes('altaf.aziz16')) {
-        localStorage.removeItem(STORAGE_KEYS.PROFILE);
-      }
-
-      // Reset user to Miftahur Ridlo if it was the old dummy lecturer or student
-      const rawUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-      if (rawUser && (rawUser.includes('dosen.utama') || rawUser.includes('altaf.aziz16@student.ac.id') || rawUser.includes('Rian'))) {
-        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-      }
 
       localStorage.setItem(STORAGE_KEYS.DATA_VERSION, CURRENT_DATA_VERSION);
     }
@@ -111,17 +103,31 @@ function setStorage<T>(key: string, data: T): void {
   }
 }
 
+export interface RegisteredUser extends AuthUser {
+  password?: string;
+}
+
 export const defaultStudentUser: AuthUser = {
-  id: initialStudentProfile.id,
-  name: initialStudentProfile.name,
-  email: initialStudentProfile.email,
+  id: 'std_demo',
+  name: 'Mahasiswa',
+  email: 'mahasiswa@student.ac.id',
   role: 'mahasiswa',
-  nim: initialStudentProfile.nim,
-  avatarUrl: initialStudentProfile.avatarUrl,
+  nim: '10123001',
+  avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=300',
   registeredAt: '2026-09-01',
 };
 
-export const defaultLecturerUser: AuthUser = mockLecturerUsers[0];
+export const defaultLecturerUser: AuthUser = {
+  id: 'dos_01',
+  name: 'Miftahur Ridlo, M.Kom.',
+  email: 'miftahurridlo.688@gmail.com',
+  role: 'dosen',
+  nidn: '0412088501',
+  title: 'Dosen Pengampu Utama',
+  department: 'Sistem Informasi Geografis & Geomatika',
+  avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+  registeredAt: '2026-08-01',
+};
 
 export interface MeetingAttendanceRosterItem {
   studentName: string;
@@ -147,119 +153,192 @@ export interface MeetingAttendanceRosterSummary {
 }
 
 export const studentService = {
-  // Current Authenticated User (Lecturer or Student)
-  getCurrentUser(): AuthUser {
-    return getStorage<AuthUser>(STORAGE_KEYS.CURRENT_USER, defaultStudentUser);
+  // Current Authenticated User (Lecturer or Student or null if not logged in)
+  getCurrentUser(): AuthUser | null {
+    return getStorage<AuthUser | null>(STORAGE_KEYS.CURRENT_USER, null);
   },
 
-  setCurrentUser(user: AuthUser): void {
-    setStorage(STORAGE_KEYS.CURRENT_USER, user);
+  setCurrentUser(user: AuthUser | null): void {
+    if (!user) {
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    } else {
+      setStorage(STORAGE_KEYS.CURRENT_USER, user);
+    }
+  },
+
+  logout(): void {
+    this.setCurrentUser(null);
+  },
+
+  getRegisteredUsers(): RegisteredUser[] {
+    return getStorage<RegisteredUser[]>(STORAGE_KEYS.REGISTERED_USERS, []);
+  },
+
+  saveRegisteredUser(user: RegisteredUser): void {
+    const users = this.getRegisteredUsers();
+    const idx = users.findIndex((u) => u.email.toLowerCase() === user.email.toLowerCase());
+    if (idx >= 0) {
+      users[idx] = { ...users[idx], ...user };
+    } else {
+      users.push(user);
+    }
+    setStorage(STORAGE_KEYS.REGISTERED_USERS, users);
+  },
+
+  getRegisteredLecturers(): AuthUser[] {
+    const users = this.getRegisteredUsers();
+    return users.filter((u) => u.role === 'dosen');
   },
 
   // Auth: Login with Email & Password
   login(email: string, password = ''): { success: boolean; user?: AuthUser; message: string } {
     const normalized = email.trim().toLowerCase();
-    const courses = this.getAllCourses();
-
-    const validation = validateEmailAccess(normalized, courses, LECTURER_WHITELIST_EMAILS);
-
-    if (!validation.allowed) {
-      return {
-        success: false,
-        message: validation.message || 'Email tidak terdaftar.',
-      };
+    if (!normalized) {
+      return { success: false, message: 'Silakan masukkan email Anda.' };
     }
 
-    if (validation.role === 'dosen') {
-      const lecturer = mockLecturerUsers.find((l) => l.email.toLowerCase() === normalized) || {
-        id: `dos_${Date.now()}`,
-        name: normalized.includes('miftah') ? 'Miftahur Ridlo, M.Kom.' : 'Tengku Abdillah Aziz, S.Pd.',
-        email: normalized,
-        role: 'dosen' as const,
-        nidn: normalized.includes('miftah') ? '0412088501' : '0419058902',
-        title: normalized.includes('miftah') ? 'Dosen Pengampu Utama' : 'Dosen Pengampu Partner',
-        department: normalized.includes('miftah') ? 'Sistem Informasi Geografis & Geomatika' : 'Rekayasa Perangkat Lunak & Geoinformatika',
-        avatarUrl: normalized.includes('miftah')
-          ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250'
-          : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
-        registeredAt: '2026-08-01',
-      };
-      this.setCurrentUser(lecturer);
+    const registeredUsers = this.getRegisteredUsers();
+    const existing = registeredUsers.find((u) => u.email.toLowerCase() === normalized);
+
+    if (existing) {
+      if (existing.password && password && existing.password !== password) {
+        return {
+          success: false,
+          message: 'Kata sandi tidak sesuai. Silakan periksa kembali kata sandi Anda.',
+        };
+      }
+      this.setCurrentUser(existing);
       return {
         success: true,
-        user: lecturer,
-        message: `Selamat datang, ${lecturer.name}! Anda masuk ke Portal Tim Dosen (Tersinkronisasi My Journey).`,
+        user: existing,
+        message: `Selamat datang kembali, ${existing.name}!`,
       };
     }
 
-    // Student Login
-    const rosterInfo = getStudentRosterInfo(normalized);
-    const currentProfile = this.getProfile();
-    const studentUser: AuthUser = {
-      id: `std_${rosterInfo.nim}`,
-      name: rosterInfo.name,
-      email: normalized,
-      role: 'mahasiswa',
-      nim: rosterInfo.nim,
-      avatarUrl: currentProfile.avatarUrl,
-      registeredAt: '2026-09-01',
-    };
-    this.updateProfile({
-      name: rosterInfo.name,
-      email: normalized,
-      nim: rosterInfo.nim,
-    });
-    this.setCurrentUser(studentUser);
+    // Auto-provision if in Lecturer Whitelist
+    if (LECTURER_WHITELIST_EMAILS.map((e) => e.toLowerCase()).includes(normalized)) {
+      const lecturerName = normalized.includes('miftah') ? 'Miftahur Ridlo, M.Kom.' : 'Tengku Abdillah Aziz, S.Pd.';
+      const lecturerTitle = normalized.includes('miftah') ? 'Dosen Pengampu Utama' : 'Dosen Pengampu Partner';
+      const lecturerNidn = normalized.includes('miftah') ? '0412088501' : '0419058902';
+      const lecturerDept = normalized.includes('miftah')
+        ? 'Sistem Informasi Geografis & Geomatika'
+        : 'Rekayasa Perangkat Lunak & Geoinformatika';
+      const lecturerAvatar = normalized.includes('miftah')
+        ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250'
+        : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250';
+
+      const newLecturer: RegisteredUser = {
+        id: `dos_${Date.now()}`,
+        name: lecturerName,
+        email: normalized,
+        role: 'dosen',
+        password: password || '',
+        nidn: lecturerNidn,
+        title: lecturerTitle,
+        department: lecturerDept,
+        avatarUrl: lecturerAvatar,
+        registeredAt: new Date().toISOString(),
+      };
+
+      this.saveRegisteredUser(newLecturer);
+      this.setCurrentUser(newLecturer);
+      return {
+        success: true,
+        user: newLecturer,
+        message: `Selamat datang, ${newLecturer.name}! Akun Dosen Pengampu Anda aktif.`,
+      };
+    }
+
     return {
-      success: true,
-      user: studentUser,
-      message: `Selamat datang kembali, ${studentUser.name}!`,
+      success: false,
+      message: 'Email belum terdaftar. Silakan buka tab "Daftar Akun" untuk mendaftarkan akun baru.',
     };
   },
 
-  // Auth: Registration (Enforces pre-registered email check)
-  register(data: { name: string; email: string; nim?: string; password?: string }): {
+  // Auth: Registration
+  register(data: {
+    name: string;
+    email: string;
+    role?: UserRole;
+    nim?: string;
+    nidn?: string;
+    password?: string;
+  }): {
     success: boolean;
     user?: AuthUser;
     message: string;
   } {
     const normalized = data.email.trim().toLowerCase();
-    const courses = this.getAllCourses();
-
-    const validation = validateEmailAccess(normalized, courses, LECTURER_WHITELIST_EMAILS);
-
-    if (!validation.allowed) {
-      return {
-        success: false,
-        message: 'Pendaftaran ditolak: Email Anda belum didaftarkan oleh Tim Dosen di kelas manapun. Hubungi dosen pengampu.',
-      };
+    if (!normalized) {
+      return { success: false, message: 'Email wajib diisi.' };
+    }
+    if (!data.name.trim()) {
+      return { success: false, message: 'Nama lengkap wajib diisi.' };
     }
 
-    const newUser: AuthUser = {
-      id: `usr_${Date.now()}`,
-      name: data.name,
+    const isLecturerWhitelist = LECTURER_WHITELIST_EMAILS.map((e) => e.toLowerCase()).includes(normalized);
+    const role: UserRole = isLecturerWhitelist ? 'dosen' : (data.role || 'mahasiswa');
+
+    let defaultName = data.name.trim();
+    let title: string | undefined;
+    let nidn: string | undefined = data.nidn?.trim();
+    let department: string | undefined;
+    let avatarUrl: string;
+
+    if (role === 'dosen') {
+      if (normalized.includes('miftah')) {
+        defaultName = defaultName || 'Miftahur Ridlo, M.Kom.';
+        title = 'Dosen Pengampu Utama';
+        nidn = nidn || '0412088501';
+        department = 'Sistem Informasi Geografis & Geomatika';
+        avatarUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250';
+      } else if (normalized.includes('altaf')) {
+        defaultName = defaultName || 'Tengku Abdillah Aziz, S.Pd.';
+        title = 'Dosen Pengampu Partner';
+        nidn = nidn || '0419058902';
+        department = 'Rekayasa Perangkat Lunak & Geoinformatika';
+        avatarUrl = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250';
+      } else {
+        title = 'Dosen Pengampu';
+        nidn = nidn || '0400000001';
+        department = 'Teknologi Informasi';
+        avatarUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250';
+      }
+    } else {
+      avatarUrl = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=300';
+    }
+
+    const newUser: RegisteredUser = {
+      id: role === 'dosen' ? `dos_${Date.now()}` : `std_${Date.now()}`,
+      name: defaultName,
       email: normalized,
-      role: validation.role,
-      nim: data.nim || '22081010045',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300',
+      role,
+      password: data.password || '',
+      nim: role === 'mahasiswa' ? (data.nim?.trim() || '10123001') : undefined,
+      nidn,
+      title,
+      department,
+      avatarUrl,
       registeredAt: new Date().toISOString(),
     };
 
+    this.saveRegisteredUser(newUser);
     this.setCurrentUser(newUser);
 
-    if (newUser.role === 'mahasiswa') {
-      const currentProfile = this.getProfile();
+    if (role === 'mahasiswa') {
       this.updateProfile({
-        name: data.name,
+        name: newUser.name,
         email: normalized,
-        nim: data.nim || currentProfile.nim,
+        nim: newUser.nim || '10123001',
       });
     }
 
     return {
       success: true,
       user: newUser,
-      message: `Akun berhasil dibuat! Anda terdaftar pada ${validation.matchedCourses.length} kelas kuliah.`,
+      message: role === 'dosen'
+        ? `Pendaftaran berhasil! Selamat datang di Portal Dosen, ${newUser.name}. Akun terhubung dengan My Journey.`
+        : `Pendaftaran berhasil! Selamat datang di Portal Mahasiswa, ${newUser.name}.`,
     };
   },
 

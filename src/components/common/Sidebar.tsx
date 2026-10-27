@@ -11,7 +11,8 @@ import {
   ChevronRight,
   Shield,
   Sparkles,
-  Info
+  Info,
+  LogOut
 } from 'lucide-react';
 import { Logo } from './Logo.tsx';
 import type { StudentProfile } from '../../types/index.ts';
@@ -34,6 +35,7 @@ interface SidebarProps {
   profile: StudentProfile;
   pendingTasksCount: number;
   unreadAnnouncementsCount: number;
+  onLogout?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -44,6 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   profile,
   pendingTasksCount,
   unreadAnnouncementsCount,
+  onLogout,
 }) => {
   const navItems = [
     {
@@ -170,14 +173,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       {/* Footer Info Box */}
-      <div className="p-4 mx-3 mb-4 rounded-xl bg-slate-800/40 border border-slate-800 text-xs text-slate-400">
-        <div className="flex items-center gap-2 text-slate-300 font-medium mb-1">
+      <div className="p-4 mx-3 mb-4 rounded-xl bg-slate-800/40 border border-slate-800 text-xs text-slate-400 space-y-2">
+        <div className="flex items-center gap-2 text-slate-300 font-medium">
           <Info className="w-3.5 h-3.5 text-blue-400" />
           <span>Portal Mahasiswa v2.4</span>
         </div>
         <p className="text-[11px] text-slate-400 leading-relaxed">
           Dirancang untuk pembelajaran terpusat. Terhubung dengan platform dosen Smart Learning Hub.
         </p>
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="w-full mt-2 pt-2 border-t border-slate-700/60 text-xs font-semibold text-rose-400 hover:text-rose-300 hover:underline flex items-center justify-center gap-1.5 transition-colors"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Keluar (Logout)</span>
+          </button>
+        )}
       </div>
     </div>
   );

@@ -333,96 +333,127 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
       {/* ========================================================= */}
       {activeSubTab === 'kelas' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-            {courses.map((course) => (
-              <div
-                key={course.id}
-                className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md transition-all flex flex-col justify-between"
-              >
-                <div>
-                  {/* Top Header Row (Soft Blue Code Pill on Left, Class Tag on Right) */}
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono font-bold text-xs px-2.5 py-1 rounded-md bg-sky-50 dark:bg-sky-950/70 text-sky-700 dark:text-sky-300 border border-sky-100 dark:border-sky-900/50">
-                      {course.code}
-                    </span>
-
-                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 px-2.5 py-0.5 rounded-full">
-                      {course.semester || 'Kelas A'}
-                    </span>
-                  </div>
-
-                  {/* Course Title */}
-                  <h3 
-                    onClick={() => onOpenCourse(course.id)}
-                    className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mt-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 cursor-pointer transition-colors line-clamp-2"
-                  >
-                    {course.title}
-                  </h3>
-
-                  {/* Course Description */}
-                  <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-1">
-                    {course.description}
-                  </p>
-                </div>
-
-                {/* Bottom Metadata Info Lines (Identical to My Journey) */}
-                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2 text-xs text-slate-500 dark:text-slate-400">
-                  {/* Schedule & Action Icons */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span>{course.scheduleDay}, {course.scheduleTime}</span>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpenCourse(course.id);
-                        }}
-                        className="p-1 rounded text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                        title="Edit Kelas"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteCourse(course.id, course.title);
-                        }}
-                        className="p-1 rounded text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
-                        title="Hapus Kelas"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Room & Student Count */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span className="truncate max-w-[140px] sm:max-w-[180px]">{course.room}</span>
-                    </div>
-
-                    <div className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
-                      <Users className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{course.enrolledStudentEmails?.length || 0} Mahasiswa</span>
-                    </div>
-                  </div>
-
-                  {/* Open Class Direct Button */}
-                  <button
-                    onClick={() => onOpenCourse(course.id)}
-                    className="w-full mt-2 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 hover:text-blue-600 dark:text-slate-200 flex items-center justify-center gap-1.5 transition-all"
-                  >
-                    <span>Buka Ruang Kelas</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+          {courses.length === 0 ? (
+            <div className="p-12 text-center rounded-3xl bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-800 space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 mx-auto flex items-center justify-center font-bold">
+                <BookOpen className="w-7 h-7" />
               </div>
-            ))}
-          </div>
+              <div className="max-w-md mx-auto space-y-1">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Belum Ada Kelas Perkuliahan
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                  Mulai dengan membuat mata kuliah baru secara mandiri atau sinkronkan data pengajaran dari Google Sheets / My Journey.
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-3 pt-2">
+                <button
+                  onClick={() => setIsAddCourseModalOpen(true)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs flex items-center gap-2 transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ Tambah Kelas Baru</span>
+                </button>
+                <button
+                  onClick={() => setIsSyncModalOpen(true)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-all flex items-center gap-2"
+                >
+                  <span>Tarik dari Google Sheets</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+              {courses.map((course) => (
+                <div
+                  key={course.id}
+                  className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md transition-all flex flex-col justify-between"
+                >
+                  <div>
+                    {/* Top Header Row (Soft Blue Code Pill on Left, Class Tag on Right) */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono font-bold text-xs px-2.5 py-1 rounded-md bg-sky-50 dark:bg-sky-950/70 text-sky-700 dark:text-sky-300 border border-sky-100 dark:border-sky-900/50">
+                        {course.code}
+                      </span>
+
+                      <span className="text-xs font-medium text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 px-2.5 py-0.5 rounded-full">
+                        {course.semester || 'Kelas A'}
+                      </span>
+                    </div>
+
+                    {/* Course Title */}
+                    <h3 
+                      onClick={() => onOpenCourse(course.id)}
+                      className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mt-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 cursor-pointer transition-colors line-clamp-2"
+                    >
+                      {course.title}
+                    </h3>
+
+                    {/* Course Description */}
+                    <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-1">
+                      {course.description}
+                    </p>
+                  </div>
+
+                  {/* Bottom Metadata Info Lines (Identical to My Journey) */}
+                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2 text-xs text-slate-500 dark:text-slate-400">
+                    {/* Schedule & Action Icons */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span>{course.scheduleDay}, {course.scheduleTime}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenCourse(course.id);
+                          }}
+                          className="p-1 rounded text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                          title="Edit Kelas"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCourse(course.id, course.title);
+                          }}
+                          className="p-1 rounded text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
+                          title="Hapus Kelas"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Room & Student Count */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate max-w-[140px] sm:max-w-[180px]">{course.room}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
+                        <Users className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{course.enrolledStudentEmails?.length || 0} Mahasiswa</span>
+                      </div>
+                    </div>
+
+                    {/* Open Class Direct Button */}
+                    <button
+                      onClick={() => onOpenCourse(course.id)}
+                      className="w-full mt-2 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 hover:text-blue-600 dark:text-slate-200 flex items-center justify-center gap-1.5 transition-all"
+                    >
+                      <span>Buka Ruang Kelas</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

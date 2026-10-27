@@ -1,0 +1,73 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { LECTURER_WHITELIST_EMAILS } from '../data/mockData.ts';
+
+// Test mock localStorage for node environment
+const storage: Record<string, string> = {};
+(globalThis as any).localStorage = {
+  getItem: (k: string) => storage[k] || null,
+  setItem: (k: string, v: string) => { storage[k] = v; },
+  removeItem: (k: string) => { delete storage[k]; },
+  clear: () => { Object.keys(storage).forEach((k) => delete storage[k]); },
+};
+
+// Import after setting up mock localStorage
+import { studentService } from './studentService.ts';
+
+test('Registration: miftahurridlo.688@gmail.com registers as Dosen Utama', () => {
+  const result = studentService.register({
+    name: 'Miftahur Ridlo',
+    email: 'miftahurridlo.688@gmail.com',
+    password: 'password123',
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.user?.role, 'dosen');
+  assert.equal(result.user?.email, 'miftahurridlo.688@gmail.com');
+  assert.equal(result.user?.title, 'Dosen Pengampu Utama');
+  assert.equal(result.user?.nidn, '0412088501');
+});
+
+test('Registration: altaf.aziz16@gmail.com registers as Dosen Partner', () => {
+  const result = studentService.register({
+    name: 'Tengku Abdillah Aziz',
+    email: 'altaf.aziz16@gmail.com',
+    password: 'securePassword456',
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.user?.role, 'dosen');
+  assert.equal(result.user?.email, 'altaf.aziz16@gmail.com');
+  assert.equal(result.user?.title, 'Dosen Pengampu Partner');
+  assert.equal(result.user?.nidn, '0419058902');
+});
+
+test('Login: verifies matching password and rejects incorrect password', () => {
+  const loginGood = studentService.login('miftahurridlo.688@gmail.com', 'password123');
+  assert.equal(loginGood.success, true);
+  assert.equal(loginGood.user?.email, 'miftahurridlo.688@gmail.com');
+
+  const loginBad = studentService.login('miftahurridlo.688@gmail.com', 'wrongpassword');
+  assert.equal(loginBad.success, false);
+  assert.match(loginBad.message, /tidak sesuai/i);
+});
+
+test('Logout: clears current user to null', () => {
+  studentService.logout();
+  const current = studentService.getCurrentUser();
+  assert.equal(current, null);
+});
+
+test('Registration: Student registers with student role and NIM', () => {
+  const result = studentService.register({
+    name: 'Budi Santoso',
+    email: 'budi@student.ac.id',
+    role: 'mahasiswa',
+    nim: '10123099',
+    password: 'mhsPassword123',
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.user?.role, 'mahasiswa');
+  assert.equal(result.user?.nim, '10123099');
+});
