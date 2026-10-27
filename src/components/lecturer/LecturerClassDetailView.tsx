@@ -343,6 +343,44 @@ export const LecturerClassDetailView: React.FC<LecturerClassDetailViewProps> = (
               </button>
             </div>
 
+            {/* Quick Pick from Master Database */}
+            {(() => {
+              const masterStudents = studentService.getMasterStudents();
+              const availableStudents = masterStudents.filter(
+                (s) => !(course.enrolledStudentEmails || []).some((e) => e.toLowerCase() === s.email.toLowerCase())
+              );
+              if (availableStudents.length === 0) return null;
+
+              return (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl bg-blue-50/60 dark:bg-slate-800/60 border border-blue-200/60 dark:border-slate-700">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span className="text-xs font-semibold text-blue-950 dark:text-blue-200">
+                      Pilih dari Basis Data Mahasiswa:
+                    </span>
+                  </div>
+                  <select
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        studentService.addStudentEmailToCourse(course.id, e.target.value);
+                        onDataUpdated();
+                        e.target.value = '';
+                      }
+                    }}
+                    defaultValue=""
+                    className="py-1.5 px-3 rounded-lg text-xs font-semibold bg-white dark:bg-slate-700 border border-blue-200 dark:border-slate-600 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">-- Pilih Mahasiswa ({availableStudents.length} tersedia) --</option>
+                    {availableStudents.map((s) => (
+                      <option key={s.id || s.email} value={s.email}>
+                        {s.nim} - {s.name} ({s.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              );
+            })()}
+
             {/* Single Email Input */}
             {!isBulkMode ? (
               <form onSubmit={handleAddSingleEmail} className="flex flex-col sm:flex-row gap-3">

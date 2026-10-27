@@ -38,6 +38,20 @@ export interface EnrolledStudent {
   attendanceRate?: number;
 }
 
+export interface MasterStudent {
+  id: string;
+  nim: string;
+  name: string;
+  email: string;
+  major?: string;
+  classSection?: string;
+  enrolledCourseCodes: string[];
+  isRegistered?: boolean;
+  registeredAt?: string;
+  avatarUrl?: string;
+  phone?: string;
+}
+
 export interface StudentProfile {
   id: string;
   name: string;

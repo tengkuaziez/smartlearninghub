@@ -74,18 +74,59 @@ test('Safe calls when unauthenticated: methods do not throw null pointer errors'
   });
 });
 
-test('Registration: Student registers with student role and NIM', () => {
+test('Registration: Student rejected if email is not in master database whitelist', () => {
+  const result = studentService.register({
+    name: 'Mahasiswa Tak Dikenal',
+    email: 'unknown.stranger@gmail.com',
+    role: 'mahasiswa',
+    nim: '99999999',
+    password: 'mhsPassword123',
+  });
+
+  assert.equal(result.success, false);
+  assert.match(result.message, /belum terdaftar/i);
+});
+
+test('Registration: Pre-authorized student registers successfully and links NIM and courses', () => {
+  // Pre-authorize student in master database
+  studentService.saveMasterStudent({
+    id: 'mstd_test_budi',
+    nim: '10123099',
+    name: 'Budi Santoso',
+    email: 'budi@student.ac.id',
+    major: 'Informatika',
+    classSection: 'Kelas A',
+    enrolledCourseCodes: ['IF-208'],
+  });
+
   const result = studentService.register({
     name: 'Budi Santoso',
     email: 'budi@student.ac.id',
     role: 'mahasiswa',
-    nim: '10123099',
     password: 'mhsPassword123',
   });
 
   assert.equal(result.success, true);
   assert.equal(result.user?.role, 'mahasiswa');
   assert.equal(result.user?.nim, '10123099');
+});
+
+test('Master Database: saves, searches, and deletes students', () => {
+  const countBefore = studentService.getMasterStudents().length;
+  studentService.saveMasterStudent({
+    id: 'mstd_test_aziz',
+    nim: '3222431013',
+    name: 'Tengku Aziz',
+    email: 'tengku.aziz@student.ac.id',
+    major: 'Informatika',
+    classSection: 'Kelas A',
+    enrolledCourseCodes: ['GEO-301'],
+  });
+
+  const students = studentService.getMasterStudents();
+  assert.ok(students.some((s) => s.email === 'tengku.aziz@student.ac.id'));
+  assert.equal(studentService.isStudentEmailAuthorized('tengku.aziz@student.ac.id'), true);
+  assert.equal(studentService.isStudentEmailAuthorized('random123@xyz.com'), false);
 });
 
 test('Profile: updateLecturerProfile updates active lecturer profile details', () => {

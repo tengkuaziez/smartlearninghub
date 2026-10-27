@@ -9,7 +9,8 @@ import {
   ChevronRight,
   ShieldCheck,
   GraduationCap,
-  LogOut
+  LogOut,
+  Users
 } from 'lucide-react';
 import { Logo } from '../common/Logo.tsx';
 import type { AuthUser } from '../../types/index.ts';
@@ -17,6 +18,7 @@ import type { AuthUser } from '../../types/index.ts';
 export type LecturerNavTab = 
   | 'beranda'
   | 'kelas'
+  | 'mahasiswa'
   | 'koreksi'
   | 'pengumuman'
   | 'profil';
@@ -50,6 +52,11 @@ export const LecturerSidebar: React.FC<LecturerSidebarProps> = ({
       id: 'kelas' as LecturerNavTab,
       label: 'Manajemen Kelas',
       icon: BookOpen,
+    },
+    {
+      id: 'mahasiswa' as LecturerNavTab,
+      label: 'Manajemen Mahasiswa',
+      icon: Users,
     },
     {
       id: 'koreksi' as LecturerNavTab,

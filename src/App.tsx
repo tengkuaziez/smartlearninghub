@@ -35,6 +35,7 @@ import { ProfileView } from './components/profile/ProfileView.tsx';
 import { LecturerDashboardView } from './components/lecturer/LecturerDashboardView.tsx';
 import { LecturerClassManagementView } from './components/lecturer/LecturerClassManagementView.tsx';
 import { LecturerClassDetailView } from './components/lecturer/LecturerClassDetailView.tsx';
+import { LecturerStudentManagementView } from './components/lecturer/LecturerStudentManagementView.tsx';
 import { LecturerProfileView } from './components/lecturer/LecturerProfileView.tsx';
 import { LecturerQrBroadcastModal } from './components/lecturer/LecturerQrBroadcastModal.tsx';
 
@@ -557,7 +558,15 @@ export default function App() {
                 </>
               )}
 
-              {/* Lecturer View 3: Koreksi Tugas */}
+              {/* Lecturer View 3: Manajemen Mahasiswa (Master Database) */}
+              {lecturerTab === 'mahasiswa' && (
+                <LecturerStudentManagementView
+                  courses={allLecturerCourses}
+                  onDataUpdated={reloadData}
+                />
+              )}
+
+              {/* Lecturer View 4: Koreksi Tugas */}
               {lecturerTab === 'koreksi' && (
                 <div className="space-y-6">
                   <div className="pb-2 border-b border-slate-200 dark:border-slate-800">

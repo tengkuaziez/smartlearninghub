@@ -975,6 +975,38 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                 </select>
               </div>
 
+              {/* Quick Select from Master Database */}
+              {(() => {
+                const master = studentService.getMasterStudents();
+                if (master.length === 0) return null;
+                return (
+                  <div>
+                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                      Pilih dari Basis Data Mahasiswa:
+                    </label>
+                    <select
+                      onChange={(e) => {
+                        const s = master.find((item) => item.id === e.target.value || item.email === e.target.value);
+                        if (s) {
+                          setNewStudentName(s.name);
+                          setNewStudentNim(s.nim);
+                          setNewStudentEmail(s.email);
+                        }
+                      }}
+                      defaultValue=""
+                      className="w-full px-3 py-2 rounded-xl bg-blue-50 dark:bg-slate-800 border border-blue-200 dark:border-blue-900 text-xs font-semibold text-blue-900 dark:text-blue-300 focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">-- Pilih Mahasiswa untuk Auto-fill ({master.length} di Database) --</option>
+                      {master.map((s) => (
+                        <option key={s.id || s.email} value={s.id || s.email}>
+                          {s.nim} - {s.name} ({s.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })()}
+
               <div>
                 <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
                   Nama Lengkap Mahasiswa
