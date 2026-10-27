@@ -1065,9 +1065,10 @@ export const studentService = {
         });
 
         if (error || !data?.user) {
+          const detail = error?.message ? ` (${error.message})` : '';
           return {
             success: false,
-            message: 'Kata sandi atau email tidak cocok dengan akun My Journey / Supabase Anda. Mohon masukkan kata sandi akun My Journey yang benar.',
+            message: `Kata sandi atau email tidak cocok dengan akun My Journey / Supabase Anda${detail}. Mohon masukkan kata sandi akun My Journey yang benar.`,
           };
         }
 

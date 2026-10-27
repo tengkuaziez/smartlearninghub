@@ -4,11 +4,21 @@
  */
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const DEFAULT_SUPABASE_URL = 'https://tukpkikqdavfkdqbvclx.supabase.co';
-const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1a3BraWtxZGF2ZmtkcWJ2Y2x4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIyOTQ0NDYsImV4cCI6MjEwNzg3MDQ0Nn0.gKsIl3QByfpJV7HBfgCpWxGPo5vzhkczOimsbWJYaVA';
+export const UNIFIED_SUPABASE_URL = 'https://tukpkikqdavfkdqbvclx.supabase.co';
+export const UNIFIED_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1a3BraWtxZGF2ZmtkcWJ2Y2x4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIyOTQ0NDYsImV4cCI6MjEwNzg3MDQ0Nn0.gKsIl3QByfpJV7HBfgCpWxGPo5vzhkczOimsbWJYaVA';
 
-const supabaseUrl = ((import.meta as any).env?.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL).trim();
-const supabaseAnonKey = ((import.meta as any).env?.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY).trim();
+const rawEnvUrl = ((import.meta as any).env?.VITE_SUPABASE_URL || '').trim();
+const rawEnvKey = ((import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '').trim();
+
+// Selalu pastikan menggunakan Supabase My Journey tunggal (tukpkikqdavfkdqbvclx).
+// Jika ada env lama di Vercel (seperti owfyuhmohdshresinktf atau placeholder), abaikan dan pakai server My Journey.
+const isOutdatedOrWrong = 
+  !rawEnvUrl || 
+  rawEnvUrl.includes('owfyuhmohdshresinktf') || 
+  rawEnvUrl.includes('YOUR_PROJECT_ID');
+
+export const supabaseUrl = isOutdatedOrWrong ? UNIFIED_SUPABASE_URL : rawEnvUrl;
+export const supabaseAnonKey = isOutdatedOrWrong ? UNIFIED_SUPABASE_ANON_KEY : rawEnvKey;
 
 export const isSupabaseConfigured = (): boolean => {
   return Boolean(
