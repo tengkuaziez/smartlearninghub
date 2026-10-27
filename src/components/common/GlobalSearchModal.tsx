@@ -45,9 +45,9 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
     return {
       courses: courses.filter(
         (c) =>
-          c.title.toLowerCase().includes(q) ||
-          c.code.toLowerCase().includes(q) ||
-          c.teacher.name.toLowerCase().includes(q)
+          c.title?.toLowerCase().includes(q) ||
+          c.code?.toLowerCase().includes(q) ||
+          c.teacher?.name?.toLowerCase().includes(q)
       ),
       assignments: assignments.filter(
         (a) => a.title.toLowerCase().includes(q) || a.instructions.toLowerCase().includes(q)

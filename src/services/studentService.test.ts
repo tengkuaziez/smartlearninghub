@@ -58,6 +58,22 @@ test('Logout: clears current user to null', () => {
   assert.equal(current, null);
 });
 
+test('Safe calls when unauthenticated: methods do not throw null pointer errors', () => {
+  studentService.logout();
+  assert.doesNotThrow(() => {
+    const enrolled = studentService.getEnrolledCourses();
+    assert.deepEqual(enrolled, []);
+  });
+  assert.doesNotThrow(() => {
+    const ann = studentService.getAnnouncements();
+    assert.ok(Array.isArray(ann));
+  });
+  assert.doesNotThrow(() => {
+    const sub = studentService.getSubmissionForAssignment('test-id');
+    assert.equal(sub, undefined);
+  });
+});
+
 test('Registration: Student registers with student role and NIM', () => {
   const result = studentService.register({
     name: 'Budi Santoso',

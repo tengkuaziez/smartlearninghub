@@ -430,10 +430,14 @@ export const studentService = {
 
   getEnrolledCourses(studentEmail?: string): CourseClass[] {
     const courses = this.getAllCourses();
-    const emailToFilter = (studentEmail || this.getCurrentUser().email).toLowerCase();
+    const user = this.getCurrentUser();
+    if (!user && !studentEmail) {
+      return [];
+    }
+    const emailToFilter = (studentEmail || user?.email || '').toLowerCase();
 
     // If currentUser is dosen, return all courses managed by the 2 lecturers
-    if (this.getCurrentUser().role === 'dosen') {
+    if (user?.role === 'dosen') {
       return courses;
     }
 
@@ -503,7 +507,7 @@ export const studentService = {
     semester?: string;
   }): CourseClass {
     const courses = this.getAllCourses();
-    const currentLecturer = this.getCurrentUser();
+    const currentLecturer = this.getCurrentUser() || defaultLecturerUser;
     const newCourseId = `course_${Date.now()}`;
     const cleanCode = data.code.toUpperCase().trim();
     const cleanTitle = data.title.trim();
@@ -716,6 +720,7 @@ export const studentService = {
   getSubmissionForAssignment(assignmentId: string): AssignmentSubmission | undefined {
     const submissions = this.getSubmissions();
     const user = this.getCurrentUser();
+    if (!user) return undefined;
     return submissions.find((s) => s.assignmentId === assignmentId && s.studentEmail?.toLowerCase() === user.email.toLowerCase());
   },
 
@@ -728,7 +733,7 @@ export const studentService = {
     textResponse?: string;
   }): AssignmentSubmission {
     const submissions = this.getSubmissions();
-    const user = this.getCurrentUser();
+    const user = this.getCurrentUser() || defaultStudentUser;
     const assignment = this.getAssignmentById(payload.assignmentId);
 
     const now = new Date();
@@ -852,7 +857,7 @@ export const studentService = {
       campusLatitude: -6.200000,
       campusLongitude: 106.816666,
       radiusMeters: 150,
-      openedByLecturerEmail: this.getCurrentUser().email,
+      openedByLecturerEmail: this.getCurrentUser()?.email || 'miftahurridlo.688@gmail.com',
     };
 
     if (existingIdx >= 0) {
@@ -1037,7 +1042,7 @@ export const studentService = {
       };
     }
 
-    const user = this.getCurrentUser();
+    const user = this.getCurrentUser() || defaultStudentUser;
     const existingRecords = this.getAttendanceRecords(matchedSession.courseId);
     const alreadyAttended = existingRecords.some(
       (r) =>
@@ -1102,13 +1107,19 @@ export const studentService = {
 
   // Announcements
   getAnnouncements(courseId?: string): Announcement[] {
+    const user = this.getCurrentUser();
     const enrolledCourses = this.getEnrolledCourses();
     const enrolledCourseIds = new Set(enrolledCourses.map((c) => c.id));
 
     const announcements = getStorage<Announcement[]>(STORAGE_KEYS.ANNOUNCEMENTS, initialAnnouncements);
     
     // Lecturer can see all announcements
-    if (this.getCurrentUser().role === 'dosen') {
+    if (user?.role === 'dosen') {
+      return courseId ? announcements.filter((a) => a.courseId === courseId) : announcements;
+    }
+
+    // Guest / unauthenticated sees all announcements
+    if (!user) {
       return courseId ? announcements.filter((a) => a.courseId === courseId) : announcements;
     }
 
@@ -1119,7 +1130,7 @@ export const studentService = {
 
   postAnnouncement(data: { courseId: string; title: string; content: string }): Announcement {
     const announcements = getStorage<Announcement[]>(STORAGE_KEYS.ANNOUNCEMENTS, initialAnnouncements);
-    const user = this.getCurrentUser();
+    const user = this.getCurrentUser() || defaultLecturerUser;
     const course = this.getCourseById(data.courseId);
 
     const newAnn: Announcement = {

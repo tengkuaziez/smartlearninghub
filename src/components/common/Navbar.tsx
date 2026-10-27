@@ -238,7 +238,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 />
                 <div className="hidden sm:flex flex-col text-left leading-none">
                   <span className="text-xs font-semibold text-slate-900 dark:text-white">
-                    {currentUser.name.split(' ')[0]}
+                    {(currentUser.name || 'Pengguna').split(' ')[0]}
                   </span>
                   <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
                     {currentUser.role === 'dosen' ? 'Tim Dosen' : `NIM: ${currentUser.nim || '2208101'}`}
