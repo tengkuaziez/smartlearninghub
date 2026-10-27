@@ -55,25 +55,9 @@ const STORAGE_KEYS = {
   CUSTOM_ROSTER: 'slh_custom_roster',
 };
 
-export const MY_JOURNEY_STUDENT_SEED: Array<Omit<MasterStudent, 'id'>> = [
-  { nim: '3222431013', name: 'Tengku Aziz', email: 'tengku.aziz@student.ac.id', major: 'Informatika', classSection: 'Kelas A', enrolledCourseCodes: ['GEO-301', 'IF-208'] },
-  { nim: '10123001', name: 'Rafi Alamsyah Putra', email: 'rafi.alamsyah@student.ac.id', major: 'Sistem Informasi Geografis', classSection: 'Kelas A', enrolledCourseCodes: ['GEO-301'] },
-  { nim: '10123014', name: 'Annisa Fitri Ramadhani', email: 'annisa.fitri@student.ac.id', major: 'Sistem Informasi Geografis', classSection: 'Kelas A', enrolledCourseCodes: ['GEO-301'] },
-  { nim: '10123027', name: 'Dimas Bagus Prasetyo', email: 'dimas.bagus@student.ac.id', major: 'Sistem Informasi Geografis', classSection: 'Kelas A', enrolledCourseCodes: ['GEO-301'] },
-  { nim: '10123035', name: 'Salma Zahra Nur Azizah', email: 'salma.zahra@student.ac.id', major: 'Sistem Informasi Geografis', classSection: 'Kelas A', enrolledCourseCodes: ['GEO-301'] },
-  { nim: '10122045', name: 'Farhan Maulana Hakim', email: 'farhan.m@student.ac.id', major: 'Informatika', classSection: 'Kelas B', enrolledCourseCodes: ['IF-405'] },
-  { nim: '10122052', name: 'Tiara Amanda Putri', email: 'tiara.ap@student.ac.id', major: 'Informatika', classSection: 'Kelas B', enrolledCourseCodes: ['IF-405'] },
-  { nim: '10122061', name: 'Kevin Christian Wijaya', email: 'kevin.cw@student.ac.id', major: 'Informatika', classSection: 'Kelas B', enrolledCourseCodes: ['IF-405'] },
-  { nim: '10122089', name: 'Nurul Hidayati', email: 'nurul.h@student.ac.id', major: 'Informatika', classSection: 'Kelas B', enrolledCourseCodes: ['IF-405'] },
-  { nim: '10124102', name: 'Muhammad Aditya Pratama', email: 'aditya.p@student.ac.id', major: 'Rekayasa Perangkat Lunak', classSection: 'Kelas C', enrolledCourseCodes: ['IF-208'] },
-  { nim: '10124119', name: 'Dhea Kartika Sari', email: 'dhea.ks@student.ac.id', major: 'Rekayasa Perangkat Lunak', classSection: 'Kelas C', enrolledCourseCodes: ['IF-208'] },
-  { nim: '10124133', name: 'Bagas Satria Wibowo', email: 'bagas.sw@student.ac.id', major: 'Rekayasa Perangkat Lunak', classSection: 'Kelas C', enrolledCourseCodes: ['IF-208'] },
-  { nim: '10124148', name: 'Nabila Syakira', email: 'nabila.s@student.ac.id', major: 'Rekayasa Perangkat Lunak', classSection: 'Kelas C', enrolledCourseCodes: ['IF-208'] },
-];
+const CURRENT_DATA_VERSION = 'v_kosongan_clean_slate_2026_10_27_r6';
 
-const CURRENT_DATA_VERSION = 'v_kosongan_clean_slate_2026_10_27_r4';
-
-// Automatic migration & purge of outdated dummy data
+// Automatic migration & purge of outdated dummy data (memulai kosongan & bersih)
 if (typeof window !== 'undefined') {
   try {
     const savedVer = localStorage.getItem(STORAGE_KEYS.DATA_VERSION);
@@ -82,6 +66,7 @@ if (typeof window !== 'undefined') {
       // Clear old dummy keys to start completely empty
       [
         STORAGE_KEYS.COURSES,
+        STORAGE_KEYS.MASTER_STUDENTS,
         STORAGE_KEYS.MEETINGS,
         STORAGE_KEYS.ASSIGNMENTS,
         STORAGE_KEYS.SUBMISSIONS,
@@ -405,7 +390,7 @@ export const studentService = {
     // Auto-provision if in Lecturer Whitelist
     if (LECTURER_WHITELIST_EMAILS.map((e) => e.toLowerCase()).includes(normalized)) {
       const isMiftah = normalized.includes('miftah');
-      const lecturerName = isMiftah ? 'Muhammad Miftahurridlo, M.Kom.' : 'Tengku Abdillah Aziz, S.Pd.';
+      const lecturerName = isMiftah ? 'Muhammad Miftahurridlo, M.Kom.' : 'Tengku Abdillah Azis';
       const lecturerTitle = isMiftah ? 'Dosen Pengampu Utama' : 'Dosen Pengampu Partner';
       const lecturerNidn = isMiftah ? '0412088501' : '0419058902';
       const lecturerDept = isMiftah
@@ -453,18 +438,8 @@ export const studentService = {
     const registeredUsers = this.getRegisteredUsers().filter((u) => u.role === 'mahasiswa');
     const courses = this.getAllCourses();
 
-    // If empty on first access, auto-seed with standard cohort including Tengku Aziz
     if (students.length === 0) {
-      const seeded: MasterStudent[] = MY_JOURNEY_STUDENT_SEED.map((s, idx) => ({
-        ...s,
-        id: `mstd_${idx + 1}`,
-        avatarUrl: getInitialsAvatar(s.name, false),
-      }));
-      setStorage(STORAGE_KEYS.MASTER_STUDENTS, seeded);
-      return seeded.map((std) => ({
-        ...std,
-        isRegistered: registeredUsers.some((u) => u.email.toLowerCase() === std.email.toLowerCase()),
-      }));
+      return [];
     }
 
     return students.map((std) => {
@@ -646,9 +621,13 @@ export const studentService = {
       }
     } catch {}
 
-    // 2. Jika tidak ada di localStorage, gunakan seed My Journey
+    // 2. Jika tidak ada di localStorage, kembalikan kosongan (tanpa data dummy)
     if (sourceStudents.length === 0) {
-      sourceStudents = MY_JOURNEY_STUDENT_SEED;
+      return {
+        success: true,
+        message: 'Database mahasiswa My Journey saat ini masih kosong.',
+        count: 0,
+      };
     }
 
     const payload: Array<Omit<MasterStudent, 'id'>> = sourceStudents.map((s) => ({
@@ -687,7 +666,8 @@ export const studentService = {
         const d = row.data || {};
         const existing = currentCourses.find((c) => c.id === row.id || c.code.toLowerCase() === (d.code || '').toLowerCase());
         const isLecturerAziz = row.user_id === 'd342423d-fce0-4b54-896f-4c4b27e70dc0';
-        const lecturerName = isLecturerAziz ? 'Tengku Abdillah Aziz, M.Kom.' : 'Tim Dosen Pengampu';
+        const lecturerName = isLecturerAziz ? 'Tengku Abdillah Azis' : 'Muhammad Miftahurridlo';
+        const partnerName = isLecturerAziz ? 'Muhammad Miftahurridlo' : 'Tengku Abdillah Azis';
 
         return {
           id: row.id,
@@ -707,10 +687,10 @@ export const studentService = {
           enrolledCount: existing?.enrolledCount || 0,
           enrolledStudentEmails: existing?.enrolledStudentEmails || [],
           completedMeetingsCount: existing?.completedMeetingsCount || 0,
-          totalMeetingsCount: existing?.totalMeetingsCount || 16,
+          totalMeetingsCount: 16,
           progress: existing?.progress || 0,
           primaryLecturer: lecturerName,
-          partnerLecturer: isLecturerAziz ? 'Tim Dosen Pengampu' : 'Tengku Abdillah Aziz, M.Kom.',
+          partnerLecturer: partnerName,
           teacher: {
             name: lecturerName,
             title: 'Dosen Pengampu',
@@ -719,10 +699,14 @@ export const studentService = {
         };
       });
 
-      // Tetap pertahankan mata kuliah lokal jika ada yang belum di-cloud
+      // Filter out any legacy dummy courses (IF-405, IF-208, GEO-301, crs-1, crs-2, crs-3)
+      const isDummyCourse = (c: CourseClass) =>
+        ['crs-1', 'crs-2', 'crs-3'].includes(c.id) ||
+        ['IF-405', 'IF-208', 'GEO-301'].includes((c.code || '').toUpperCase());
+
       const mergedCourses = [...syncedCourses];
       currentCourses.forEach((c) => {
-        if (!mergedCourses.some((m) => m.id === c.id || m.code.toLowerCase() === c.code.toLowerCase())) {
+        if (!isDummyCourse(c) && !mergedCourses.some((m) => m.id === c.id || m.code.toLowerCase() === c.code.toLowerCase())) {
           mergedCourses.push(c);
         }
       });
@@ -736,6 +720,159 @@ export const studentService = {
     } catch (err: any) {
       return { success: false, count: 0, message: `Gagal menyinkronkan Supabase: ${err.message}` };
     }
+  },
+
+  // Sinkronisasi menyeluruh dari Google Apps Script Teaching Bridge + Supabase Cloud
+  async syncAllFromMyJourneyCloud(): Promise<{ success: boolean; message: string }> {
+    let coursesCount = 0;
+    let profilesCount = 0;
+    let studentsCount = 0;
+
+    // 1. Tarik dari Google Apps Script Teaching Bridge (Google Sheets)
+    try {
+      const gasUrl = `${(import.meta as any).env?.VITE_GAS_API_URL || 'https://script.google.com/macros/s/AKfycbwDzcpOCO9Npm0sH8DM9maCOEtDo_LWaHMX4K7JY6RPle_5En0fG5s59sEHRJ9UZ45W/exec'}?action=getTeaching`;
+      const res = await fetch(gasUrl);
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.status === 'success' && json?.data) {
+          // A. Profil Dosen
+          if (json.data.Profiles && Array.isArray(json.data.Profiles)) {
+            const curUser = this.getCurrentUser();
+            const regUsers = this.getRegisteredUsers();
+
+            json.data.Profiles.forEach((prof: any) => {
+              const cleanEmail = (prof.email || '').toLowerCase().trim();
+              if (!cleanEmail) return;
+
+              const idx = regUsers.findIndex((u) => u.email.toLowerCase() === cleanEmail);
+              const cleanName = prof.name || (cleanEmail.includes('miftah') ? 'Muhammad Miftahurridlo' : 'Tengku Abdillah Azis');
+              const userObj: RegisteredUser = {
+                id: idx >= 0 ? regUsers[idx].id : `dos_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`,
+                name: cleanName,
+                email: cleanEmail,
+                role: 'dosen',
+                title: prof.title || prof.role || 'Dosen Pengampu',
+                department: prof.department || (cleanEmail.includes('miftah') ? 'Sistem Informasi Geografis & Geomatika' : 'Rekayasa Perangkat Lunak & Geoinformatika'),
+                avatarUrl: prof.avatarUrl || getInitialsAvatar(cleanName, true),
+                bio: prof.bio || `${cleanName} — Dosen Pengampu Smart Learning Hub & My Journey.`,
+                registeredAt: regUsers[idx]?.registeredAt || new Date().toISOString(),
+              };
+
+              if (idx >= 0) {
+                regUsers[idx] = { ...regUsers[idx], ...userObj };
+              } else {
+                regUsers.push(userObj);
+              }
+              profilesCount++;
+
+              if (curUser && curUser.email.toLowerCase() === cleanEmail) {
+                this.setCurrentUser(userObj);
+              }
+            });
+
+            setStorage(STORAGE_KEYS.REGISTERED_USERS, regUsers);
+          }
+
+          // B. Kelas dari Google Sheets (hanya non-dummy)
+          if (json.data.Courses && Array.isArray(json.data.Courses) && json.data.Courses.length > 0) {
+            const currentCourses = this.getAllCourses().filter(
+              (c) => !['crs-1', 'crs-2', 'crs-3'].includes(c.id) && !['IF-405', 'IF-208', 'GEO-301'].includes(c.code.toUpperCase())
+            );
+
+            json.data.Courses.forEach((c: any) => {
+              const codeStr = String(c.code || '').trim();
+              const nameStr = c.name || 'Mata Kuliah';
+              if (!codeStr || ['IF-405', 'IF-208', 'GEO-301'].includes(codeStr.toUpperCase())) return;
+
+              const existsIdx = currentCourses.findIndex((crs) => crs.id === c.id || crs.code.toLowerCase() === codeStr.toLowerCase());
+              const mappedCourse: CourseClass = {
+                id: c.id || `gas_crs_${codeStr}`,
+                code: codeStr,
+                title: nameStr,
+                section: c.section || 'Kelas A',
+                schedule: c.schedule || 'Jadwal Kuliah',
+                room: c.room || 'Lab Komputasi',
+                credits: Number(c.credits) || 3,
+                semester: c.semester || 'Ganjil 2026/2027',
+                academicYear: c.academicYear || '2026/2027',
+                description: c.description || `Mata kuliah ${nameStr} diampu oleh tim dosen.`,
+                category: 'Geografi & Geospasial',
+                color: 'from-blue-600 to-indigo-700',
+                status: 'active',
+                syllabusOverview: c.syllabusOverview || 'Kurikulum OBE',
+                enrolledCount: Number(c.enrolledCount) || 0,
+                enrolledStudentEmails: [],
+                completedMeetingsCount: 0,
+                totalMeetingsCount: 16,
+                progress: 0,
+                primaryLecturer: c.primaryLecturer || 'Tengku Abdillah Azis',
+                partnerLecturer: c.partnerLecturer || 'Muhammad Miftahurridlo',
+                teacher: {
+                  name: c.primaryLecturer || 'Tengku Abdillah Azis',
+                  title: 'Dosen Pengampu',
+                  avatarUrl: '',
+                },
+              };
+
+              if (existsIdx >= 0) {
+                currentCourses[existsIdx] = { ...currentCourses[existsIdx], ...mappedCourse };
+              } else {
+                currentCourses.push(mappedCourse);
+              }
+              coursesCount++;
+            });
+
+            setStorage(STORAGE_KEYS.COURSES, currentCourses);
+          }
+
+          // C. Mahasiswa Resmi dari Google Sheets (hanya mahasiswa nyata)
+          if (json.data.Students && Array.isArray(json.data.Students) && json.data.Students.length > 0) {
+            const masterStudents = this.getMasterStudents();
+            json.data.Students.forEach((std: any) => {
+              const cleanEmail = (std.email || '').toLowerCase().trim();
+              if (!cleanEmail) return;
+
+              const idx = masterStudents.findIndex((m) => m.email.toLowerCase() === cleanEmail);
+              const record: MasterStudent = {
+                id: std.id || `std_${Date.now()}`,
+                nim: String(std.nim || '10123000'),
+                name: std.name || 'Mahasiswa',
+                email: cleanEmail,
+                major: std.major || 'Sistem Informasi Geografis',
+                classSection: std.classSection || 'Kelas A',
+                enrolledCourseCodes: std.courseCode ? [String(std.courseCode)] : [],
+                avatarUrl: getInitialsAvatar(std.name || 'Mahasiswa', false),
+              };
+
+              if (idx >= 0) {
+                masterStudents[idx] = { ...masterStudents[idx], ...record };
+              } else {
+                masterStudents.push(record);
+              }
+              studentsCount++;
+            });
+            setStorage(STORAGE_KEYS.MASTER_STUDENTS, masterStudents);
+          }
+        }
+      }
+    } catch (gasErr) {
+      console.warn('[MyJourneySync] Google Apps Script fetch warning:', gasErr);
+    }
+
+    // 2. Tarik Kelas dari Supabase Cloud
+    try {
+      const supaResult = await this.syncCoursesFromSupabase();
+      if (supaResult.success) {
+        coursesCount += supaResult.count;
+      }
+    } catch (supaErr) {
+      console.warn('[MyJourneySync] Supabase fetch warning:', supaErr);
+    }
+
+    return {
+      success: true,
+      message: `Sinkronisasi berhasil! ${coursesCount} mata kuliah aktif dan profil dosen diselaraskan.`,
+    };
   },
 
   // Auth: Login dengan dukungan Supabase Auth & Local Fallback
@@ -782,13 +919,14 @@ export const studentService = {
           }
 
           this.setCurrentUser(user);
-          // Sinkronisasi otomatis mata kuliah dari Supabase
-          await this.syncCoursesFromSupabase();
+          // Sinkronisasi otomatis data Teaching & Profil dari Google Sheets + Supabase My Journey
+          await this.syncAllFromMyJourneyCloud();
 
+          const refreshedUser = this.getCurrentUser() || user;
           return {
             success: true,
-            user,
-            message: `Selamat datang kembali, ${user.name}! (Terverifikasi Supabase)`,
+            user: refreshedUser,
+            message: `Selamat datang kembali, ${refreshedUser.name}! (Terverifikasi Supabase & My Journey)`,
           };
         }
       } catch {
@@ -799,7 +937,11 @@ export const studentService = {
     // 2. Fallback ke login lokal
     const localResult = this.login(email, password);
     if (localResult.success) {
-      this.syncCoursesFromSupabase().catch(() => {});
+      await this.syncAllFromMyJourneyCloud();
+      const refreshedUser = this.getCurrentUser();
+      if (refreshedUser) {
+        localResult.user = refreshedUser;
+      }
     }
     return localResult;
   },

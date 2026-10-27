@@ -368,66 +368,27 @@ export const myJourneySyncService = {
   },
 
   /**
-   * Tarik pembaruan Teaching dari Google Sheets (jika ada pembaruan dari My Journey)
+   * Tarik pembaruan Teaching dari Google Sheets & Supabase (sinkronisasi menyeluruh)
    */
   async pullTeachingFromGoogleSheets(): Promise<SyncResult> {
-    const url = googleDriveService.getGasApiUrl();
-    if (!url) {
-      return {
-        success: false,
-        message: 'URL Google Apps Script belum dikonfigurasi.',
-        timestamp: new Date().toISOString(),
-      };
-    }
-
     try {
-      const fetchUrl = `${url}${url.includes('?') ? '&' : '?'}action=getTeaching`;
-      const res = await fetch(fetchUrl);
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-      }
-
-      const json = await res.json();
-      if (json.status === 'success' && json.data) {
-        // Jika ada tabel Profiles di Spreadsheet, perbarui profil dosen yang cocok
-        if (json.data.Profiles && Array.isArray(json.data.Profiles)) {
-          const curUser = studentService.getCurrentUser();
-          if (curUser) {
-            const matched = json.data.Profiles.find((p: any) => p.email?.toLowerCase() === curUser.email.toLowerCase());
-            if (matched) {
-              studentService.updateLecturerProfile({
-                name: matched.name || curUser.name,
-                title: matched.title || curUser.title,
-                department: matched.department || curUser.department,
-                avatarUrl: matched.avatarUrl || curUser.avatarUrl,
-              });
-            }
-          }
-        }
-
-        const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
-        localStorage.setItem(STORAGE_KEYS.LAST_SYNC_TIMESTAMP, nowStr);
-        localStorage.setItem(STORAGE_KEYS.LAST_SYNC_STATUS, JSON.stringify({
-          status: 'success',
-          message: `Data ditarik dari Google Sheets My Journey (${nowStr})`,
-        }));
-
-        return {
-          success: true,
-          message: 'Berhasil menarik data Teaching dan Profil terbaru dari Google Sheets My Journey.',
-          timestamp: nowStr,
-        };
-      }
+      const result = await studentService.syncAllFromMyJourneyCloud();
+      const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
+      localStorage.setItem(STORAGE_KEYS.LAST_SYNC_TIMESTAMP, nowStr);
+      localStorage.setItem(STORAGE_KEYS.LAST_SYNC_STATUS, JSON.stringify({
+        status: 'success',
+        message: `${result.message} (${nowStr})`,
+      }));
 
       return {
-        success: false,
-        message: json.message || 'Sheet Teaching belum memiliki data tambahan.',
-        timestamp: new Date().toISOString(),
+        success: true,
+        message: result.message,
+        timestamp: nowStr,
       };
     } catch (err: any) {
       return {
         success: false,
-        message: `Gagal mengambil data dari Google Sheets: ${err.message}`,
+        message: `Gagal menyinkronkan data: ${err.message}`,
         timestamp: new Date().toISOString(),
       };
     }

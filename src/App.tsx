@@ -151,17 +151,20 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Auto-sync courses directly from Supabase Cloud on mount & user change
+  // Auto-sync data & profile directly from My Journey Cloud (Google Sheets + Supabase) on mount & user change
   useEffect(() => {
-    studentService.syncCoursesFromSupabase().then((res) => {
-      if (res.success && res.count > 0) {
+    studentService.syncAllFromMyJourneyCloud().then((res) => {
+      if (res.success) {
         setAllLecturerCourses(studentService.getAllCourses());
-        if (currentUser) {
-          setCourses(studentService.getEnrolledCourses(currentUser.email));
+        const updatedUser = studentService.getCurrentUser();
+        if (updatedUser) {
+          setCurrentUser(updatedUser);
+          setCourses(studentService.getEnrolledCourses(updatedUser.email));
         }
+        reloadData();
       }
     }).catch(() => {});
-  }, [currentUser]);
+  }, [currentUser?.email]);
 
   // Background Auto-sync Teaching ke Google Sheets & My Journey saat Dosen Aktif
   useEffect(() => {
@@ -195,7 +198,7 @@ export default function App() {
     reloadData();
   };
 
-  const handleLoginSuccess = (user: AuthUser) => {
+  const handleLoginSuccess = async (user: AuthUser) => {
     setCurrentUser(user);
     setIsGuestMode(false);
     setSelectedCourseId(null);
@@ -204,6 +207,12 @@ export default function App() {
       setLecturerTab('beranda');
     } else {
       setStudentTab('beranda');
+    }
+    // Pull full profile & cloud teaching data immediately
+    await studentService.syncAllFromMyJourneyCloud();
+    const refreshed = studentService.getCurrentUser();
+    if (refreshed) {
+      setCurrentUser(refreshed);
     }
     reloadData();
   };
