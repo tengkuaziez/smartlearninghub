@@ -4,19 +4,15 @@ import {
   Mail, 
   Lock, 
   User, 
-  ShieldCheck, 
   ArrowRight, 
   CheckCircle2, 
   AlertCircle, 
-  Sparkles,
   KeyRound,
-  GraduationCap,
-  Award
+  Hash,
 } from 'lucide-react';
 import { Logo } from '../common/Logo.tsx';
 import { studentService, type RegisteredUser } from '../../services/studentService.ts';
-import { LECTURER_WHITELIST_EMAILS } from '../../data/mockData.ts';
-import type { AuthUser, UserRole } from '../../types/index.ts';
+import type { AuthUser } from '../../types/index.ts';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -38,9 +34,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
-  const [role, setRole] = useState<UserRole>('dosen');
-  const [nim, setNim] = useState('');
-  const [nidn, setNidn] = useState('');
+  const [identifier, setIdentifier] = useState(''); // Unified NIM / NIDN
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,23 +50,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   }, [isOpen, initialMode]);
 
-  // Auto-detect lecturer whitelist
-  useEffect(() => {
-    const clean = email.toLowerCase().trim();
-    if (LECTURER_WHITELIST_EMAILS.map((e) => e.toLowerCase()).includes(clean)) {
-      setRole('dosen');
-      if (!name) {
-        setName(clean.includes('miftah') ? 'Miftahur Ridlo, M.Kom.' : 'Tengku Abdillah Aziz, S.Pd.');
-      }
-      if (!nidn) {
-        setNidn(clean.includes('miftah') ? '0412088501' : '0419058902');
-      }
-    }
-  }, [email, name, nidn]);
-
   if (!isOpen) return null;
-
-  const isLecturerEmail = LECTURER_WHITELIST_EMAILS.map((e) => e.toLowerCase()).includes(email.toLowerCase().trim());
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,11 +66,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setTimeout(() => {
           onLoginSuccess(res.user!);
           onClose();
-        }, 600);
+        }, 500);
       } else {
         setError(res.message);
       }
-    }, 400);
+    }, 350);
   };
 
   const handleRegister = (e: React.FormEvent) => {
@@ -112,9 +90,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const res = studentService.register({
         name,
         email,
-        role,
-        nim: role === 'mahasiswa' ? nim : undefined,
-        nidn: role === 'dosen' ? nidn : undefined,
+        nim: identifier.trim() || undefined,
+        nidn: identifier.trim() || undefined,
         password,
       });
 
@@ -123,11 +100,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setTimeout(() => {
           onLoginSuccess(res.user!);
           onClose();
-        }, 900);
+        }, 800);
       } else {
         setError(res.message);
       }
-    }, 500);
+    }, 450);
   };
 
   const handleForgotPassword = (e: React.FormEvent) => {
@@ -163,7 +140,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       >
         {/* Header */}
         <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
-          <Logo size={28} showText={true} textClassName="text-sm font-bold text-slate-900 dark:text-white" />
+          <div className="flex items-center gap-2">
+            <Logo size={28} showText={true} textClassName="text-sm font-bold text-slate-900 dark:text-white" />
+          </div>
           <button
             onClick={onClose}
             className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
@@ -203,7 +182,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'
               }`}
             >
-              Daftar Akun Baru
+              Daftar Akun
             </button>
             <button
               onClick={() => {
@@ -221,7 +200,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </button>
           </div>
 
-          {/* LOGIN FORM */}
+          {/* LOGIN FORM (Unified) */}
           {mode === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
@@ -286,57 +265,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-2.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full py-2.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
               >
-                {isLoading ? 'Memeriksa Kredensial...' : 'Masuk Sekarang'}
+                {isLoading ? 'Memeriksa Kredensial...' : 'Masuk ke Smart Learning Hub'}
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
           )}
 
-          {/* REGISTER FORM */}
+          {/* REGISTER FORM (Unified) */}
           {mode === 'register' && (
             <form onSubmit={handleRegister} className="space-y-3">
-              {/* Role Indicator Banner */}
-              {isLecturerEmail ? (
-                <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-900 dark:text-indigo-200 flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                  <span>Terdeteksi sebagai <strong>Akun Dosen Pengampu</strong> (Tersambung My Journey).</span>
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Pilih Peran Akun
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setRole('dosen')}
-                      className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                        role === 'dosen'
-                          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 shadow-xs'
-                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-                      }`}
-                    >
-                      <Award className="w-4 h-4" />
-                      <span>Dosen Pengampu</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRole('mahasiswa')}
-                      className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                        role === 'mahasiswa'
-                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 shadow-xs'
-                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-                      }`}
-                    >
-                      <GraduationCap className="w-4 h-4" />
-                      <span>Mahasiswa</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Nama Lengkap
@@ -347,7 +286,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Contoh: Miftahur Ridlo, M.Kom."
+                    placeholder="Nama Lengkap Anda"
                     className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
                     required
                   />
@@ -364,40 +303,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="miftahurridlo.688@gmail.com atau email mahasiswa"
+                    placeholder="nama@email.com"
                     className="w-full pl-9 pr-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
                     required
                   />
                 </div>
               </div>
 
-              {role === 'dosen' ? (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    NIDN Dosen (Opsional)
-                  </label>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  NIM / NIDN <span className="text-slate-400 font-normal">(Opsional)</span>
+                </label>
+                <div className="relative">
+                  <Hash className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    value={nidn}
-                    onChange={(e) => setNidn(e.target.value)}
-                    placeholder="Nomor Induk Dosen Nasional (misal 0412088501)"
-                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    placeholder="Nomor Induk Mahasiswa / Dosen"
+                    className="w-full pl-9 pr-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
                   />
                 </div>
-              ) : (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    NIM Mahasiswa
-                  </label>
-                  <input
-                    type="text"
-                    value={nim}
-                    onChange={(e) => setNim(e.target.value)}
-                    placeholder="Nomor Induk Mahasiswa"
-                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
-                  />
-                </div>
-              )}
+              </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -445,9 +372,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-2.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm flex items-center justify-center gap-2"
+                className="w-full py-2.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
               >
-                {isLoading ? 'Mendaftarkan Akun...' : 'Daftarkan Akun Sekarang'}
+                {isLoading ? 'Mendaftarkan Akun...' : 'Daftar Akun Smart Learning Hub'}
+                <ArrowRight className="w-4 h-4" />
               </button>
             </form>
           )}
@@ -509,7 +437,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {savedUsers.length > 0 && (
             <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                Akun Terdaftar di Perangkat Ini:
+                Akun Tersimpan di Perangkat Ini:
               </span>
               <div className="flex flex-col gap-1.5">
                 {savedUsers.map((u) => (
@@ -526,7 +454,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <span className={`text-[10px] px-2 py-0.5 rounded-md font-mono shrink-0 ${
                       u.role === 'dosen' ? 'bg-indigo-600 text-white' : 'bg-blue-600 text-white'
                     }`}>
-                      {u.role === 'dosen' ? 'Dosen' : 'Mhs'}
+                      {u.role === 'dosen' ? 'Dosen' : 'Mahasiswa'}
                     </span>
                   </button>
                 ))}
@@ -534,10 +462,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
           )}
 
-          {/* Lecturer Quick Guide Notice */}
-          <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 space-y-1">
-            <p className="font-bold text-slate-700 dark:text-slate-300">Akun Resmi Tim Dosen Pengampu:</p>
-            <p>Daftarkan akun dengan email <strong>miftahurridlo.688@gmail.com</strong> atau <strong>altaf.aziz16@gmail.com</strong> untuk otomatis mengaktifkan hak akses Dosen Pengampu & sinkronisasi My Journey.</p>
+          {/* Unified System Notice */}
+          <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+            Portal tunggal untuk seluruh civitas akademik. Sistem otomatis mengaktifkan ruang kerja <strong>Dosen Pengampu</strong> atau <strong>Mahasiswa</strong> sesuai identitas akun Anda.
           </div>
         </div>
       </div>

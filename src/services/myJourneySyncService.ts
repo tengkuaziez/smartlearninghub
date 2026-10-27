@@ -260,25 +260,27 @@ export const myJourneySyncService = {
       };
     });
 
-    // 6. Profiles
-    const profilesPayload = [
-      {
-        email: 'miftahurridlo.688@gmail.com',
-        name: 'Miftahur Ridlo, M.Kom.',
+    // 6. Profiles from registered lecturers
+    const registeredLecturers = studentService.getRegisteredLecturers();
+    const profilesPayload = registeredLecturers.map((lec) => ({
+      email: lec.email,
+      name: lec.name,
+      title: lec.title || 'Dosen Pengampu',
+      role: 'Dosen & Peneliti',
+      department: lec.department || 'Teknologi Informasi',
+      avatarUrl: lec.avatarUrl,
+    }));
+
+    if (profilesPayload.length === 0) {
+      profilesPayload.push({
+        email: uploaderEmail,
+        name: 'Muhammad Miftahurridlo',
         title: 'Dosen Pengampu Utama',
         role: 'Dosen & Peneliti',
-        department: 'Sistem Informasi Geografis & Geomatika',
-        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-      },
-      {
-        email: 'altaf.aziz16@gmail.com',
-        name: 'Tengku Abdillah Aziz, S.Pd.',
-        title: 'Dosen Pengampu Partner',
-        role: 'Dosen & Peneliti',
-        department: 'Rekayasa Perangkat Lunak & Geoinformatika',
-        avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
-      },
-    ];
+        department: 'Pendidikan Geografi / Sains Informasi Geografis',
+        avatarUrl: studentService.getCurrentUser()?.avatarUrl || '',
+      });
+    }
 
     return {
       action: 'syncTeaching',
@@ -387,6 +389,22 @@ export const myJourneySyncService = {
 
       const json = await res.json();
       if (json.status === 'success' && json.data) {
+        // Jika ada tabel Profiles di Spreadsheet, perbarui profil dosen yang cocok
+        if (json.data.Profiles && Array.isArray(json.data.Profiles)) {
+          const curUser = studentService.getCurrentUser();
+          if (curUser) {
+            const matched = json.data.Profiles.find((p: any) => p.email?.toLowerCase() === curUser.email.toLowerCase());
+            if (matched) {
+              studentService.updateLecturerProfile({
+                name: matched.name || curUser.name,
+                title: matched.title || curUser.title,
+                department: matched.department || curUser.department,
+                avatarUrl: matched.avatarUrl || curUser.avatarUrl,
+              });
+            }
+          }
+        }
+
         const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
         localStorage.setItem(STORAGE_KEYS.LAST_SYNC_TIMESTAMP, nowStr);
         localStorage.setItem(STORAGE_KEYS.LAST_SYNC_STATUS, JSON.stringify({
@@ -396,7 +414,7 @@ export const myJourneySyncService = {
 
         return {
           success: true,
-          message: 'Berhasil menarik data Teaching terbaru dari Google Sheets My Journey.',
+          message: 'Berhasil menarik data Teaching dan Profil terbaru dari Google Sheets My Journey.',
           timestamp: nowStr,
         };
       }

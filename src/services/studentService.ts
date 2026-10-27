@@ -107,25 +107,31 @@ export interface RegisteredUser extends AuthUser {
   password?: string;
 }
 
+export const getInitialsAvatar = (name: string, isDosen = false): string => {
+  const bg = isDosen ? '4f46e5' : '2563eb';
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=${bg}&color=fff&size=256&bold=true`;
+};
+
 export const defaultStudentUser: AuthUser = {
   id: 'std_demo',
   name: 'Mahasiswa',
   email: 'mahasiswa@student.ac.id',
   role: 'mahasiswa',
   nim: '10123001',
-  avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=300',
+  avatarUrl: getInitialsAvatar('Mahasiswa', false),
   registeredAt: '2026-09-01',
 };
 
 export const defaultLecturerUser: AuthUser = {
   id: 'dos_01',
-  name: 'Miftahur Ridlo, M.Kom.',
+  name: 'Muhammad Miftahurridlo, M.Kom.',
   email: 'miftahurridlo.688@gmail.com',
   role: 'dosen',
   nidn: '0412088501',
   title: 'Dosen Pengampu Utama',
-  department: 'Sistem Informasi Geografis & Geomatika',
-  avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+  department: 'Pendidikan Geografi / Sains Informasi Geografis',
+  avatarUrl: getInitialsAvatar('Muhammad Miftahurridlo', true),
+  bio: 'Dosen Pengampu Utama Smart Learning Hub & My Journey.',
   registeredAt: '2026-08-01',
 };
 
@@ -155,13 +161,21 @@ export interface MeetingAttendanceRosterSummary {
 export const studentService = {
   // Current Authenticated User (Lecturer or Student or null if not logged in)
   getCurrentUser(): AuthUser | null {
-    return getStorage<AuthUser | null>(STORAGE_KEYS.CURRENT_USER, null);
+    const user = getStorage<AuthUser | null>(STORAGE_KEYS.CURRENT_USER, null);
+    if (user && user.avatarUrl && (user.avatarUrl.includes('photo-1534528741775') || user.avatarUrl.includes('photo-1507003211169'))) {
+      user.avatarUrl = getInitialsAvatar(user.name, user.role === 'dosen');
+      setStorage(STORAGE_KEYS.CURRENT_USER, user);
+    }
+    return user;
   },
 
   setCurrentUser(user: AuthUser | null): void {
     if (!user) {
       localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
     } else {
+      if (user.avatarUrl && (user.avatarUrl.includes('photo-1534528741775') || user.avatarUrl.includes('photo-1507003211169'))) {
+        user.avatarUrl = getInitialsAvatar(user.name, user.role === 'dosen');
+      }
       setStorage(STORAGE_KEYS.CURRENT_USER, user);
     }
   },
@@ -171,7 +185,18 @@ export const studentService = {
   },
 
   getRegisteredUsers(): RegisteredUser[] {
-    return getStorage<RegisteredUser[]>(STORAGE_KEYS.REGISTERED_USERS, []);
+    const users = getStorage<RegisteredUser[]>(STORAGE_KEYS.REGISTERED_USERS, []);
+    let modified = false;
+    users.forEach((u) => {
+      if (u.avatarUrl && (u.avatarUrl.includes('photo-1534528741775') || u.avatarUrl.includes('photo-1507003211169'))) {
+        u.avatarUrl = getInitialsAvatar(u.name, u.role === 'dosen');
+        modified = true;
+      }
+    });
+    if (modified) {
+      setStorage(STORAGE_KEYS.REGISTERED_USERS, users);
+    }
+    return users;
   },
 
   saveRegisteredUser(user: RegisteredUser): void {
@@ -188,6 +213,149 @@ export const studentService = {
   getRegisteredLecturers(): AuthUser[] {
     const users = this.getRegisteredUsers();
     return users.filter((u) => u.role === 'dosen');
+  },
+
+  // Update lecturer profile directly (Foto, Gelar, NIDN, Prodi, Bio, dsb)
+  updateLecturerProfile(updates: Partial<AuthUser>): AuthUser {
+    const current = this.getCurrentUser();
+    if (!current) {
+      throw new Error('Tidak ada akun yang sedang aktif.');
+    }
+
+    const updatedUser: AuthUser = {
+      ...current,
+      ...updates,
+      id: current.id,
+      email: current.email,
+      role: current.role,
+    };
+
+    // Update in registered users list
+    const users = this.getRegisteredUsers();
+    const idx = users.findIndex((u) => u.email.toLowerCase() === current.email.toLowerCase());
+    if (idx >= 0) {
+      users[idx] = { ...users[idx], ...updatedUser };
+      setStorage(STORAGE_KEYS.REGISTERED_USERS, users);
+    }
+
+    this.setCurrentUser(updatedUser);
+    return updatedUser;
+  },
+
+  // Sinkronisasi data profil dari My Journey (Shared LocalStorage, Supabase, atau Google Sheets)
+  async syncProfileFromMyJourney(targetEmail?: string): Promise<{ success: boolean; message: string; profile?: AuthUser }> {
+    const emailToSync = (targetEmail || this.getCurrentUser()?.email || '').toLowerCase().trim();
+    if (!emailToSync) {
+      return { success: false, message: 'Email tidak ditemukan untuk sinkronisasi.' };
+    }
+
+    let foundProfileData: any = null;
+
+    // 1. Coba ambil dari LocalStorage My Journey (jika diakses pada peramban/origin yang sama)
+    try {
+      const rawMyJourney = localStorage.getItem('my_journey_user_profile');
+      if (rawMyJourney) {
+        const parsed = JSON.parse(rawMyJourney);
+        if (parsed && (parsed.name || parsed.title)) {
+          foundProfileData = parsed;
+        }
+      }
+    } catch {}
+
+    // 2. Jika belum ada atau mau verifikasi, coba tarik dari Google Sheets Teaching Bridge
+    try {
+      const gasResult = await fetch(`${(import.meta as any).env?.VITE_GAS_API_URL || 'https://script.google.com/macros/s/AKfycbwDzcpOCO9Npm0sH8DM9maCOEtDo_LWaHMX4K7JY6RPle_5En0fG5s59sEHRJ9UZ45W/exec'}?action=getTeaching`);
+      if (gasResult.ok) {
+        const json = await gasResult.json();
+        if (json?.data?.Profiles && Array.isArray(json.data.Profiles)) {
+          const matched = json.data.Profiles.find((p: any) => p.email?.toLowerCase() === emailToSync);
+          if (matched) {
+            foundProfileData = {
+              name: matched.name || foundProfileData?.name,
+              title: matched.title || foundProfileData?.title,
+              role: matched.role || foundProfileData?.role,
+              department: matched.department || foundProfileData?.department,
+              avatarUrl: matched.avatarUrl || foundProfileData?.avatarUrl,
+            };
+          }
+        }
+      }
+    } catch {}
+
+    if (foundProfileData) {
+      let fullName = foundProfileData.name || '';
+      if (foundProfileData.titlePrefix) {
+        fullName = `${foundProfileData.titlePrefix} ${fullName}`;
+      }
+      const suffix = foundProfileData.titleSuffix || (foundProfileData.title && foundProfileData.title.includes('.') ? foundProfileData.title : '');
+      if (suffix && !fullName.includes(suffix)) {
+        fullName = `${fullName}, ${suffix}`;
+      }
+
+      const updated = this.updateLecturerProfile({
+        name: fullName || foundProfileData.name,
+        title: foundProfileData.role || foundProfileData.title || 'Dosen Pengampu Utama',
+        department: foundProfileData.universityOrOrg || foundProfileData.department || 'Pendidikan Geografi / Sains Informasi Geografis',
+        avatarUrl: foundProfileData.avatarUrl && !foundProfileData.avatarUrl.includes('photo-1534528741775')
+          ? foundProfileData.avatarUrl
+          : getInitialsAvatar(fullName || foundProfileData.name, true),
+        bio: foundProfileData.bio || 'Dosen Pengampu Utama Smart Learning Hub & My Journey.',
+        googleScholarUrl: foundProfileData.googleScholarUrl || '',
+        sintaUrl: foundProfileData.sintaUrl || '',
+        linkedinUrl: foundProfileData.linkedinUrl || '',
+      });
+
+      return {
+        success: true,
+        message: 'Profil berhasil disinkronkan dengan My Journey!',
+        profile: updated,
+      };
+    }
+
+    return {
+      success: false,
+      message: 'Data My Journey belum ditemukan di peramban ini atau cloud. Anda dapat mengedit profil secara langsung atau menempel data profil My Journey.',
+    };
+  },
+
+  // Impor profil dari format JSON My Journey
+  importMyJourneyProfileJson(jsonString: string): { success: boolean; message: string; profile?: AuthUser } {
+    try {
+      const parsed = JSON.parse(jsonString.trim());
+      if (!parsed || (!parsed.name && !parsed.email)) {
+        return { success: false, message: 'Format data JSON My Journey tidak valid.' };
+      }
+
+      let fullName = parsed.name || '';
+      if (parsed.titlePrefix) {
+        fullName = `${parsed.titlePrefix} ${fullName}`;
+      }
+      const suffix = parsed.titleSuffix || (parsed.title && parsed.title.includes('.') ? parsed.title : '');
+      if (suffix && !fullName.includes(suffix)) {
+        fullName = `${fullName}, ${suffix}`;
+      }
+
+      const updated = this.updateLecturerProfile({
+        name: fullName || parsed.name,
+        title: parsed.role || parsed.title || 'Dosen Pengampu Utama',
+        department: parsed.universityOrOrg || parsed.department || 'Pendidikan Geografi / Sains Informasi Geografis',
+        avatarUrl: parsed.avatarUrl && !parsed.avatarUrl.includes('photo-1534528741775')
+          ? parsed.avatarUrl
+          : getInitialsAvatar(fullName || parsed.name, true),
+        bio: parsed.bio || 'Dosen Pengampu Utama Smart Learning Hub & My Journey.',
+        googleScholarUrl: parsed.googleScholarUrl || '',
+        sintaUrl: parsed.sintaUrl || '',
+        linkedinUrl: parsed.linkedinUrl || '',
+      });
+
+      return {
+        success: true,
+        message: 'Data profil My Journey berhasil diimpor ke Smart Learning Hub!',
+        profile: updated,
+      };
+    } catch (e: any) {
+      return { success: false, message: 'Gagal mengurai teks JSON: ' + e.message };
+    }
   },
 
   // Auth: Login with Email & Password
@@ -217,15 +385,17 @@ export const studentService = {
 
     // Auto-provision if in Lecturer Whitelist
     if (LECTURER_WHITELIST_EMAILS.map((e) => e.toLowerCase()).includes(normalized)) {
-      const lecturerName = normalized.includes('miftah') ? 'Miftahur Ridlo, M.Kom.' : 'Tengku Abdillah Aziz, S.Pd.';
-      const lecturerTitle = normalized.includes('miftah') ? 'Dosen Pengampu Utama' : 'Dosen Pengampu Partner';
-      const lecturerNidn = normalized.includes('miftah') ? '0412088501' : '0419058902';
-      const lecturerDept = normalized.includes('miftah')
-        ? 'Sistem Informasi Geografis & Geomatika'
+      const isMiftah = normalized.includes('miftah');
+      const lecturerName = isMiftah ? 'Muhammad Miftahurridlo, M.Kom.' : 'Tengku Abdillah Aziz, S.Pd.';
+      const lecturerTitle = isMiftah ? 'Dosen Pengampu Utama' : 'Dosen Pengampu Partner';
+      const lecturerNidn = isMiftah ? '0412088501' : '0419058902';
+      const lecturerDept = isMiftah
+        ? 'Pendidikan Geografi / Sains Informasi Geografis'
         : 'Rekayasa Perangkat Lunak & Geoinformatika';
-      const lecturerAvatar = normalized.includes('miftah')
-        ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250'
-        : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250';
+      const lecturerAvatar = getInitialsAvatar(lecturerName, true);
+      const lecturerBio = isMiftah
+        ? 'Dosen Pengampu Utama Smart Learning Hub & My Journey.'
+        : 'Dosen Pengampu Partner Smart Learning Hub & My Journey.';
 
       const newLecturer: RegisteredUser = {
         id: `dos_${Date.now()}`,
@@ -236,6 +406,7 @@ export const studentService = {
         nidn: lecturerNidn,
         title: lecturerTitle,
         department: lecturerDept,
+        bio: lecturerBio,
         avatarUrl: lecturerAvatar,
         registeredAt: new Date().toISOString(),
       };
@@ -277,40 +448,33 @@ export const studentService = {
     }
 
     const isLecturerWhitelist = LECTURER_WHITELIST_EMAILS.map((e) => e.toLowerCase()).includes(normalized);
-    const role: UserRole = isLecturerWhitelist ? 'dosen' : (data.role || 'mahasiswa');
+    const role: UserRole = isLecturerWhitelist ? 'dosen' : 'mahasiswa';
 
-    let defaultName = data.name.trim();
+    const cleanName = data.name.trim();
     let title: string | undefined;
     let nidn: string | undefined = data.nidn?.trim();
     let department: string | undefined;
+    let bio: string | undefined;
     let avatarUrl: string;
 
     if (role === 'dosen') {
-      if (normalized.includes('miftah')) {
-        defaultName = defaultName || 'Miftahur Ridlo, M.Kom.';
-        title = 'Dosen Pengampu Utama';
-        nidn = nidn || '0412088501';
-        department = 'Sistem Informasi Geografis & Geomatika';
-        avatarUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250';
-      } else if (normalized.includes('altaf')) {
-        defaultName = defaultName || 'Tengku Abdillah Aziz, S.Pd.';
-        title = 'Dosen Pengampu Partner';
-        nidn = nidn || '0419058902';
-        department = 'Rekayasa Perangkat Lunak & Geoinformatika';
-        avatarUrl = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250';
-      } else {
-        title = 'Dosen Pengampu';
-        nidn = nidn || '0400000001';
-        department = 'Teknologi Informasi';
-        avatarUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250';
-      }
+      const isMiftah = normalized.includes('miftah');
+      title = isMiftah ? 'Dosen Pengampu Utama' : 'Dosen Pengampu Partner';
+      nidn = nidn || (isMiftah ? '0412088501' : '0419058902');
+      department = isMiftah
+        ? 'Pendidikan Geografi / Sains Informasi Geografis'
+        : 'Rekayasa Perangkat Lunak & Geoinformatika';
+      bio = isMiftah
+        ? 'Dosen Pengampu Utama Smart Learning Hub & My Journey.'
+        : 'Dosen Pengampu Partner Smart Learning Hub & My Journey.';
+      avatarUrl = getInitialsAvatar(cleanName, true);
     } else {
-      avatarUrl = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=300';
+      avatarUrl = getInitialsAvatar(cleanName, false);
     }
 
     const newUser: RegisteredUser = {
       id: role === 'dosen' ? `dos_${Date.now()}` : `std_${Date.now()}`,
-      name: defaultName,
+      name: cleanName,
       email: normalized,
       role,
       password: data.password || '',
@@ -318,6 +482,7 @@ export const studentService = {
       nidn,
       title,
       department,
+      bio,
       avatarUrl,
       registeredAt: new Date().toISOString(),
     };

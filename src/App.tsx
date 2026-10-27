@@ -380,107 +380,127 @@ export default function App() {
         {/* Page Content Body */}
         <main className="flex-1 p-3 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           {/* ========================================================= */}
-          {/* 0. UNREGISTERED / GUEST LANDING VIEW */}
+          {/* 0. UNREGISTERED / GUEST LANDING VIEW (UNIFIED) */}
           {/* ========================================================= */}
           {!currentUser && (
             <div className="py-6 sm:py-12 max-w-4xl mx-auto space-y-8 animate-in fade-in duration-200">
               {/* Hero Banner */}
-              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 p-8 sm:p-12 text-white shadow-xl border border-slate-800 text-center sm:text-left">
+              <div className="relative overflow-hidden rounded-3xl bg-linear-to-r from-slate-900 via-indigo-950 to-blue-900 p-8 sm:p-12 text-white shadow-xl border border-slate-800 text-center sm:text-left">
                 <div className="relative z-10 max-w-2xl space-y-4">
                   <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-200 text-xs font-semibold">
                     <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
-                    <span>Smart Learning Hub — Portal Pembelajaran Mandiri</span>
+                    <span>Smart Learning Hub — Portal Pembelajaran Terpadu</span>
                   </div>
                   <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight">
-                    Mulai Perkuliahan Bersama Tim Dosen
+                    Portal Perkuliahan Terintegrasi
                   </h1>
                   <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
-                    Sistem portal perkuliahan terpadu berbasis kurikulum OBE, presensi QR proyektor, dan modul pengajaran tersinkronisasi. Silakan daftar atau masuk untuk mulai mengelola kelas.
+                    Satu portal akademik untuk seluruh aktivitas perkuliahan. Kelola kurikulum OBE, presensi QR realtime, materi ajar, pengumpulan tugas, dan rekapitulasi penilaian secara mudah dan transparan.
                   </p>
                   <div className="pt-2 flex flex-wrap items-center justify-center sm:justify-start gap-3">
-                    <button
-                      onClick={() => {
-                        setAuthMode('register');
-                        setIsAuthModalOpen(true);
-                      }}
-                      className="px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md transition-all flex items-center gap-2"
-                    >
-                      <span>Daftar Akun Baru</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
                     <button
                       onClick={() => {
                         setAuthMode('login');
                         setIsAuthModalOpen(true);
                       }}
+                      className="px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md transition-all flex items-center gap-2"
+                    >
+                      <span>Masuk ke Smart Learning Hub</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAuthMode('register');
+                        setIsAuthModalOpen(true);
+                      }}
                       className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm backdrop-blur-xs border border-white/20 transition-all"
                     >
-                      Masuk ke Akun
+                      Daftar Akun Baru
                     </button>
                   </div>
                 </div>
                 <div className="absolute -right-10 -bottom-10 w-72 h-72 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
               </div>
 
-              {/* 2 Role Options */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Lecturer Registration Card */}
-                <div className="p-6 sm:p-7 rounded-3xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-900/60 shadow-xs flex flex-col justify-between space-y-4">
-                  <div className="space-y-3">
-                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
-                      <Award className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                        Daftar sebagai Dosen Pengampu
-                      </h3>
-                      <p className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold mt-0.5">
-                        Tersambung dengan Akun My Journey
-                      </p>
-                    </div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                      Daftarkan akun Anda dengan email <strong>miftahurridlo.688@gmail.com</strong> atau <strong>altaf.aziz16@gmail.com</strong> untuk otomatis mengaktifkan peran Dosen Pengampu, pembuatan kelas mandiri, dan integrasi Google Sheets.
-                    </p>
+              {/* 4 Feature Cards (Unified Platform) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
+                    <BookOpen className="w-5 h-5" />
                   </div>
-                  <button
-                    onClick={() => {
-                      setAuthMode('register');
-                      setIsAuthModalOpen(true);
-                    }}
-                    className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2 shadow-xs transition-colors"
-                  >
-                    <span>Daftar Akun Dosen Pengampu</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Kurikulum & RPS OBE
+                  </h3>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Rencana Pembelajaran Semester terstruktur dengan capaian mingguan yang transparan.
+                  </p>
                 </div>
 
-                {/* Student Login/Register Card */}
-                <div className="p-6 sm:p-7 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between space-y-4">
-                  <div className="space-y-3">
-                    <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
-                      <GraduationCap className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                        Akses Portal Mahasiswa
-                      </h3>
-                      <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold mt-0.5">
-                        Ruang Kelas, Bahan Ajar & Tugas
-                      </p>
-                    </div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                      Mahasiswa dapat mendaftarkan akun menggunakan NIM dan email kampus untuk mengakses materi RPS yang dibagikan dosen, presensi QR kelas, dan pengumpulan tugas.
-                    </p>
+                <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
+                    <CheckCircle2 className="w-5 h-5" />
                   </div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Presensi QR Proyektor
+                  </h3>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Pemindaian QR presisi berbasis token berbatas waktu untuk mencegah titip absen.
+                  </p>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
+                  <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold">
+                    <Layers className="w-5 h-5" />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Bahan Ajar & Flipbook
+                  </h3>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Akses materi modul, modul interaktif Heyzine, dan berkas ajar dalam satu pintu.
+                  </p>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Tugas & Evaluasi
+                  </h3>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Pengumpulan tugas daring mandiri dengan umpan balik dosen dan rekap nilai otomatis.
+                  </p>
+                </div>
+              </div>
+
+              {/* Single Entry Card */}
+              <div className="p-6 sm:p-7 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="space-y-1 text-center sm:text-left">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    Sudah memiliki akun atau ingin mendaftar?
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Sistem secara otomatis menyesuaikan antarmuka Dosen Pengampu atau Mahasiswa sesuai email terdaftar.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
                   <button
                     onClick={() => {
                       setAuthMode('login');
                       setIsAuthModalOpen(true);
                     }}
-                    className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 flex items-center justify-center gap-2 transition-colors"
+                    className="px-5 py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-colors"
                   >
-                    <span>Masuk / Daftar Mahasiswa</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    Masuk Sekarang
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAuthMode('register');
+                      setIsAuthModalOpen(true);
+                    }}
+                    className="px-5 py-2.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 transition-colors"
+                  >
+                    Daftar Akun
                   </button>
                 </div>
               </div>

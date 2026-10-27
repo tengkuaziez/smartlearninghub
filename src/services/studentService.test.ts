@@ -87,3 +87,45 @@ test('Registration: Student registers with student role and NIM', () => {
   assert.equal(result.user?.role, 'mahasiswa');
   assert.equal(result.user?.nim, '10123099');
 });
+
+test('Profile: updateLecturerProfile updates active lecturer profile details', () => {
+  studentService.login('miftahurridlo.688@gmail.com', 'password123');
+  const updated = studentService.updateLecturerProfile({
+    name: 'Muhammad Miftahurridlo, M.Kom.',
+    nidn: '0412088501',
+    department: 'Pendidikan Geografi',
+    bio: 'Dosen Pengampu OBE dan Sistem Informasi Geografis.',
+  });
+
+  assert.equal(updated.name, 'Muhammad Miftahurridlo, M.Kom.');
+  assert.equal(updated.department, 'Pendidikan Geografi');
+  assert.equal(updated.bio, 'Dosen Pengampu OBE dan Sistem Informasi Geografis.');
+
+  const current = studentService.getCurrentUser();
+  assert.equal(current?.name, 'Muhammad Miftahurridlo, M.Kom.');
+  assert.equal(current?.department, 'Pendidikan Geografi');
+});
+
+test('Profile: importMyJourneyProfileJson imports profile cleanly', () => {
+  studentService.login('miftahurridlo.688@gmail.com', 'password123');
+  const json = JSON.stringify({
+    name: 'Muhammad Miftahurridlo',
+    titleSuffix: 'M.Kom.',
+    role: 'Dosen & Peneliti',
+    universityOrOrg: 'Universitas Terbuka',
+    bio: 'Workspace terpadu riset, mengajar, dan geospasial.',
+  });
+
+  const res = studentService.importMyJourneyProfileJson(json);
+  assert.equal(res.success, true);
+  assert.equal(res.profile?.name, 'Muhammad Miftahurridlo, M.Kom.');
+  assert.equal(res.profile?.department, 'Universitas Terbuka');
+  assert.equal(res.profile?.bio, 'Workspace terpadu riset, mengajar, dan geospasial.');
+});
+
+test('Avatar: ensures no dummy Unsplash photos are used', () => {
+  const regUser = studentService.getCurrentUser();
+  assert.ok(regUser?.avatarUrl);
+  assert.equal(regUser.avatarUrl.includes('photo-1534528741775'), false);
+  assert.equal(regUser.avatarUrl.includes('photo-1507003211169'), false);
+});
