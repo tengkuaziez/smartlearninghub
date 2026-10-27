@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, 
   Bell, 
@@ -13,9 +13,12 @@ import {
   Database,
   ArrowLeftRight,
   GraduationCap,
-  Cloud
+  Cloud,
+  Calendar,
+  Clock
 } from 'lucide-react';
 import { Logo } from './Logo.tsx';
+import { MiniCalendarWidget } from './MiniCalendarWidget.tsx';
 import type { AuthUser, StudentNotification } from '../../types/index.ts';
 
 interface NavbarProps {
@@ -48,7 +51,46 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenGoogleModal,
 }) => {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isCalendarPopoverOpen, setIsCalendarPopoverOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  const calendarRef = useRef<HTMLDivElement>(null);
   const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  // Live Clock Ticking every 1s
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Close calendar popover on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
+        setIsCalendarPopoverOpen(false);
+      }
+    };
+    if (isCalendarPopoverOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isCalendarPopoverOpen]);
+
+  const indoDays = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  const indoMonths = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+  const dayName = indoDays[currentTime.getDay()];
+  const dateNum = currentTime.getDate();
+  const monthName = indoMonths[currentTime.getMonth()];
+  const yearNum = currentTime.getFullYear();
+  const formattedDateStr = `${dayName}, ${dateNum} ${monthName} ${yearNum}`;
+  const hours = String(currentTime.getHours()).padStart(2, '0');
+  const minutes = String(currentTime.getMinutes()).padStart(2, '0');
+  const seconds = String(currentTime.getSeconds()).padStart(2, '0');
+  const formattedTimeStr = `${hours}.${minutes}.${seconds} WIB`;
 
   return (
     <header className="sticky top-0 z-30 w-full h-16 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
@@ -75,15 +117,41 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="hidden md:flex items-center">
             <button
               onClick={onOpenSearch}
-              className="flex items-center gap-2.5 px-3.5 py-2 w-72 lg:w-96 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200/70 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-sm transition-all border border-transparent hover:border-slate-300 dark:hover:border-slate-700 text-left"
+              className="flex items-center gap-2.5 px-3.5 py-2 w-60 xl:w-80 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200/70 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-sm transition-all border border-transparent hover:border-slate-300 dark:hover:border-slate-700 text-left"
               aria-label="Cari kelas, materi, dan tugas (Tekan Cmd+K)"
             >
               <Search className="w-4 h-4 text-slate-400" />
-              <span className="flex-1 truncate">Cari materi, mahasiswa, atau tugas...</span>
-              <kbd className="hidden lg:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-700 rounded border border-slate-200 dark:border-slate-600">
+              <span className="flex-1 truncate">Cari materi, mahasiswa...</span>
+              <kbd className="hidden xl:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-700 rounded border border-slate-200 dark:border-slate-600">
                 ⌘K
               </kbd>
             </button>
+          </div>
+
+          {/* Realtime Date & Clock Pill (Sejajar dengan Search) */}
+          <div ref={calendarRef} className="relative hidden lg:flex items-center">
+            <button
+              onClick={() => setIsCalendarPopoverOpen((prev) => !prev)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 text-xs font-medium text-slate-700 dark:text-slate-200 shadow-2xs transition-all cursor-pointer group"
+              title="Klik untuk melihat Kalender Akademik"
+            >
+              <div className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                <span className="whitespace-nowrap font-medium">{formattedDateStr}</span>
+              </div>
+              <span className="text-slate-300 dark:text-slate-600">|</span>
+              <div className="flex items-center gap-1.5 font-mono">
+                <Clock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span className="whitespace-nowrap font-bold">{formattedTimeStr}</span>
+              </div>
+            </button>
+
+            {/* Calendar Popover Dropdown */}
+            {isCalendarPopoverOpen && (
+              <div className="absolute top-full left-0 mt-2 z-50 w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl p-2 animate-in fade-in zoom-in-95 duration-150">
+                <MiniCalendarWidget className="border-0 shadow-none p-0" />
+              </div>
+            )}
           </div>
         </div>
 

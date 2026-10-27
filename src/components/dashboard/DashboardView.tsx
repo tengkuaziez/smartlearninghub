@@ -14,7 +14,6 @@ import {
   Sparkles
 } from 'lucide-react';
 import { Badge, SubmissionStatusBadge } from '../common/Badge.tsx';
-import { MiniCalendarWidget } from '../common/MiniCalendarWidget.tsx';
 import { 
   calculatePublishedAverage, 
   getAssignmentSubmissionStatus, 
@@ -89,48 +88,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      {/* Top Section: Welcome Header & Mini Calendar with Realtime Date/Clock */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        <div className="lg:col-span-7 xl:col-span-8 flex flex-col justify-between">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-900 p-6 sm:p-8 text-white shadow-lg border border-slate-800 h-full flex flex-col justify-center">
-            <div className="relative z-10 max-w-xl">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-200 text-xs font-semibold mb-3">
-                <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
-                <span>Smart Learning Hub — Kelas Tim Dosen</span>
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                Selamat Datang, {profile.name}!
-              </h1>
-              <p className="mt-2 text-xs sm:text-sm text-slate-300 leading-relaxed">
-                Anda terdaftar pada <strong>{activeCoursesCount} mata kuliah</strong> yang diampu oleh tim dosen kami. Pantau materi, hadiri pertemuan terjadwal, dan kumpulkan tugas tepat waktu.
-              </p>
-              <div className="mt-5 flex flex-wrap gap-3">
-                <button
-                  onClick={() => onNavigate('kelas')}
-                  className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-sm transition-all"
-                >
-                  Buka Kelas Saya &rarr;
-                </button>
-                <button
-                  onClick={() => onNavigate('absensi')}
-                  className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all backdrop-blur-xs"
-                >
-                  Pindai QR Presensi
-                </button>
-              </div>
-            </div>
-
-            <div className="absolute -right-8 -bottom-12 w-64 h-64 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
+      {/* Welcome Header */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-900 p-6 sm:p-8 text-white shadow-lg border border-slate-800">
+        <div className="relative z-10 max-w-2xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-200 text-xs font-semibold mb-3">
+            <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
+            <span>Smart Learning Hub — Kelas Tim Dosen</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+            Selamat Datang, {profile.name}!
+          </h1>
+          <p className="mt-2 text-xs sm:text-sm text-slate-300 leading-relaxed">
+            Anda terdaftar pada <strong>{activeCoursesCount} mata kuliah</strong> yang diampu oleh tim dosen kami. Pantau materi, hadiri pertemuan terjadwal, dan kumpulkan tugas tepat waktu.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button
+              onClick={() => onNavigate('kelas')}
+              className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-sm transition-all"
+            >
+              Buka Kelas Saya &rarr;
+            </button>
+            <button
+              onClick={() => onNavigate('absensi')}
+              className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all backdrop-blur-xs"
+            >
+              Pindai QR Presensi
+            </button>
           </div>
         </div>
 
-        <div className="lg:col-span-5 xl:col-span-4">
-          <MiniCalendarWidget 
-            courses={courses} 
-            meetings={meetings} 
-            onOpenCourse={(id) => onNavigate('kelas', id)} 
-          />
-        </div>
+        <div className="absolute -right-8 -bottom-12 w-64 h-64 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
       </div>
 
       {/* Summary Stat Cards */}
