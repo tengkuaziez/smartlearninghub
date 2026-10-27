@@ -25,6 +25,7 @@ import {
   X
 } from 'lucide-react';
 import { studentService } from '../../services/studentService.ts';
+import { myJourneySyncService } from '../../services/myJourneySyncService.ts';
 import { calculateAttendanceStats, formatIndonesianDate } from '../../utils/academicCalculations.ts';
 import type { 
   CourseClass, 
@@ -65,6 +66,10 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
   // Modals
   const [isAddCourseModalOpen, setIsAddCourseModalOpen] = useState(false);
   const [isAddStudentModalOpen, setIsAddStudentModalOpen] = useState(false);
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+  const [isSyncLoading, setIsSyncLoading] = useState(false);
+  const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
+  const lastSyncTimestamp = myJourneySyncService.getLastSyncTimestamp();
 
   // New Course Form State
   const [newCourseCode, setNewCourseCode] = useState('');
@@ -147,6 +152,8 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
     setNewCourseCode('');
     setNewCourseTitle('');
     setNewCourseDesc('');
+    // Auto-sync pembaruan ke Google Sheets & My Journey
+    myJourneySyncService.triggerDebouncedAutoSync();
   };
 
   // Handle Add Student to Whitelist
@@ -171,6 +178,36 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
       setNewStudentName('');
       setNewStudentNim('');
       setNewStudentEmail('');
+      // Auto-sync pembaruan ke Google Sheets & My Journey
+      myJourneySyncService.triggerDebouncedAutoSync();
+    }
+  };
+
+  const handleManualPushToSheets = async () => {
+    setIsSyncLoading(true);
+    setSyncFeedback(null);
+    try {
+      const res = await myJourneySyncService.pushTeachingToGoogleSheets();
+      onDataUpdated();
+      setSyncFeedback(res.message);
+    } catch (err: any) {
+      setSyncFeedback('Gagal mengirim ke Google Sheets: ' + err.message);
+    } finally {
+      setIsSyncLoading(false);
+    }
+  };
+
+  const handleManualPullFromSheets = async () => {
+    setIsSyncLoading(true);
+    setSyncFeedback(null);
+    try {
+      const res = await myJourneySyncService.pullTeachingFromGoogleSheets();
+      onDataUpdated();
+      setSyncFeedback(res.message);
+    } catch (err: any) {
+      setSyncFeedback('Gagal mengambil dari Google Sheets: ' + err.message);
+    } finally {
+      setIsSyncLoading(false);
     }
   };
 
@@ -263,16 +300,12 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
         {/* Right Action: Sync My Journey & + Tambah Kelas Baru Button */}
         <div className="flex items-center gap-2 shrink-0">
           <button
-            onClick={() => {
-              const res = studentService.syncFromMyJourney('miftahurridlo.688@gmail.com');
-              onDataUpdated();
-              alert(res.message);
-            }}
-            title="Tarik data Teaching terbaru dari My Journey (Akun: miftahurridlo.688@gmail.com)"
-            className="px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-50 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1.5 transition-all"
+            onClick={() => setIsSyncModalOpen(true)}
+            title="Kelola sinkronisasi otomatis Google Sheets & My Journey"
+            className="px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-50 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1.5 transition-all shadow-xs"
           >
             <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span>Sync My Journey</span>
+            <span>Sync Google Sheets</span>
           </button>
 
           {activeSubTab === 'mahasiswa' ? (
@@ -971,6 +1004,91 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Sinkronisasi Otomatis Google Sheets & My Journey */}
+      {isSyncModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-lg w-full border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    Sinkronisasi Google Sheets & My Journey
+                  </h3>
+                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1 mt-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Sistem Otomatis Aktif (Background Sync)
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setIsSyncModalOpen(false);
+                  setSyncFeedback(null);
+                }}
+                className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              Smart Learning Hub dan My Journey terhubung ke <strong>Google Spreadsheet bersama</strong>. Setiap Anda menyusun kelas, jadwal sesi, materi, RPS, atau mahasiswa, data otomatis tersimpan ke Google Sheets sehingga bagian <em>Teaching</em> di My Journey selalu sama persis.
+            </p>
+
+            {/* Quick Stats Grid */}
+            <div className="grid grid-cols-3 gap-2.5 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-center">
+              <div>
+                <span className="block text-lg font-black text-slate-900 dark:text-white">{courses.length}</span>
+                <span className="text-[10px] text-slate-500 font-medium">Kelas Aktif</span>
+              </div>
+              <div>
+                <span className="block text-lg font-black text-slate-900 dark:text-white">{studentsList.length}</span>
+                <span className="text-[10px] text-slate-500 font-medium">Mahasiswa</span>
+              </div>
+              <div>
+                <span className="block text-lg font-black text-slate-900 dark:text-white">{meetings.length}</span>
+                <span className="text-[10px] text-slate-500 font-medium">Sesi OBE</span>
+              </div>
+            </div>
+
+            {/* Sync Feedback Toast */}
+            {syncFeedback && (
+              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-900 dark:text-emerald-200 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{syncFeedback}</span>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="space-y-2 pt-2">
+              <button
+                onClick={handleManualPushToSheets}
+                disabled={isSyncLoading}
+                className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <Sparkles className={`w-4 h-4 ${isSyncLoading ? 'animate-spin' : ''}`} />
+                {isSyncLoading ? 'Menyinkronkan...' : 'Kirim Sekarang (Push ke Google Sheets)'}
+              </button>
+
+              <button
+                onClick={handleManualPullFromSheets}
+                disabled={isSyncLoading}
+                className="w-full py-2 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold text-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <span>Tarik Pembaruan dari Google Sheets</span>
+              </button>
+            </div>
+
+            <div className="text-[11px] text-slate-400 text-center font-mono pt-1">
+              Terakhir Disinkronkan: {lastSyncTimestamp || 'Baru Saja'}
+            </div>
           </div>
         </div>
       )}

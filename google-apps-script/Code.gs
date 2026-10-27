@@ -19,21 +19,36 @@ var DEFAULT_FOLDER_NAME = "SmartLearningHub_Uploads";
 var DEFAULT_SPREADSHEET_NAME = "Smart_Learning_Hub_Backup_Akademik";
 
 /**
- * Handle GET requests (Health Check)
+ * Handle GET requests (Health Check & Fetch Teaching)
  */
 function doGet(e) {
-  var response = {
+  var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : "ping";
+
+  if (action === "ping") {
+    return createJsonResponse({
+      status: "ok",
+      service: "Smart Learning Hub & My Journey Unified Google Bridge",
+      version: "3.0.0",
+      timestamp: new Date().toISOString(),
+      message: "API Google Apps Script siap menerima sinkronisasi otomatis Teaching & Berkas."
+    });
+  }
+
+  if (action === "getTeaching" || action === "getAll") {
+    return handleGetTeaching();
+  }
+
+  return createJsonResponse({
     status: "ok",
     service: "Smart Learning Hub — Google Drive & Sheets Bridge",
-    version: "2.0.0",
+    version: "3.0.0",
     timestamp: new Date().toISOString(),
     message: "API Google Apps Script siap menerima berkas dan pencadangan data."
-  };
-  return createJsonResponse(response);
+  });
 }
 
 /**
- * Handle POST requests (Upload Berkas & Backup Spreadsheet)
+ * Handle POST requests (Upload Berkas, Backup Spreadsheet, Sync Teaching)
  */
 function doPost(e) {
   try {
@@ -47,8 +62,10 @@ function doPost(e) {
     var payload = JSON.parse(e.postData.contents);
     var action = payload.action;
 
-    if (action === "upload_file") {
+    if (action === "upload_file" || action === "uploadFile") {
       return handleFileUpload(payload);
+    } else if (action === "syncTeaching" || action === "sync_teaching") {
+      return handleSyncTeaching(payload);
     } else if (action === "backup_to_sheets") {
       return handleBackupToSheets(payload);
     } else if (action === "ping") {
@@ -324,6 +341,188 @@ function getOrCreateSubFolder(parentFolder, subFolderName) {
     return folders.next();
   }
   return parentFolder.createFolder(subFolderName);
+}
+
+/**
+ * 3. FUNGSI SINKRONISASI MODUL TEACHING (MY JOURNEY <-> SMART LEARNING HUB)
+ */
+function handleSyncTeaching(data) {
+  var ss = getOrCreateSpreadsheet();
+  
+  // Sheet 1: Courses
+  if (data.courses && data.courses.length > 0) {
+    var cSheet = getOrCreateSheet(ss, "Courses");
+    cSheet.clear();
+    var cHeaders = ["id", "code", "name", "semester", "academicYear", "section", "enrolledCount", "schedule", "room", "status", "description", "credits", "syllabusOverview", "primaryLecturer", "partnerLecturer"];
+    var cRows = [cHeaders];
+    for (var i = 0; i < data.courses.length; i++) {
+      var c = data.courses[i];
+      cRows.push([
+        c.id, c.code, c.name, c.semester, c.academicYear, c.section,
+        c.enrolledCount, c.schedule, c.room, c.status, c.description,
+        c.credits, c.syllabusOverview, c.primaryLecturer || "-", c.partnerLecturer || "-"
+      ]);
+    }
+    cSheet.getRange(1, 1, cRows.length, cHeaders.length).setValues(cRows);
+    styleHeaderRange(cSheet.getRange(1, 1, 1, cHeaders.length), "#1E2D45");
+    cSheet.autoResizeColumns(1, cHeaders.length);
+  }
+
+  // Sheet 2: Students
+  if (data.students && data.students.length > 0) {
+    var sSheet = getOrCreateSheet(ss, "Students");
+    sSheet.clear();
+    var sHeaders = ["id", "nim", "name", "courseCode", "courseName", "classSection", "academicYear", "email", "attendancePercent"];
+    var sRows = [sHeaders];
+    for (var j = 0; j < data.students.length; j++) {
+      var st = data.students[j];
+      sRows.push([
+        st.id, st.nim, st.name, st.courseCode, st.courseName,
+        st.classSection, st.academicYear, st.email, st.attendancePercent
+      ]);
+    }
+    sSheet.getRange(1, 1, sRows.length, sHeaders.length).setValues(sRows);
+    styleHeaderRange(sSheet.getRange(1, 1, 1, sHeaders.length), "#1E2D45");
+    sSheet.autoResizeColumns(1, sHeaders.length);
+  }
+
+  // Sheet 3: Materials
+  if (data.materials && data.materials.length > 0) {
+    var mSheet = getOrCreateSheet(ss, "Materials");
+    mSheet.clear();
+    var mHeaders = ["id", "title", "fileType", "courseId", "courseName", "topic", "uploadDate", "size", "downloadCount", "notes", "fileUrl", "fileName", "storageType"];
+    var mRows = [mHeaders];
+    for (var k = 0; k < data.materials.length; k++) {
+      var m = data.materials[k];
+      mRows.push([
+        m.id, m.title, m.fileType, m.courseId, m.courseName,
+        m.topic, m.uploadDate, m.size, m.downloadCount, m.notes,
+        m.fileUrl, m.fileName, m.storageType
+      ]);
+    }
+    mSheet.getRange(1, 1, mRows.length, mHeaders.length).setValues(mRows);
+    styleHeaderRange(mSheet.getRange(1, 1, 1, mHeaders.length), "#1E2D45");
+    mSheet.autoResizeColumns(1, mHeaders.length);
+  }
+
+  // Sheet 4: Rps
+  if (data.rps && data.rps.length > 0) {
+    var rSheet = getOrCreateSheet(ss, "Rps");
+    rSheet.clear();
+    var rHeaders = ["id", "courseId", "courseName", "code", "semester", "academicYear", "learningOutcomesJson", "weeklyTopicsJson", "referencesJson", "version", "lastUpdated", "status"];
+    var rRows = [rHeaders];
+    for (var l = 0; l < data.rps.length; l++) {
+      var rp = data.rps[l];
+      rRows.push([
+        rp.id, rp.courseId, rp.courseName, rp.code, rp.semester, rp.academicYear,
+        JSON.stringify(rp.learningOutcomesJson || []),
+        JSON.stringify(rp.weeklyTopicsJson || []),
+        JSON.stringify(rp.referencesJson || []),
+        rp.version, rp.lastUpdated, rp.status
+      ]);
+    }
+    rSheet.getRange(1, 1, rRows.length, rHeaders.length).setValues(rRows);
+    styleHeaderRange(rSheet.getRange(1, 1, 1, rHeaders.length), "#1E2D45");
+    rSheet.autoResizeColumns(1, rHeaders.length);
+  }
+
+  // Sheet 5: Sessions
+  if (data.sessions && data.sessions.length > 0) {
+    var sesSheet = getOrCreateSheet(ss, "Sessions");
+    sesSheet.clear();
+    var sesHeaders = ["id", "courseId", "courseName", "code", "section", "topic", "date", "time", "room", "isOnline", "preparationNotes", "status"];
+    var sesRows = [sesHeaders];
+    for (var mIdx = 0; mIdx < data.sessions.length; mIdx++) {
+      var ses = data.sessions[mIdx];
+      sesRows.push([
+        ses.id, ses.courseId, ses.courseName, ses.code, ses.section, ses.topic,
+        ses.date, ses.time, ses.room, ses.isOnline, ses.preparationNotes, ses.status
+      ]);
+    }
+    sesSheet.getRange(1, 1, sesRows.length, sesHeaders.length).setValues(sesRows);
+    styleHeaderRange(sesSheet.getRange(1, 1, 1, sesHeaders.length), "#1E2D45");
+    sesSheet.autoResizeColumns(1, sesHeaders.length);
+  }
+
+  // Sheet 6: Profiles
+  if (data.profiles && data.profiles.length > 0) {
+    var pSheet = getOrCreateSheet(ss, "Profiles");
+    pSheet.clear();
+    var pHeaders = ["email", "name", "title", "role", "department", "avatarUrl", "lastSynced"];
+    var pRows = [pHeaders];
+    for (var p = 0; p < data.profiles.length; p++) {
+      var prof = data.profiles[p];
+      pRows.push([
+        prof.email, prof.name, prof.title, prof.role, prof.department, prof.avatarUrl, new Date().toISOString()
+      ]);
+    }
+    pSheet.getRange(1, 1, pRows.length, pHeaders.length).setValues(pRows);
+    styleHeaderRange(pSheet.getRange(1, 1, 1, pHeaders.length), "#1E2D45");
+    pSheet.autoResizeColumns(1, pHeaders.length);
+  }
+
+  return createJsonResponse({
+    status: "success",
+    message: "Modul Teaching (Courses, Students, Materials, Rps, Sessions) berhasil disinkronkan ke Google Spreadsheet!",
+    spreadsheetId: ss.getId(),
+    spreadsheetUrl: ss.getUrl(),
+    timestamp: new Date().toISOString()
+  });
+}
+
+/**
+ * 4. FUNGSI AMBIL DATA TEACHING UNTUK CLIENT (MY JOURNEY & SMART LEARNING HUB)
+ */
+function handleGetTeaching() {
+  var ss = getOrCreateSpreadsheet();
+  var tables = ["Courses", "Students", "Materials", "Rps", "Sessions", "Profiles"];
+  var result = {};
+
+  for (var t = 0; t < tables.length; t++) {
+    var sheetName = tables[t];
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet) {
+      result[sheetName] = [];
+      continue;
+    }
+
+    var values = sheet.getDataRange().getValues();
+    if (values.length <= 1) {
+      result[sheetName] = [];
+      continue;
+    }
+
+    var headers = values[0];
+    var rows = [];
+    for (var r = 1; r < values.length; r++) {
+      var rowObj = {};
+      for (var c = 0; c < headers.length; c++) {
+        rowObj[headers[c]] = values[r][c];
+      }
+      rows.push(rowObj);
+    }
+    result[sheetName] = rows;
+  }
+
+  return createJsonResponse({
+    status: "success",
+    data: result,
+    timestamp: new Date().toISOString()
+  });
+}
+
+/**
+ * Helper: Ambil atau buat Spreadsheet Utama
+ */
+function getOrCreateSpreadsheet() {
+  var rootFolder = getOrCreateFolder(DEFAULT_FOLDER_NAME);
+  var files = rootFolder.getFilesByType(MimeType.GOOGLE_SHEETS);
+  if (files.hasNext()) {
+    return SpreadsheetApp.open(files.next());
+  }
+  var newSs = SpreadsheetApp.create(DEFAULT_SPREADSHEET_NAME);
+  DriveApp.getFileById(newSs.getId()).moveTo(rootFolder);
+  return newSs;
 }
 
 /**

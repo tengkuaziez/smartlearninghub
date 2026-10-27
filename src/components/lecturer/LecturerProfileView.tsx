@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { studentService } from '../../services/studentService.ts';
 import { mockLecturerUsers } from '../../data/mockData.ts';
+import { myJourneySyncService } from '../../services/myJourneySyncService.ts';
 import type { AuthUser, CourseClass } from '../../types/index.ts';
 
 interface LecturerProfileViewProps {
@@ -37,19 +38,21 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
 
   const syncStatus = studentService.getMyJourneySyncStatus();
+  const lastSyncTime = myJourneySyncService.getLastSyncTimestamp();
 
-  const handleSyncFromMyJourney = () => {
+  const handleSyncFromMyJourney = async () => {
     setIsSyncing(true);
     setSyncFeedback(null);
     try {
-      const result = studentService.syncFromMyJourney('miftahurridlo.688@gmail.com');
+      // 1. Simpan dan kirim paket data Teaching ke Google Sheets bersama
+      const result = await myJourneySyncService.pushTeachingToGoogleSheets(currentUser.email);
       onDataRefreshed();
       setSyncFeedback(result.message);
     } catch (err: any) {
       setSyncFeedback('Gagal menyinkronkan data: ' + err.message);
     } finally {
       setIsSyncing(false);
-      setTimeout(() => setSyncFeedback(null), 5000);
+      setTimeout(() => setSyncFeedback(null), 6000);
     }
   };
 

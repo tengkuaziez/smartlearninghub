@@ -33,6 +33,7 @@ import {
   defaultStudentUser, 
   defaultLecturerUser 
 } from './services/studentService.ts';
+import { myJourneySyncService } from './services/myJourneySyncService.ts';
 
 import type { 
   AuthUser,
@@ -131,6 +132,13 @@ export default function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Background Auto-sync Teaching ke Google Sheets & My Journey saat Dosen Aktif
+  useEffect(() => {
+    if (currentUser.role === 'dosen') {
+      myJourneySyncService.triggerDebouncedAutoSync();
+    }
+  }, [currentUser.role]);
 
   const handleToggleTheme = () => {
     setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
