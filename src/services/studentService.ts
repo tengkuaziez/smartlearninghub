@@ -35,6 +35,7 @@ import {
 
 import { validateEmailAccess } from '../utils/academicCalculations.ts';
 import { supabase, isSupabaseConfigured } from './supabaseClient.ts';
+import { supabaseDataService, LECTURER_USER_ID } from './supabaseDataService.ts';
 
 const STORAGE_KEYS = {
   DATA_VERSION: 'slh_data_version',
@@ -212,6 +213,7 @@ export const studentService = {
       users.push(user);
     }
     setStorage(STORAGE_KEYS.REGISTERED_USERS, users);
+    supabaseDataService.savePortalUser(user).catch(() => {});
   },
 
   getRegisteredLecturers(): AuthUser[] {
@@ -529,6 +531,9 @@ export const studentService = {
       }
     }
 
+    // Sinkronisasi otomatis ke Supabase Database My Journey (Background)
+    supabaseDataService.saveStudent(updated).catch(() => {});
+
     return updated;
   },
 
@@ -542,6 +547,9 @@ export const studentService = {
 
     // Also remove from courses
     if (toDelete) {
+      if (toDelete.id) {
+        supabaseDataService.deleteStudent(toDelete.id).catch(() => {});
+      }
       const courses = this.getAllCourses();
       let modified = false;
       courses.forEach((crs) => {
@@ -589,6 +597,8 @@ export const studentService = {
     });
 
     setStorage(STORAGE_KEYS.MASTER_STUDENTS, currentList);
+    // Sinkronisasi otomatis ke Supabase Database My Journey (Bulk)
+    supabaseDataService.saveStudentsBulk(currentList).catch(() => {});
 
     // Sync to courses
     const courses = this.getAllCourses();
@@ -766,6 +776,126 @@ export const studentService = {
     }
   },
 
+  // Sinkronisasi data Mahasiswa langsung dari Supabase Database (My Journey)
+  async syncStudentsFromSupabase(): Promise<{ success: boolean; count: number; message: string }> {
+    try {
+      const cloudStudents = await supabaseDataService.fetchStudents();
+      if (!cloudStudents || cloudStudents.length === 0) {
+        return { success: true, count: 0, message: 'Tidak ada data mahasiswa di Supabase.' };
+      }
+
+      const currentStudents = getStorage<MasterStudent[]>(STORAGE_KEYS.MASTER_STUDENTS, []);
+      const customRoster = getStorage<Record<string, any>>(STORAGE_KEYS.CUSTOM_ROSTER, {});
+      let addedCount = 0;
+
+      cloudStudents.forEach((cs) => {
+        const cleanEmail = cs.email.trim().toLowerCase();
+        if (!cleanEmail) return;
+
+        const idx = currentStudents.findIndex(
+          (s) => s.email.toLowerCase() === cleanEmail || s.id === cs.id
+        );
+
+        if (idx >= 0) {
+          const mergedCodes = Array.from(
+            new Set([...(currentStudents[idx].enrolledCourseCodes || []), ...(cs.enrolledCourseCodes || [])])
+          );
+          currentStudents[idx] = {
+            ...currentStudents[idx],
+            ...cs,
+            enrolledCourseCodes: mergedCodes,
+          };
+        } else {
+          currentStudents.push(cs);
+          addedCount++;
+        }
+
+        customRoster[cleanEmail] = {
+          name: cs.name,
+          nim: cs.nim,
+          email: cleanEmail,
+        };
+      });
+
+      setStorage(STORAGE_KEYS.MASTER_STUDENTS, currentStudents);
+      setStorage(STORAGE_KEYS.CUSTOM_ROSTER, customRoster);
+
+      return {
+        success: true,
+        count: cloudStudents.length,
+        message: `Berhasil menyelaraskan ${cloudStudents.length} mahasiswa dari Supabase My Journey!`,
+      };
+    } catch (err: any) {
+      return { success: false, count: 0, message: `Gagal menyinkronkan Mahasiswa Supabase: ${err.message}` };
+    }
+  },
+
+  // Sinkronisasi Pengguna Terdaftar (Portal Users) dari Supabase Cloud
+  async syncPortalUsersFromSupabase(): Promise<{ success: boolean; count: number }> {
+    try {
+      const cloudUsers = await supabaseDataService.fetchPortalUsers();
+      if (!cloudUsers || cloudUsers.length === 0) {
+        return { success: true, count: 0 };
+      }
+
+      const localUsers = this.getRegisteredUsers();
+      cloudUsers.forEach((cu) => {
+        const cleanEmail = cu.email.trim().toLowerCase();
+        const idx = localUsers.findIndex((u) => u.email.toLowerCase() === cleanEmail);
+        if (idx >= 0) {
+          localUsers[idx] = { ...localUsers[idx], ...cu };
+        } else {
+          localUsers.push(cu);
+        }
+      });
+
+      setStorage(STORAGE_KEYS.REGISTERED_USERS, localUsers);
+      return { success: true, count: cloudUsers.length };
+    } catch {
+      return { success: false, count: 0 };
+    }
+  },
+
+  // Sinkronisasi Presensi dari Supabase Cloud
+  async syncAttendanceFromSupabase(): Promise<void> {
+    try {
+      const sessions = await supabaseDataService.fetchAttendanceSessions();
+      if (sessions && sessions.length > 0) {
+        const localSessions = getStorage<AttendanceSession[]>(STORAGE_KEYS.ATTENDANCE_SESSIONS, []);
+        const mergedMap = new Map(localSessions.map((s) => [s.id, s]));
+        sessions.forEach((s) => mergedMap.set(s.id, s));
+        setStorage(STORAGE_KEYS.ATTENDANCE_SESSIONS, Array.from(mergedMap.values()));
+      }
+      const records = await supabaseDataService.fetchAttendanceRecords();
+      if (records && records.length > 0) {
+        const localRecords = getStorage<AttendanceRecord[]>(STORAGE_KEYS.ATTENDANCE_RECORDS, []);
+        const mergedMap = new Map(localRecords.map((r) => [r.id, r]));
+        records.forEach((r) => mergedMap.set(r.id, r));
+        setStorage(STORAGE_KEYS.ATTENDANCE_RECORDS, Array.from(mergedMap.values()));
+      }
+    } catch {}
+  },
+
+  // Sinkronisasi Tugas & Submissions dari Supabase Cloud
+  async syncAssignmentsFromSupabase(): Promise<void> {
+    try {
+      const assignments = await supabaseDataService.fetchAssignments();
+      if (assignments && assignments.length > 0) {
+        const localAssignments = getStorage<Assignment[]>(STORAGE_KEYS.ASSIGNMENTS, []);
+        const mergedMap = new Map(localAssignments.map((a) => [a.id, a]));
+        assignments.forEach((a) => mergedMap.set(a.id, a));
+        setStorage(STORAGE_KEYS.ASSIGNMENTS, Array.from(mergedMap.values()));
+      }
+      const submissions = await supabaseDataService.fetchSubmissions();
+      if (submissions && submissions.length > 0) {
+        const localSubmissions = getStorage<AssignmentSubmission[]>(STORAGE_KEYS.SUBMISSIONS, []);
+        const mergedMap = new Map(localSubmissions.map((s) => [s.id, s]));
+        submissions.forEach((s) => mergedMap.set(s.id, s));
+        setStorage(STORAGE_KEYS.SUBMISSIONS, Array.from(mergedMap.values()));
+      }
+    } catch {}
+  },
+
   // Sinkronisasi menyeluruh dari Google Apps Script Teaching Bridge + Supabase Cloud
   async syncAllFromMyJourneyCloud(): Promise<{ success: boolean; message: string }> {
     let coursesCount = 0;
@@ -913,9 +1043,34 @@ export const studentService = {
       console.warn('[MyJourneySync] Supabase fetch warning:', supaErr);
     }
 
+    // 3. Tarik Mahasiswa dari Supabase Cloud (My Journey)
+    try {
+      const supaStudents = await this.syncStudentsFromSupabase();
+      if (supaStudents.success) {
+        studentsCount += supaStudents.count;
+      }
+    } catch (stdErr) {
+      console.warn('[MyJourneySync] Supabase students fetch warning:', stdErr);
+    }
+
+    // 4. Tarik Akun Terdaftar (Portal Users) dari Supabase Cloud
+    try {
+      await this.syncPortalUsersFromSupabase();
+    } catch (puErr) {
+      console.warn('[MyJourneySync] Supabase portal users warning:', puErr);
+    }
+
+    // 5. Tarik Presensi & Tugas dari Supabase Cloud
+    try {
+      await this.syncAttendanceFromSupabase();
+      await this.syncAssignmentsFromSupabase();
+    } catch (attErr) {
+      console.warn('[MyJourneySync] Supabase attendance/assignments warning:', attErr);
+    }
+
     return {
       success: true,
-      message: `Sinkronisasi berhasil! ${coursesCount} mata kuliah aktif dan profil dosen diselaraskan.`,
+      message: `Sinkronisasi berhasil! ${coursesCount} mata kuliah dan ${studentsCount} mahasiswa aktif diselaraskan dari Cloud.`,
     };
   },
 
@@ -978,7 +1133,24 @@ export const studentService = {
       }
     }
 
-    // 2. Fallback ke login lokal
+    // 2. Cek apakah ada di Supabase portal_users jika belum ada di cache browser ini
+    const regUsers = this.getRegisteredUsers();
+    let existing = regUsers.find((u) => u.email.toLowerCase() === normalized);
+    if (!existing) {
+      try {
+        const cloudUsers = await supabaseDataService.fetchPortalUsers();
+        if (cloudUsers) {
+          const matched = cloudUsers.find((u) => u.email.toLowerCase() === normalized);
+          if (matched) {
+            regUsers.push(matched);
+            setStorage(STORAGE_KEYS.REGISTERED_USERS, regUsers);
+            existing = matched;
+          }
+        }
+      } catch {}
+    }
+
+    // 3. Fallback ke login lokal
     const localResult = this.login(email, password);
     if (localResult.success) {
       await this.syncAllFromMyJourneyCloud();
@@ -1107,7 +1279,12 @@ export const studentService = {
       avatarUrl = getInitialsAvatar(cleanName, false);
       const masterRecord = this.getMasterStudents().find((s) => s.email.toLowerCase() === normalized);
       if (masterRecord) {
-        if (!studentNim && masterRecord.nim) studentNim = masterRecord.nim;
+        masterRecord.name = cleanName;
+        if (studentNim) {
+          masterRecord.nim = studentNim;
+        } else if (masterRecord.nim) {
+          studentNim = masterRecord.nim;
+        }
         studentMajor = masterRecord.major;
         enrolledCodes = masterRecord.enrolledCourseCodes || [];
         masterRecord.isRegistered = true;
@@ -1399,6 +1576,9 @@ export const studentService = {
     setStorage(STORAGE_KEYS.COURSES, [...courses, newCourse]);
     setStorage(STORAGE_KEYS.MEETINGS, [...allMeetings, ...newMeetings]);
 
+    // Kirim sinkronisasi ke Supabase Cloud (My Journey Unified DB)
+    supabaseDataService.saveCourse(newCourse).catch(() => {});
+
     this.addActivity({
       title: 'Mata Kuliah Baru Dibuat',
       description: `Dosen menambahkan kelas baru ${newCourse.code} - ${newCourse.title} (16 Pertemuan).`,
@@ -1415,6 +1595,9 @@ export const studentService = {
     setStorage(STORAGE_KEYS.COURSES, courses);
     const meetings = this.getMeetings().filter((m) => m.courseId !== courseId);
     setStorage(STORAGE_KEYS.MEETINGS, meetings);
+
+    // Kirim sinkronisasi ke Supabase Cloud (My Journey Unified DB)
+    supabaseDataService.deleteCourse(courseId).catch(() => {});
   },
 
   // Lecturer Action: Register Student with Details and enroll to course
@@ -1610,6 +1793,9 @@ export const studentService = {
     }
     setStorage(STORAGE_KEYS.SUBMISSIONS, updatedList);
 
+    // Kirim sinkronisasi ke Supabase Cloud (My Journey Unified DB)
+    supabaseDataService.saveSubmission(newSubmission).catch(() => {});
+
     if (assignment) {
       const course = this.getCourseById(assignment.courseId);
       this.addActivity({
@@ -1710,6 +1896,9 @@ export const studentService = {
     }
 
     setStorage(STORAGE_KEYS.ATTENDANCE_SESSIONS, sessions);
+
+    // Kirim sinkronisasi ke Supabase Cloud (My Journey Unified DB)
+    supabaseDataService.saveAttendanceSession(updatedSession).catch(() => {});
 
     // Update meeting's sessionActive flag in meetings storage
     const meetings = this.getMeetings();
@@ -1924,6 +2113,9 @@ export const studentService = {
     const updatedRecords = [newRecord, ...allRecords];
     setStorage(STORAGE_KEYS.ATTENDANCE_RECORDS, updatedRecords);
 
+    // Kirim sinkronisasi ke Supabase Cloud (My Journey Unified DB)
+    supabaseDataService.saveAttendanceRecord(newRecord).catch(() => {});
+
     const course = this.getCourseById(matchedSession.courseId);
     this.addActivity({
       title: 'Presensi Kehadiran Berhasil',
@@ -2108,3 +2300,23 @@ export const studentService = {
     Object.values(STORAGE_KEYS).forEach((k) => localStorage.removeItem(k));
   },
 };
+
+// =========================================================================
+// SINKRONISASI OTOMATIS & REALTIME CLOUD LISTENER (BROWSER INITIALIZATION)
+// =========================================================================
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    studentService.syncAllFromMyJourneyCloud().catch(() => {});
+    supabaseDataService.setupRealtimeSubscription((table) => {
+      if (table === 'students') {
+        studentService.syncStudentsFromSupabase().catch(() => {});
+      } else if (table === 'courses') {
+        studentService.syncCoursesFromSupabase().catch(() => {});
+      } else if (table === 'attendance_records') {
+        studentService.syncAttendanceFromSupabase().catch(() => {});
+      } else if (table === 'portal_users') {
+        studentService.syncPortalUsersFromSupabase().catch(() => {});
+      }
+    });
+  }, 250);
+}
