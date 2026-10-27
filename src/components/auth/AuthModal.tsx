@@ -31,11 +31,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onLoginSuccess,
 }) => {
   const [mode, setMode] = useState<AuthMode>('login');
-  const [email, setEmail] = useState('altaf.aziz16@student.ac.id');
-  const [password, setPassword] = useState('password123');
-  const [confirmPassword, setConfirmPassword] = useState('password123');
-  const [name, setName] = useState('Muhammad Altaf Aziz');
-  const [nim, setNim] = useState('22081010045');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [name, setName] = useState('');
+  const [nim, setNim] = useState('');
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
