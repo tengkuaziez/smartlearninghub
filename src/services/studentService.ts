@@ -34,6 +34,7 @@ import {
 } from '../data/mockData.ts';
 
 import { validateEmailAccess } from '../utils/academicCalculations.ts';
+import { supabase, isSupabaseConfigured } from './supabaseClient.ts';
 
 const STORAGE_KEYS = {
   DATA_VERSION: 'slh_data_version',
@@ -665,6 +666,198 @@ export const studentService = {
       message: `Berhasil menyelaraskan ${payload.length} data mahasiswa dari My Journey (${result.added} baru, ${result.updated} diperbarui).`,
       count: payload.length,
     };
+  },
+
+  // Sinkronisasi data Mata Kuliah langsung dari Supabase Database (My Journey)
+  async syncCoursesFromSupabase(): Promise<{ success: boolean; count: number; message: string }> {
+    if (!isSupabaseConfigured() || !supabase) {
+      return { success: false, count: 0, message: 'Supabase belum dikonfigurasi.' };
+    }
+    try {
+      const { data, error } = await supabase.from('courses').select('*');
+      if (error) {
+        return { success: false, count: 0, message: `Error Supabase: ${error.message}` };
+      }
+      if (!data || data.length === 0) {
+        return { success: true, count: 0, message: 'Tidak ada data mata kuliah di database Supabase.' };
+      }
+
+      const currentCourses = this.getAllCourses();
+      const syncedCourses: CourseClass[] = data.map((row) => {
+        const d = row.data || {};
+        const existing = currentCourses.find((c) => c.id === row.id || c.code.toLowerCase() === (d.code || '').toLowerCase());
+        const isLecturerAziz = row.user_id === 'd342423d-fce0-4b54-896f-4c4b27e70dc0';
+        const lecturerName = isLecturerAziz ? 'Tengku Abdillah Aziz, M.Kom.' : 'Tim Dosen Pengampu';
+
+        return {
+          id: row.id,
+          code: d.code || 'KULIAH',
+          title: d.name || 'Mata Kuliah',
+          room: d.room || existing?.room || 'Lab Komputasi',
+          status: (d.status === 'Aktif' || d.status === 'active' ? 'active' : 'upcoming') as any,
+          credits: d.credits || 2,
+          section: d.section || 'Kelas A',
+          schedule: d.schedule || existing?.schedule || 'Jadwal Kuliah',
+          semester: d.semester || 'Ganjil 2026/2027',
+          academicYear: d.academicYear || '2026/2027',
+          description: d.description || existing?.description || '',
+          category: 'Geografi & Komputasi',
+          color: existing?.color || 'from-blue-600 to-indigo-700',
+          syllabusOverview: d.syllabusOverview || existing?.syllabusOverview || 'Silabus perkuliahan dalam proses penyusunan.',
+          enrolledCount: existing?.enrolledCount || 0,
+          enrolledStudentEmails: existing?.enrolledStudentEmails || [],
+          completedMeetingsCount: existing?.completedMeetingsCount || 0,
+          totalMeetingsCount: existing?.totalMeetingsCount || 16,
+          progress: existing?.progress || 0,
+          primaryLecturer: lecturerName,
+          partnerLecturer: isLecturerAziz ? 'Tim Dosen Pengampu' : 'Tengku Abdillah Aziz, M.Kom.',
+          teacher: {
+            name: lecturerName,
+            title: 'Dosen Pengampu',
+            avatarUrl: '',
+          },
+        };
+      });
+
+      // Tetap pertahankan mata kuliah lokal jika ada yang belum di-cloud
+      const mergedCourses = [...syncedCourses];
+      currentCourses.forEach((c) => {
+        if (!mergedCourses.some((m) => m.id === c.id || m.code.toLowerCase() === c.code.toLowerCase())) {
+          mergedCourses.push(c);
+        }
+      });
+
+      setStorage(STORAGE_KEYS.COURSES, mergedCourses);
+      return {
+        success: true,
+        count: syncedCourses.length,
+        message: `Berhasil menyelaraskan ${syncedCourses.length} mata kuliah dari Supabase My Journey!`,
+      };
+    } catch (err: any) {
+      return { success: false, count: 0, message: `Gagal menyinkronkan Supabase: ${err.message}` };
+    }
+  },
+
+  // Auth: Login dengan dukungan Supabase Auth & Local Fallback
+  async loginAsync(email: string, password = ''): Promise<{ success: boolean; user?: AuthUser; message: string }> {
+    const normalized = email.trim().toLowerCase();
+    if (!normalized) {
+      return { success: false, message: 'Silakan masukkan email Anda.' };
+    }
+
+    // 1. Coba verifikasi dengan Supabase Auth jika online
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: normalized,
+          password,
+        });
+
+        if (!error && data?.user) {
+          const isLecturer = LECTURER_WHITELIST_EMAILS.map((e) => e.toLowerCase()).includes(normalized) ||
+            data.user.user_metadata?.role === 'dosen';
+
+          const registeredUsers = this.getRegisteredUsers();
+          let user = registeredUsers.find((u) => u.email.toLowerCase() === normalized);
+
+          const fullName = data.user.user_metadata?.full_name || data.user.user_metadata?.name || (user ? user.name : normalized.split('@')[0]);
+
+          if (!user) {
+            user = {
+              id: data.user.id,
+              name: fullName,
+              email: normalized,
+              role: isLecturer ? 'dosen' : 'mahasiswa',
+              password: password,
+              avatarUrl: getInitialsAvatar(fullName, isLecturer),
+              registeredAt: new Date().toISOString(),
+            };
+            this.saveRegisteredUser(user);
+          } else {
+            user.password = password;
+            if (fullName && fullName !== user.name) {
+              user.name = fullName;
+            }
+            this.saveRegisteredUser(user);
+          }
+
+          this.setCurrentUser(user);
+          // Sinkronisasi otomatis mata kuliah dari Supabase
+          await this.syncCoursesFromSupabase();
+
+          return {
+            success: true,
+            user,
+            message: `Selamat datang kembali, ${user.name}! (Terverifikasi Supabase)`,
+          };
+        }
+      } catch {
+        // Fallback ke login lokal jika jaringan bermasalah
+      }
+    }
+
+    // 2. Fallback ke login lokal
+    const localResult = this.login(email, password);
+    if (localResult.success) {
+      this.syncCoursesFromSupabase().catch(() => {});
+    }
+    return localResult;
+  },
+
+  // Auth: Register dengan dukungan Supabase Auth & Whitelist Check
+  async registerAsync(data: {
+    name: string;
+    email: string;
+    role?: UserRole;
+    nim?: string;
+    nidn?: string;
+    password?: string;
+  }): Promise<{
+    success: boolean;
+    user?: AuthUser;
+    message: string;
+  }> {
+    const normalized = data.email.trim().toLowerCase();
+    if (!normalized) {
+      return { success: false, message: 'Email wajib diisi.' };
+    }
+    if (!data.name.trim()) {
+      return { success: false, message: 'Nama lengkap wajib diisi.' };
+    }
+
+    const isLecturerWhitelist = LECTURER_WHITELIST_EMAILS.map((e) => e.toLowerCase()).includes(normalized);
+    const role: UserRole = isLecturerWhitelist ? 'dosen' : 'mahasiswa';
+
+    // Strict whitelist check untuk mahasiswa
+    if (role === 'mahasiswa') {
+      const isAuthorized = this.isStudentEmailAuthorized(normalized);
+      if (!isAuthorized) {
+        return {
+          success: false,
+          message: `Pendaftaran akun ditolak: Email "${normalized}" belum terdaftar di basis data mahasiswa resmi kelas ini. Silakan hubungi Dosen Pengampu untuk mendaftarkan email Anda ke kelas terlebih dahulu.`,
+        };
+      }
+    }
+
+    // Daftarkan juga ke Supabase Auth jika online
+    if (isSupabaseConfigured() && supabase && data.password) {
+      try {
+        await supabase.auth.signUp({
+          email: normalized,
+          password: data.password,
+          options: {
+            data: {
+              full_name: data.name.trim(),
+              role,
+              nim: data.nim?.trim() || '',
+              nidn: data.nidn?.trim() || '',
+            },
+          },
+        });
+      } catch {}
+    }
+
+    return this.register(data);
   },
 
   // Auth: Registration

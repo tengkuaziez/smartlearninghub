@@ -15,6 +15,7 @@ import { LecturerSidebar, type LecturerNavTab } from './components/lecturer/Lect
 import { GlobalSearchModal } from './components/common/GlobalSearchModal.tsx';
 import { NotificationDrawer } from './components/common/NotificationDrawer.tsx';
 import { AuthModal } from './components/auth/AuthModal.tsx';
+import { LoginPage } from './components/auth/LoginPage.tsx';
 import { GoogleIntegrationModal } from './components/common/GoogleIntegrationModal.tsx';
 
 // Student views
@@ -66,6 +67,7 @@ export default function App() {
 
   // Current logged in user (determines Dosen vs Mahasiswa portal, or null if guest)
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => studentService.getCurrentUser());
+  const [isGuestMode, setIsGuestMode] = useState<boolean>(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
   // Navigation Tabs
@@ -149,6 +151,18 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Auto-sync courses directly from Supabase Cloud on mount & user change
+  useEffect(() => {
+    studentService.syncCoursesFromSupabase().then((res) => {
+      if (res.success && res.count > 0) {
+        setAllLecturerCourses(studentService.getAllCourses());
+        if (currentUser) {
+          setCourses(studentService.getEnrolledCourses(currentUser.email));
+        }
+      }
+    }).catch(() => {});
+  }, [currentUser]);
+
   // Background Auto-sync Teaching ke Google Sheets & My Journey saat Dosen Aktif
   useEffect(() => {
     if (currentUser?.role === 'dosen') {
@@ -183,6 +197,7 @@ export default function App() {
 
   const handleLoginSuccess = (user: AuthUser) => {
     setCurrentUser(user);
+    setIsGuestMode(false);
     setSelectedCourseId(null);
     setSelectedMeetingId(null);
     if (user.role === 'dosen') {
@@ -196,6 +211,7 @@ export default function App() {
   const handleLogout = () => {
     studentService.logout();
     setCurrentUser(null);
+    setIsGuestMode(false);
     setSelectedCourseId(null);
     setSelectedMeetingId(null);
     setActiveAssignmentId(null);
@@ -328,6 +344,19 @@ export default function App() {
   const unreadAnnouncementsCount = announcements.filter((a) => !a.isRead).length;
   const pendingGradingCount = submissions.filter((s) => s.grade === undefined).length;
 
+  // Unauthenticated view: Render unified full-screen LoginPage (matches My Journey design)
+  if (!currentUser && !isGuestMode) {
+    return (
+      <LoginPage
+        onLoginSuccess={handleLoginSuccess}
+        onContinueAsGuest={() => setIsGuestMode(true)}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
+        initialTab={authMode}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen flex bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans transition-colors">
       {/* Dynamic Sidebar based on User Role (Only shown when logged in) */}
@@ -371,7 +400,7 @@ export default function App() {
           onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
           onOpenAuthModal={(m) => {
             setAuthMode(m || 'login');
-            setIsAuthModalOpen(true);
+            setIsGuestMode(false);
           }}
           onQuickToggleRole={currentUser ? handleQuickToggleRole : undefined}
           onOpenGoogleModal={currentUser?.role === 'dosen' ? () => setIsGoogleModalOpen(true) : undefined}
@@ -402,9 +431,9 @@ export default function App() {
                     <button
                       onClick={() => {
                         setAuthMode('login');
-                        setIsAuthModalOpen(true);
+                        setIsGuestMode(false);
                       }}
-                      className="px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md transition-all flex items-center gap-2"
+                      className="px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md transition-all flex items-center gap-2 cursor-pointer"
                     >
                       <span>Masuk ke Smart Learning Hub</span>
                       <ArrowRight className="w-4 h-4" />
@@ -412,9 +441,9 @@ export default function App() {
                     <button
                       onClick={() => {
                         setAuthMode('register');
-                        setIsAuthModalOpen(true);
+                        setIsGuestMode(false);
                       }}
-                      className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm backdrop-blur-xs border border-white/20 transition-all"
+                      className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm backdrop-blur-xs border border-white/20 transition-all cursor-pointer"
                     >
                       Daftar Akun Baru
                     </button>

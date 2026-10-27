@@ -52,15 +52,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
     setIsLoading(true);
 
-    setTimeout(() => {
+    try {
+      const res = await studentService.loginAsync(email, password);
       setIsLoading(false);
-      const res = studentService.login(email, password);
       if (res.success && res.user) {
         setSuccess(res.message);
         setTimeout(() => {
@@ -70,10 +70,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       } else {
         setError(res.message);
       }
-    }, 350);
+    } catch (err: any) {
+      setIsLoading(false);
+      setError(`Gagal masuk: ${err?.message || 'Kesalahan sistem'}`);
+    }
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
@@ -85,9 +88,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     setIsLoading(true);
 
-    setTimeout(() => {
-      setIsLoading(false);
-      const res = studentService.register({
+    try {
+      const res = await studentService.registerAsync({
         name,
         email,
         nim: identifier.trim() || undefined,
@@ -95,6 +97,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         password,
       });
 
+      setIsLoading(false);
       if (res.success && res.user) {
         setSuccess(res.message);
         setTimeout(() => {
@@ -104,7 +107,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       } else {
         setError(res.message);
       }
-    }, 450);
+    } catch (err: any) {
+      setIsLoading(false);
+      setError(`Gagal mendaftar: ${err?.message || 'Kesalahan sistem'}`);
+    }
   };
 
   const handleForgotPassword = (e: React.FormEvent) => {

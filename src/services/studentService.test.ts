@@ -170,3 +170,15 @@ test('Avatar: ensures no dummy Unsplash photos are used', () => {
   assert.equal(regUser.avatarUrl.includes('photo-1534528741775'), false);
   assert.equal(regUser.avatarUrl.includes('photo-1507003211169'), false);
 });
+
+test('Auth Async: loginAsync falls back cleanly to local authentication if offline', async () => {
+  const res = await studentService.loginAsync('miftahurridlo.688@gmail.com', 'password123');
+  assert.equal(res.success, true);
+  assert.equal(res.user?.role, 'dosen');
+});
+
+test('Courses: syncCoursesFromSupabase method exists and returns a promise result', async () => {
+  const res = await studentService.syncCoursesFromSupabase();
+  assert.equal(typeof res.success, 'boolean');
+  assert.equal(typeof res.count, 'number');
+});
