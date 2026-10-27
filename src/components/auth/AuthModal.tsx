@@ -131,9 +131,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   const handleDirectSelectUser = (u: RegisteredUser) => {
-    studentService.setCurrentUser(u);
-    onLoginSuccess(u);
-    onClose();
+    setEmail(u.email);
+    setPassword('');
+    setError(null);
+    setSuccess(`Akun ${u.name} dipilih. Silakan masukkan kata sandi Anda.`);
   };
 
   return (

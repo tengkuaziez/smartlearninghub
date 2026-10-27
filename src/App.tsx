@@ -259,6 +259,10 @@ export default function App() {
         handleSelectLecturerTab('kelas');
       } else if (tab === 'pengumuman') {
         handleSelectLecturerTab('pengumuman');
+      } else if (tab === 'mahasiswa') {
+        handleSelectLecturerTab('mahasiswa');
+      } else if (tab === 'profil' || tab === 'profile') {
+        handleSelectLecturerTab('profil');
       } else {
         handleSelectLecturerTab('beranda');
       }

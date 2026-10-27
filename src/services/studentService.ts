@@ -375,7 +375,7 @@ export const studentService = {
     const existing = registeredUsers.find((u) => u.email.toLowerCase() === normalized);
 
     if (existing) {
-      if (existing.password && password && existing.password !== password) {
+      if (!password || (existing.password && existing.password !== password)) {
         return {
           success: false,
           message: 'Kata sandi tidak sesuai. Silakan periksa kembali kata sandi Anda.',
@@ -389,46 +389,17 @@ export const studentService = {
       };
     }
 
-    // Auto-provision if in Lecturer Whitelist
+    // Jika akun dosen tapi belum tercache lokal, arahkan ke login online Supabase
     if (LECTURER_WHITELIST_EMAILS.map((e) => e.toLowerCase()).includes(normalized)) {
-      const isMiftah = normalized.includes('miftah');
-      const lecturerName = isMiftah ? 'Muhammad Miftahurridlo, M.Kom.' : 'Tengku Abdillah Azis';
-      const lecturerTitle = isMiftah ? 'Dosen Pengampu Utama' : 'Dosen Pengampu Partner';
-      const lecturerNidn = isMiftah ? '0412088501' : '0419058902';
-      const lecturerDept = isMiftah
-        ? 'Sains Informasi Geografi'
-        : 'Pendidikan Geografi';
-      const lecturerAvatar = getInitialsAvatar(lecturerName, true);
-      const lecturerBio = isMiftah
-        ? 'Dosen Pengampu Utama Smart Learning Hub & My Journey.'
-        : 'Dosen Pengampu Partner Smart Learning Hub & My Journey.';
-
-      const newLecturer: RegisteredUser = {
-        id: `dos_${Date.now()}`,
-        name: lecturerName,
-        email: normalized,
-        role: 'dosen',
-        password: password || '',
-        nidn: lecturerNidn,
-        title: lecturerTitle,
-        department: lecturerDept,
-        bio: lecturerBio,
-        avatarUrl: lecturerAvatar,
-        registeredAt: new Date().toISOString(),
-      };
-
-      this.saveRegisteredUser(newLecturer);
-      this.setCurrentUser(newLecturer);
       return {
-        success: true,
-        user: newLecturer,
-        message: `Selamat datang, ${newLecturer.name}! Akun Dosen Pengampu Anda aktif.`,
+        success: false,
+        message: 'Silakan masukkan kata sandi akun My Journey Anda untuk masuk.',
       };
     }
 
     return {
       success: false,
-      message: 'Email belum terdaftar. Silakan buka tab "Daftar Akun" untuk mendaftarkan akun baru.',
+      message: 'Email belum terdaftar. Silakan buka tab "Daftar Akun" untuk mendaftarkan akun baru dengan email yang telah diizinkan dosen.',
     };
   },
 
@@ -626,37 +597,21 @@ export const studentService = {
     const clean = email.toLowerCase().trim();
     if (!clean) return false;
 
-    // 1. Check in Master Students Database
+    // 1. Cek di Database Mahasiswa Master yang diinput Dosen
     const master = this.getMasterStudents();
     if (master.some((s) => s.email.toLowerCase() === clean)) {
       return true;
     }
 
-    // 2. Check in Course enrollments
+    // 2. Cek di daftar enrollment mata kuliah aktif
     const courses = this.getAllCourses();
     if (courses.some((c) => (c.enrolledStudentEmails || []).some((e) => e.toLowerCase() === clean))) {
       return true;
     }
 
-    // 3. Check in Custom Roster
+    // 3. Cek di Roster Kustom Dosen
     const custom = getStorage<Record<string, any>>(STORAGE_KEYS.CUSTOM_ROSTER, {});
     if (custom[clean]) return true;
-
-    // 4. Check in Registered Users
-    const registered = this.getRegisteredUsers();
-    if (registered.some((u) => u.email.toLowerCase() === clean)) {
-      return true;
-    }
-
-    // 5. Otorisasi domain email akademik / kampus (*.unimed.ac.id, @mhs.*, @student.*, *.ac.id, *.edu)
-    if (
-      clean.includes('@mhs.') ||
-      clean.includes('@student.') ||
-      clean.endsWith('.ac.id') ||
-      clean.endsWith('.edu')
-    ) {
-      return true;
-    }
 
     return false;
   },
@@ -1081,85 +1036,123 @@ export const studentService = {
       return { success: false, message: 'Silakan masukkan email Anda.' };
     }
 
-    // 1. Coba verifikasi dengan Supabase Auth jika online
-    if (isSupabaseConfigured() && supabase) {
+    const isLecturer = LECTURER_WHITELIST_EMAILS.map((e) => e.toLowerCase()).includes(normalized);
+
+    // =========================================================================
+    // 1. DOSEN PENGAMPU (AKUN TIM DOSEN MY JOURNEY):
+    // Password WAJIB diverifikasi secara ketat melalui Supabase Auth!
+    // Tidak boleh tembus dengan kata sandi asal-asalan.
+    // =========================================================================
+    if (isLecturer) {
+      if (!password || !password.trim()) {
+        return {
+          success: false,
+          message: 'Kata sandi akun My Journey Anda wajib diisi.',
+        };
+      }
+
+      if (!isSupabaseConfigured() || !supabase) {
+        return {
+          success: false,
+          message: 'Koneksi database Supabase My Journey belum terhubung. Silakan periksa koneksi internet Anda.',
+        };
+      }
+
       try {
         const { data, error } = await supabase.auth.signInWithPassword({
           email: normalized,
-          password,
+          password: password.trim(),
         });
 
-        if (!error && data?.user) {
-          const isLecturer = LECTURER_WHITELIST_EMAILS.map((e) => e.toLowerCase()).includes(normalized) ||
-            data.user.user_metadata?.role === 'dosen';
-
-          const registeredUsers = this.getRegisteredUsers();
-          let user = registeredUsers.find((u) => u.email.toLowerCase() === normalized);
-
-          const fullName = data.user.user_metadata?.full_name || data.user.user_metadata?.name || (user ? user.name : normalized.split('@')[0]);
-
-          if (!user) {
-            user = {
-              id: data.user.id,
-              name: fullName,
-              email: normalized,
-              role: isLecturer ? 'dosen' : 'mahasiswa',
-              password: password,
-              avatarUrl: getInitialsAvatar(fullName, isLecturer),
-              registeredAt: new Date().toISOString(),
-            };
-            this.saveRegisteredUser(user);
-          } else {
-            user.password = password;
-            if (fullName && fullName !== user.name) {
-              user.name = fullName;
-            }
-            this.saveRegisteredUser(user);
-          }
-
-          this.setCurrentUser(user);
-          // Sinkronisasi otomatis data Teaching & Profil dari Google Sheets + Supabase My Journey
-          await this.syncAllFromMyJourneyCloud();
-
-          const refreshedUser = this.getCurrentUser() || user;
+        if (error || !data?.user) {
           return {
-            success: true,
-            user: refreshedUser,
-            message: `Selamat datang kembali, ${refreshedUser.name}! (Terverifikasi Supabase & My Journey)`,
+            success: false,
+            message: 'Kata sandi atau email tidak cocok dengan akun My Journey / Supabase Anda. Mohon masukkan kata sandi akun My Journey yang benar.',
           };
         }
-      } catch {
-        // Fallback ke login lokal jika jaringan bermasalah
-      }
-    }
 
-    // 2. Cek apakah ada di Supabase portal_users jika belum ada di cache browser ini
-    const regUsers = this.getRegisteredUsers();
-    let existing = regUsers.find((u) => u.email.toLowerCase() === normalized);
-    if (!existing) {
-      try {
-        const cloudUsers = await supabaseDataService.fetchPortalUsers();
-        if (cloudUsers) {
-          const matched = cloudUsers.find((u) => u.email.toLowerCase() === normalized);
-          if (matched) {
-            regUsers.push(matched);
-            setStorage(STORAGE_KEYS.REGISTERED_USERS, regUsers);
-            existing = matched;
-          }
+        // Supabase Auth Berhasil Terverifikasi!
+        const isMiftah = normalized.includes('miftah');
+        const defaultName = isMiftah ? 'Muhammad Miftahurridlo, M.Kom.' : 'Tengku Abdillah Azis';
+        const fullName = data.user.user_metadata?.full_name || 
+                         data.user.user_metadata?.name || 
+                         defaultName;
+
+        const registeredUsers = this.getRegisteredUsers();
+        let user = registeredUsers.find((u) => u.email.toLowerCase() === normalized);
+
+        if (!user) {
+          user = {
+            id: data.user.id,
+            name: fullName,
+            email: normalized,
+            role: 'dosen',
+            password: password,
+            nidn: isMiftah ? '0412088501' : '0419058902',
+            title: isMiftah ? 'Dosen Pengampu Utama' : 'Dosen Pengampu Partner',
+            department: isMiftah ? 'Sains Informasi Geografi' : 'Pendidikan Geografi',
+            bio: isMiftah ? 'Dosen Pengampu Utama Smart Learning Hub & My Journey.' : 'Dosen Pengampu Partner Smart Learning Hub & My Journey.',
+            avatarUrl: getInitialsAvatar(fullName, true),
+            registeredAt: new Date().toISOString(),
+          };
+          this.saveRegisteredUser(user);
+        } else {
+          user.id = data.user.id;
+          user.password = password;
+          user.name = fullName;
+          this.saveRegisteredUser(user);
         }
-      } catch {}
-    }
 
-    // 3. Fallback ke login lokal
-    const localResult = this.login(email, password);
-    if (localResult.success) {
-      await this.syncAllFromMyJourneyCloud();
-      const refreshedUser = this.getCurrentUser();
-      if (refreshedUser) {
-        localResult.user = refreshedUser;
+        this.setCurrentUser(user);
+        await this.syncAllFromMyJourneyCloud();
+
+        const refreshedUser = this.getCurrentUser() || user;
+        return {
+          success: true,
+          user: refreshedUser,
+          message: `Selamat datang kembali, ${refreshedUser.name}! (Terverifikasi Supabase My Journey)`,
+        };
+      } catch (err: any) {
+        return {
+          success: false,
+          message: `Gagal verifikasi Supabase: ${err.message || 'Koneksi bermasalah'}`,
+        };
       }
     }
-    return localResult;
+
+    // =========================================================================
+    // 2. MAHASISWA:
+    // Cek password terdaftar di akun portal Smart Learning Hub
+    // =========================================================================
+    if (!password || !password.trim()) {
+      return {
+        success: false,
+        message: 'Kata sandi akun Anda wajib diisi.',
+      };
+    }
+
+    const regUsers = this.getRegisteredUsers();
+    const existing = regUsers.find((u) => u.email.toLowerCase() === normalized);
+
+    if (existing) {
+      if (existing.password && existing.password !== password) {
+        return {
+          success: false,
+          message: 'Kata sandi tidak sesuai. Silakan periksa kembali kata sandi Anda.',
+        };
+      }
+      this.setCurrentUser(existing);
+      return {
+        success: true,
+        user: existing,
+        message: `Selamat datang kembali, ${existing.name}!`,
+      };
+    }
+
+    return {
+      success: false,
+      message: 'Email belum terdaftar. Silakan buka tab "Daftar Akun" untuk mendaftarkan akun baru menggunakan email yang telah diizinkan dosen.',
+    };
   },
 
   // Auth: Register dengan dukungan Supabase Auth & Whitelist Check

@@ -171,10 +171,13 @@ test('Avatar: ensures no dummy Unsplash photos are used', () => {
   assert.equal(regUser.avatarUrl.includes('photo-1507003211169'), false);
 });
 
-test('Auth Async: loginAsync falls back cleanly to local authentication if offline', async () => {
-  const res = await studentService.loginAsync('miftahurridlo.688@gmail.com', 'password123');
+test('Auth Async: loginAsync verifies registered student credentials', async () => {
+  const res = await studentService.loginAsync('budi@student.ac.id', 'mhsPassword123');
   assert.equal(res.success, true);
-  assert.equal(res.user?.role, 'dosen');
+  assert.equal(res.user?.role, 'mahasiswa');
+
+  const resBad = await studentService.loginAsync('budi@student.ac.id', 'wrongPass');
+  assert.equal(resBad.success, false);
 });
 
 test('Courses: syncCoursesFromSupabase method exists and returns a promise result', async () => {
@@ -183,7 +186,16 @@ test('Courses: syncCoursesFromSupabase method exists and returns a promise resul
   assert.equal(typeof res.count, 'number');
 });
 
-test('Whitelist & Auto-Provision: aziz.student@mhs.unimed.ac.id registers and appears in master students', () => {
+test('Whitelist: student must be in master database to register successfully', () => {
+  studentService.saveMasterStudent({
+    id: 'mstd_test_aziz',
+    nim: '1234567',
+    name: 'Aziz',
+    email: 'aziz.student@mhs.unimed.ac.id',
+    major: 'Sains Informasi Geografi',
+    classSection: 'Kelas A',
+  });
+
   const res = studentService.register({
     name: 'Aziz',
     email: 'aziz.student@mhs.unimed.ac.id',
