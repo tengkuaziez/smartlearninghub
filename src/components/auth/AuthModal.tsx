@@ -427,27 +427,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <div className="flex flex-col gap-1.5">
               <button
                 type="button"
-                onClick={() => handleQuickLogin('dosen.utama@smartlearning.ac.id')}
-                className="w-full p-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-900 dark:text-indigo-200 text-left text-xs font-semibold flex items-center justify-between border border-indigo-200 dark:border-indigo-800"
+                onClick={() => handleQuickLogin('miftahurridlo.688@gmail.com')}
+                className="w-full p-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-900 dark:text-indigo-200 text-left text-xs font-semibold flex items-center justify-between border border-indigo-200 dark:border-indigo-800 transition-colors"
               >
-                <span>Masuk sebagai <strong>Dosen Utama</strong> (Dr. Ir. Rian)</span>
-                <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded-md">Dosen</span>
+                <span>Masuk sebagai <strong>Dosen Utama</strong> (Miftahur Ridlo, M.Kom.)</span>
+                <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded-md font-mono">Dosen</span>
               </button>
               <button
                 type="button"
-                onClick={() => handleQuickLogin('dosen.partner@smartlearning.ac.id')}
-                className="w-full p-2 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 text-purple-900 dark:text-purple-200 text-left text-xs font-semibold flex items-center justify-between border border-purple-200 dark:border-purple-800"
+                onClick={() => handleQuickLogin('altaf.aziz16@gmail.com')}
+                className="w-full p-2.5 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 text-purple-900 dark:text-purple-200 text-left text-xs font-semibold flex items-center justify-between border border-purple-200 dark:border-purple-800 transition-colors"
               >
-                <span>Masuk sebagai <strong>Dosen Partner</strong> (Dian Paramitha)</span>
-                <span className="text-[10px] bg-purple-600 text-white px-2 py-0.5 rounded-md">Dosen</span>
+                <span>Masuk sebagai <strong>Dosen Partner</strong> (Tengku Abdillah Aziz, S.Pd.)</span>
+                <span className="text-[10px] bg-purple-600 text-white px-2 py-0.5 rounded-md font-mono">Dosen</span>
               </button>
               <button
                 type="button"
-                onClick={() => handleQuickLogin('altaf.aziz16@student.ac.id')}
-                className="w-full p-2 rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-900 dark:text-blue-200 text-left text-xs font-semibold flex items-center justify-between border border-blue-200 dark:border-blue-800"
+                onClick={() => handleQuickLogin('rafi.alamsyah@student.ac.id')}
+                className="w-full p-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-900 dark:text-blue-200 text-left text-xs font-semibold flex items-center justify-between border border-blue-200 dark:border-blue-800 transition-colors"
               >
-                <span>Masuk sebagai <strong>Mahasiswa</strong> (Altaf - 3 Kelas)</span>
-                <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-md">Mahasiswa</span>
+                <span>Masuk sebagai <strong>Mahasiswa</strong> (Rafi Alamsyah - Kelas GEO-301)</span>
+                <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-md font-mono">Mahasiswa</span>
               </button>
             </div>
           </div>

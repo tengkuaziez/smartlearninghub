@@ -25,6 +25,7 @@ import { ProfileView } from './components/profile/ProfileView.tsx';
 import { LecturerDashboardView } from './components/lecturer/LecturerDashboardView.tsx';
 import { LecturerClassManagementView } from './components/lecturer/LecturerClassManagementView.tsx';
 import { LecturerClassDetailView } from './components/lecturer/LecturerClassDetailView.tsx';
+import { LecturerProfileView } from './components/lecturer/LecturerProfileView.tsx';
 import { LecturerQrBroadcastModal } from './components/lecturer/LecturerQrBroadcastModal.tsx';
 
 import { 
@@ -469,47 +470,17 @@ export default function App() {
                 />
               )}
 
-              {/* Lecturer View 6: Profil Tim Dosen */}
+              {/* Lecturer View 6: Profil Tim Dosen (Mengikuti My Journey) */}
               {lecturerTab === 'profil' && (
-                <div className="space-y-6">
-                  <div className="pb-2 border-b border-slate-200 dark:border-slate-800">
-                    <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">
-                      Profil Tim Dosen Pengampu
-                    </h1>
-                    <p className="text-sm text-slate-500 mt-1">
-                      Informasi tim pengajar Smart Learning Hub.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex items-center gap-4">
-                      <img
-                        src={currentUser.avatarUrl}
-                        alt={currentUser.name}
-                        className="w-16 h-16 rounded-2xl object-cover ring-2 ring-indigo-500"
-                      />
-                      <div>
-                        <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider block">
-                          Akun Aktif Saat Ini
-                        </span>
-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                          {currentUser.name}
-                        </h3>
-                        <p className="text-xs text-slate-500 font-mono">{currentUser.email}</p>
-                        <p className="text-xs text-slate-400 mt-1">{currentUser.title}</p>
-                      </div>
-                    </div>
-
-                    <div className="p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 text-xs text-slate-500 space-y-2">
-                      <h4 className="font-bold text-slate-800 dark:text-slate-200">
-                        Aturan Akses Dosen:
-                      </h4>
-                      <p>
-                        Akses Dosen terkunci secara eksklusif hanya untuk 2 email terdaftar (<code>dosen.utama@smartlearning.ac.id</code> dan <code>dosen.partner@smartlearning.ac.id</code>). Mahasiswa yang login tidak akan dapat mengakses panel ini.
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                <LecturerProfileView
+                  currentUser={currentUser}
+                  courses={allLecturerCourses}
+                  onUserChanged={(updated) => {
+                    setCurrentUser(updated);
+                    reloadData();
+                  }}
+                  onDataRefreshed={reloadData}
+                />
               )}
             </>
           )}

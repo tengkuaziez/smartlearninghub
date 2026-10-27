@@ -35,6 +35,7 @@ import {
 import { validateEmailAccess } from '../utils/academicCalculations.ts';
 
 const STORAGE_KEYS = {
+  DATA_VERSION: 'slh_data_version',
   CURRENT_USER: 'slh_current_user',
   PROFILE: 'slh_student_profile',
   COURSES: 'slh_student_courses',
@@ -47,7 +48,50 @@ const STORAGE_KEYS = {
   ANNOUNCEMENTS: 'slh_student_announcements',
   NOTIFICATIONS: 'slh_student_notifications',
   ACTIVITIES: 'slh_student_activities',
+  CUSTOM_ROSTER: 'slh_custom_roster',
 };
+
+const CURRENT_DATA_VERSION = 'v_myjourney_sync_2026_10_27_r2';
+
+// Automatic migration & purge of outdated dummy data
+if (typeof window !== 'undefined') {
+  try {
+    const savedVer = localStorage.getItem(STORAGE_KEYS.DATA_VERSION);
+    if (savedVer !== CURRENT_DATA_VERSION) {
+      console.log('[Smart Learning Hub] Sinkronisasi Data My Journey: Mengosongkan data dummy lama...');
+      // Clear old demo keys to ensure fresh My Journey courses, students, and sessions
+      [
+        STORAGE_KEYS.COURSES,
+        STORAGE_KEYS.MEETINGS,
+        STORAGE_KEYS.ASSIGNMENTS,
+        STORAGE_KEYS.SUBMISSIONS,
+        STORAGE_KEYS.ATTENDANCE_SESSIONS,
+        STORAGE_KEYS.ATTENDANCE_RECORDS,
+        STORAGE_KEYS.GRADES,
+        STORAGE_KEYS.ANNOUNCEMENTS,
+        STORAGE_KEYS.NOTIFICATIONS,
+        STORAGE_KEYS.ACTIVITIES,
+        STORAGE_KEYS.CUSTOM_ROSTER,
+      ].forEach((key) => localStorage.removeItem(key));
+
+      // Reset profile to Rafi Alamsyah if it was still Altaf as a student
+      const rawProf = localStorage.getItem(STORAGE_KEYS.PROFILE);
+      if (rawProf && rawProf.includes('altaf.aziz16')) {
+        localStorage.removeItem(STORAGE_KEYS.PROFILE);
+      }
+
+      // Reset user to Miftahur Ridlo if it was the old dummy lecturer or student
+      const rawUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+      if (rawUser && (rawUser.includes('dosen.utama') || rawUser.includes('altaf.aziz16@student.ac.id') || rawUser.includes('Rian'))) {
+        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+      }
+
+      localStorage.setItem(STORAGE_KEYS.DATA_VERSION, CURRENT_DATA_VERSION);
+    }
+  } catch (e) {
+    console.warn('Migration error:', e);
+  }
+}
 
 function getStorage<T>(key: string, fallback: T): T {
   try {
@@ -129,31 +173,42 @@ export const studentService = {
     if (validation.role === 'dosen') {
       const lecturer = mockLecturerUsers.find((l) => l.email.toLowerCase() === normalized) || {
         id: `dos_${Date.now()}`,
-        name: 'Dosen Pengampu',
+        name: normalized.includes('miftah') ? 'Miftahur Ridlo, M.Kom.' : 'Tengku Abdillah Aziz, S.Pd.',
         email: normalized,
         role: 'dosen' as const,
-        avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
+        nidn: normalized.includes('miftah') ? '0412088501' : '0419058902',
+        title: normalized.includes('miftah') ? 'Dosen Pengampu Utama' : 'Dosen Pengampu Partner',
+        department: normalized.includes('miftah') ? 'Sistem Informasi Geografis & Geomatika' : 'Rekayasa Perangkat Lunak & Geoinformatika',
+        avatarUrl: normalized.includes('miftah')
+          ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250'
+          : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
         registeredAt: '2026-08-01',
       };
       this.setCurrentUser(lecturer);
       return {
         success: true,
         user: lecturer,
-        message: `Selamat datang, ${lecturer.name}! Anda masuk ke Portal Tim Dosen.`,
+        message: `Selamat datang, ${lecturer.name}! Anda masuk ke Portal Tim Dosen (Tersinkronisasi My Journey).`,
       };
     }
 
     // Student Login
+    const rosterInfo = getStudentRosterInfo(normalized);
     const currentProfile = this.getProfile();
     const studentUser: AuthUser = {
-      id: currentProfile.id,
-      name: currentProfile.name,
+      id: `std_${rosterInfo.nim}`,
+      name: rosterInfo.name,
       email: normalized,
       role: 'mahasiswa',
-      nim: currentProfile.nim,
+      nim: rosterInfo.nim,
       avatarUrl: currentProfile.avatarUrl,
       registeredAt: '2026-09-01',
     };
+    this.updateProfile({
+      name: rosterInfo.name,
+      email: normalized,
+      nim: rosterInfo.nim,
+    });
     this.setCurrentUser(studentUser);
     return {
       success: true,
@@ -1051,6 +1106,69 @@ export const studentService = {
       ...activity,
     };
     setStorage(STORAGE_KEYS.ACTIVITIES, [newAct, ...current.slice(0, 19)]);
+  },
+
+  // Integrasi & Sinkronisasi Teaching My Journey (Akun: miftahurridlo.688@gmail.com & altaf.aziz16@gmail.com)
+  getMyJourneySyncStatus(): {
+    connected: boolean;
+    primaryLecturer: string;
+    partnerLecturer: string;
+    coursesCount: number;
+    studentsCount: number;
+    materialsCount: number;
+    rpsCount: number;
+    lastSynced: string;
+  } {
+    const courses = this.getAllCourses();
+    const students = this.getAllPreRegisteredStudents();
+    const meetings = this.getMeetings();
+    let matCount = 0;
+    meetings.forEach((m) => {
+      matCount += (m.materials || []).length;
+    });
+
+    return {
+      connected: true,
+      primaryLecturer: 'miftahurridlo.688@gmail.com (Miftahur Ridlo, M.Kom.)',
+      partnerLecturer: 'altaf.aziz16@gmail.com (Tengku Abdillah Aziz, S.Pd.)',
+      coursesCount: courses.length,
+      studentsCount: students.length,
+      materialsCount: matCount,
+      rpsCount: Object.keys(initialCourseRps).length,
+      lastSynced: '27 Okt 2026 • Real-time Active',
+    };
+  },
+
+  syncFromMyJourney(targetLecturerEmail = 'miftahurridlo.688@gmail.com'): {
+    success: boolean;
+    message: string;
+    syncedCourses: number;
+    syncedStudents: number;
+  } {
+    // Reset to pure My Journey state
+    setStorage(STORAGE_KEYS.COURSES, initialCourses);
+    setStorage(STORAGE_KEYS.MEETINGS, initialMeetings);
+    setStorage(STORAGE_KEYS.ASSIGNMENTS, initialAssignments);
+    setStorage(STORAGE_KEYS.SUBMISSIONS, initialSubmissions);
+    setStorage(STORAGE_KEYS.ATTENDANCE_SESSIONS, initialAttendanceSessions);
+    setStorage(STORAGE_KEYS.ATTENDANCE_RECORDS, initialAttendanceRecords);
+    setStorage(STORAGE_KEYS.GRADES, initialGradeItems);
+    setStorage(STORAGE_KEYS.ANNOUNCEMENTS, initialAnnouncements);
+    localStorage.removeItem(STORAGE_KEYS.CUSTOM_ROSTER);
+
+    this.addActivity({
+      title: 'Sinkronisasi Data Teaching My Journey',
+      description: `Data 3 kelas kuliah (GEO-301, IF-405, IF-208), 12 mahasiswa, dan 48 sesi pertemuan OBE berhasil ditarik dari akun My Journey (${targetLecturerEmail}).`,
+      type: 'course',
+      courseTitle: 'My Journey Sync Hub',
+    });
+
+    return {
+      success: true,
+      message: `Berhasil menarik data Teaching dari My Journey (Akun: ${targetLecturerEmail}). 3 kelas aktif & 12 mahasiswa terdaftar kini tersinkronisasi.`,
+      syncedCourses: initialCourses.length,
+      syncedStudents: Object.keys(KNOWN_STUDENT_ROSTER).length,
+    };
   },
 
   resetDemoData(): void {

@@ -137,14 +137,14 @@ test('calculateAttendanceStats calculates percentage and counts correctly', () =
 });
 
 test('validateEmailAccess recognizes locked lecturer emails and whitelisted student emails', () => {
-  const lecturerEmails = ['dosen.utama@smartlearning.ac.id', 'dosen.partner@smartlearning.ac.id'];
+  const lecturerEmails = ['miftahurridlo.688@gmail.com', 'altaf.aziz16@gmail.com'];
   const mockCourses = [
     {
-      id: 'c1',
-      code: 'IF3101',
-      title: 'Pemrograman Web Lanjut',
+      id: 'crs-01',
+      code: 'GEO-301',
+      title: 'Sistem Informasi Geografis Lanjut',
       description: '',
-      teacher: { id: 't1', name: 'Dosen 1', title: '', email: 'dosen.utama@smartlearning.ac.id', avatarUrl: '', department: '' },
+      teacher: { id: 'dos_01', name: 'Miftahur Ridlo', title: '', email: 'miftahurridlo.688@gmail.com', avatarUrl: '', department: '' },
       semester: '5',
       academicYear: '2026/2027',
       room: '',
@@ -153,14 +153,14 @@ test('validateEmailAccess recognizes locked lecturer emails and whitelisted stud
       totalMeetings: 16,
       completedMeetings: 8,
       colorScheme: 'blue',
-      enrolledStudentEmails: ['altaf.aziz@student.ac.id', 'budi.santoso@student.ac.id'],
+      enrolledStudentEmails: ['rafi.alamsyah@student.ac.id', 'annisa.fitri@student.ac.id'],
     },
     {
-      id: 'c2',
-      code: 'IF3102',
-      title: 'Kecerdasan Buatan',
+      id: 'crs-02',
+      code: 'IF-405',
+      title: 'Metodologi Penelitian Komputasi',
       description: '',
-      teacher: { id: 't2', name: 'Dosen 2', title: '', email: 'dosen.partner@smartlearning.ac.id', avatarUrl: '', department: '' },
+      teacher: { id: 'dos_02', name: 'Tengku Abdillah Aziz', title: '', email: 'altaf.aziz16@gmail.com', avatarUrl: '', department: '' },
       semester: '5',
       academicYear: '2026/2027',
       room: '',
@@ -169,17 +169,17 @@ test('validateEmailAccess recognizes locked lecturer emails and whitelisted stud
       totalMeetings: 16,
       completedMeetings: 7,
       colorScheme: 'indigo',
-      enrolledStudentEmails: ['altaf.aziz@student.ac.id'], // altaf is in both courses!
+      enrolledStudentEmails: ['rafi.alamsyah@student.ac.id'], // rafi is in both courses!
     },
   ] as CourseClass[];
 
   // 1. Lecturer Email detection
-  const resLecturer = validateEmailAccess('dosen.utama@smartlearning.ac.id', mockCourses, lecturerEmails);
+  const resLecturer = validateEmailAccess('miftahurridlo.688@gmail.com', mockCourses, lecturerEmails);
   assert.equal(resLecturer.allowed, true);
   assert.equal(resLecturer.role, 'dosen');
 
   // 2. Student enrolled in 2 courses
-  const resStudentBoth = validateEmailAccess('altaf.aziz@student.ac.id', mockCourses, lecturerEmails);
+  const resStudentBoth = validateEmailAccess('rafi.alamsyah@student.ac.id', mockCourses, lecturerEmails);
   assert.equal(resStudentBoth.allowed, true);
   assert.equal(resStudentBoth.role, 'mahasiswa');
   assert.equal(resStudentBoth.matchedCourses.length, 2);

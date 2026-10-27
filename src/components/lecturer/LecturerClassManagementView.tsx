@@ -69,7 +69,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
   // New Course Form State
   const [newCourseCode, setNewCourseCode] = useState('');
   const [newCourseTitle, setNewCourseTitle] = useState('');
-  const [newCourseRoom, setNewCourseRoom] = useState('Lab Komputasi A-302');
+  const [newCourseRoom, setNewCourseRoom] = useState('Lab Komputasi Spasial Lt. 3');
   const [newCourseDay, setNewCourseDay] = useState('Senin');
   const [newCourseTime, setNewCourseTime] = useState('08:00 - 10:30 WIB');
   const [newCourseSemester, setNewCourseSemester] = useState('Semester 5');
@@ -260,8 +260,21 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
           </button>
         </div>
 
-        {/* Right Action: + Tambah Kelas Baru Button (Dark pill button) */}
+        {/* Right Action: Sync My Journey & + Tambah Kelas Baru Button */}
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => {
+              const res = studentService.syncFromMyJourney('miftahurridlo.688@gmail.com');
+              onDataUpdated();
+              alert(res.message);
+            }}
+            title="Tarik data Teaching terbaru dari My Journey (Akun: miftahurridlo.688@gmail.com)"
+            className="px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-50 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1.5 transition-all"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>Sync My Journey</span>
+          </button>
+
           {activeSubTab === 'mahasiswa' ? (
             <button
               onClick={() => setIsAddStudentModalOpen(true)}
