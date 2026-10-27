@@ -56,7 +56,7 @@ const STORAGE_KEYS = {
   CUSTOM_ROSTER: 'slh_custom_roster',
 };
 
-const CURRENT_DATA_VERSION = 'v_kosongan_clean_slate_2026_10_27_r6';
+const CURRENT_DATA_VERSION = 'v_kosongan_clean_slate_2026_10_27_r7_clean_slate';
 
 // Automatic migration & purge of outdated dummy data (memulai kosongan & bersih)
 if (typeof window !== 'undefined') {
@@ -134,7 +134,7 @@ export const defaultLecturerUser: AuthUser = {
   role: 'dosen',
   nidn: '0412088501',
   title: 'Dosen Pengampu Utama',
-  department: 'Pendidikan Geografi / Sains Informasi Geografis',
+  department: 'Sains Informasi Geografi',
   avatarUrl: getInitialsAvatar('Muhammad Miftahurridlo', true),
   bio: 'Dosen Pengampu Utama Smart Learning Hub & My Journey.',
   registeredAt: '2026-08-01',
@@ -396,8 +396,8 @@ export const studentService = {
       const lecturerTitle = isMiftah ? 'Dosen Pengampu Utama' : 'Dosen Pengampu Partner';
       const lecturerNidn = isMiftah ? '0412088501' : '0419058902';
       const lecturerDept = isMiftah
-        ? 'Pendidikan Geografi / Sains Informasi Geografis'
-        : 'Rekayasa Perangkat Lunak & Geoinformatika';
+        ? 'Sains Informasi Geografi'
+        : 'Pendidikan Geografi';
       const lecturerAvatar = getInitialsAvatar(lecturerName, true);
       const lecturerBio = isMiftah
         ? 'Dosen Pengampu Utama Smart Learning Hub & My Journey.'
@@ -1269,8 +1269,8 @@ export const studentService = {
       title = isMiftah ? 'Dosen Pengampu Utama' : 'Dosen Pengampu Partner';
       nidn = nidn || (isMiftah ? '0412088501' : '0419058902');
       department = isMiftah
-        ? 'Pendidikan Geografi / Sains Informasi Geografis'
-        : 'Rekayasa Perangkat Lunak & Geoinformatika';
+        ? 'Sains Informasi Geografi'
+        : 'Pendidikan Geografi';
       bio = isMiftah
         ? 'Dosen Pengampu Utama Smart Learning Hub & My Journey.'
         : 'Dosen Pengampu Partner Smart Learning Hub & My Journey.';

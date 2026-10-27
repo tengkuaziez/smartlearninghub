@@ -188,21 +188,21 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
       role: 'dosen' as const,
       nidn: '0412088501',
       title: 'Dosen Pengampu Utama',
-      department: 'Pendidikan Geografi / Sains Informasi Geografis',
+      department: 'Sains Informasi Geografi',
       avatarUrl: getInitialsAvatar('Muhammad Miftahurridlo', true),
-      bio: 'Dosen Pengampu Utama Smart Learning Hub & My Journey.',
+      bio: 'Dosen Pengampu Utama Smart Learning Hub & My Journey. Koordinator kurikulum OBE dan penanggung jawab pengajaran.',
       registeredAt: '2026-08-01',
     },
     registered.find((l) => l.email.toLowerCase() === 'altaf.aziz16@gmail.com') || {
       id: 'dos_02',
-      name: currentUser.email.toLowerCase() === 'altaf.aziz16@gmail.com' ? currentUser.name : 'Tengku Abdillah Aziz, S.Pd.',
+      name: currentUser.email.toLowerCase() === 'altaf.aziz16@gmail.com' ? currentUser.name : 'Tengku Abdillah Azis, S.Pd., M.Sc.',
       email: 'altaf.aziz16@gmail.com',
       role: 'dosen' as const,
       nidn: '0419058902',
       title: 'Dosen Pengampu Partner',
-      department: 'Rekayasa Perangkat Lunak & Geoinformatika',
-      avatarUrl: getInitialsAvatar('Tengku Abdillah Aziz', true),
-      bio: 'Dosen Pengampu Partner Smart Learning Hub & My Journey.',
+      department: 'Pendidikan Geografi',
+      avatarUrl: getInitialsAvatar('Tengku Abdillah Azis', true),
+      bio: 'Dosen Pengampu Partner Smart Learning Hub & My Journey. Pengampu kelas SIG dan komputasi spasial.',
       registeredAt: '2026-08-01',
     },
   ];
@@ -423,29 +423,18 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
                 {/* Taught Classes Pill List */}
                 <div className="space-y-1.5 mb-5">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                    Mata Kuliah Diampu:
+                    Mata Kuliah Diampu Bersama:
                   </span>
                   <div className="flex flex-wrap gap-1.5">
-                    {courses.map((crs) => {
-                      const teaches =
-                        crs.teacher.email.toLowerCase() === displayUser.email.toLowerCase() ||
-                        crs.secondaryTeacher?.email.toLowerCase() === displayUser.email.toLowerCase();
-                      if (!teaches) return null;
-
-                      return (
-                        <span
-                          key={crs.id}
-                          className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
-                        >
-                          <strong>{crs.code}</strong> - {crs.title.split('&')[0]}
-                        </span>
-                      );
-                    })}
-                    {courses.filter(
-                      (crs) =>
-                        crs.teacher.email.toLowerCase() === displayUser.email.toLowerCase() ||
-                        crs.secondaryTeacher?.email.toLowerCase() === displayUser.email.toLowerCase()
-                    ).length === 0 && (
+                    {courses.map((crs) => (
+                      <span
+                        key={crs.id}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                      >
+                        <strong>{crs.code}</strong> - {crs.title.split('&')[0]}
+                      </span>
+                    ))}
+                    {courses.length === 0 && (
                       <span className="text-xs text-slate-400 italic">
                         Belum ada kelas perkuliahan aktif.
                       </span>
@@ -531,17 +520,17 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
                       </span>
                     </td>
                     <td className="py-3.5 px-3 text-slate-700 dark:text-slate-300">
-                      {crs.teacher.name}
+                      {crs.primaryLecturer || crs.teacher?.name || 'Muhammad Miftahurridlo, M.Kom.'}
                     </td>
                     <td className="py-3.5 px-3 text-slate-500">
-                      {crs.secondaryTeacher ? crs.secondaryTeacher.name : '-'}
+                      {crs.partnerLecturer || crs.secondaryTeacher?.name || 'Tengku Abdillah Azis, S.Pd., M.Sc.'}
                     </td>
                     <td className="py-3.5 px-3 text-slate-500">
-                      <span>{crs.scheduleDay}, {crs.scheduleTime}</span>
-                      <span className="block text-[11px] text-slate-400">{crs.room}</span>
+                      <span>{crs.schedule || (crs.scheduleDay ? `${crs.scheduleDay}, ${crs.scheduleTime || ''}` : 'Jadwal Kuliah')}</span>
+                      <span className="block text-[11px] text-slate-400">{crs.room || 'Lab Komputasi'}</span>
                     </td>
                     <td className="py-3.5 px-3 text-center font-bold text-slate-900 dark:text-white">
-                      {crs.enrolledStudentEmails.length} org
+                      {(crs.enrolledStudentEmails || []).length} org
                     </td>
                     <td className="py-3.5 px-3 text-center">
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">

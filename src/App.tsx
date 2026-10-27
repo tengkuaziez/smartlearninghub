@@ -177,27 +177,6 @@ export default function App() {
     setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
   };
 
-  // Quick Role Toggle for local prototype testing as requested by user
-  const handleQuickToggleRole = () => {
-    if (!currentUser) return;
-    if (currentUser.role === 'dosen') {
-      const student = studentService.getRegisteredUsers().find((u) => u.role === 'mahasiswa') || defaultStudentUser;
-      studentService.setCurrentUser(student);
-      setCurrentUser(student);
-      setSelectedCourseId(null);
-      setSelectedMeetingId(null);
-      setStudentTab('beranda');
-    } else {
-      const lecturer = studentService.getRegisteredLecturers()[0] || defaultLecturerUser;
-      studentService.setCurrentUser(lecturer);
-      setCurrentUser(lecturer);
-      setSelectedCourseId(null);
-      setSelectedMeetingId(null);
-      setLecturerTab('beranda');
-    }
-    reloadData();
-  };
-
   const handleLoginSuccess = async (user: AuthUser) => {
     setCurrentUser(user);
     setIsGuestMode(false);
@@ -411,7 +390,6 @@ export default function App() {
             setAuthMode(m || 'login');
             setIsGuestMode(false);
           }}
-          onQuickToggleRole={currentUser ? handleQuickToggleRole : undefined}
           onOpenGoogleModal={currentUser?.role === 'dosen' ? () => setIsGoogleModalOpen(true) : undefined}
           onLogout={handleLogout}
         />

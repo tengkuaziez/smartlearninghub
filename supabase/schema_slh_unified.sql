@@ -79,6 +79,10 @@ ALTER TABLE public.materials DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rps DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sessions DISABLE ROW LEVEL SECURITY;
 
+-- Kosongkan data kelas & mahasiswa lama agar memulai dari kondisi bersih (Clean Slate untuk Kelas Baru Bersama)
+DELETE FROM public.courses;
+DELETE FROM public.students;
+
 -- -------------------------------------------------------------------------
 -- BAGIAN 2: Tabel-tabel Khusus Smart Learning Hub (Portal Mahasiswa)
 -- -------------------------------------------------------------------------

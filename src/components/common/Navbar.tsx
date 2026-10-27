@@ -32,7 +32,6 @@ interface NavbarProps {
   isMobileMenuOpen: boolean;
   onToggleMobileMenu: () => void;
   onOpenAuthModal: (mode?: 'login' | 'register') => void;
-  onQuickToggleRole?: () => void;
   onOpenGoogleModal?: () => void;
   onLogout?: () => void;
 }
@@ -48,7 +47,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   isMobileMenuOpen,
   onToggleMobileMenu,
   onOpenAuthModal,
-  onQuickToggleRole,
   onOpenGoogleModal,
   onLogout,
 }) => {
@@ -168,26 +166,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Cloud className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span className="hidden md:inline">Drive & Sheets</span>
-            </button>
-          )}
-
-          {/* Quick Role Switcher (When Logged In) */}
-          {currentUser && onQuickToggleRole && (
-            <button
-              onClick={onQuickToggleRole}
-              className="flex items-center gap-1 px-1.5 py-1 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs border bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
-              title="Klik untuk langsung berganti peran antara Dosen dan Mahasiswa"
-            >
-              <ArrowLeftRight className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
-              <span
-                className={`px-1.5 py-0.5 rounded-md font-mono text-[10px] sm:text-xs font-bold ${
-                  currentUser.role === 'dosen'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-blue-600 text-white'
-                }`}
-              >
-                {currentUser.role === 'dosen' ? 'Dosen' : 'Mhs'}
-              </span>
             </button>
           )}
 

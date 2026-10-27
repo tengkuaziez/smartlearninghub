@@ -35,6 +35,7 @@ export const LecturerStudentManagementView: React.FC<LecturerStudentManagementVi
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCourse, setFilterCourse] = useState<string>('all');
+  const [filterMajor, setFilterMajor] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'registered' | 'unregistered'>('all');
 
   const [notification, setNotification] = useState<string | null>(null);
@@ -46,7 +47,7 @@ export const LecturerStudentManagementView: React.FC<LecturerStudentManagementVi
   const [formName, setFormName] = useState('');
   const [formNim, setFormNim] = useState('');
   const [formEmail, setFormEmail] = useState('');
-  const [formMajor, setFormMajor] = useState('Informatika');
+  const [formMajor, setFormMajor] = useState('Sains Informasi Geografi');
   const [formClassSection, setFormClassSection] = useState('Kelas A');
   const [formSelectedCourses, setFormSelectedCourses] = useState<string[]>([]);
 
@@ -79,12 +80,16 @@ export const LecturerStudentManagementView: React.FC<LecturerStudentManagementVi
       filterCourse === 'all' ||
       (s.enrolledCourseCodes || []).map((c) => c.toLowerCase()).includes(filterCourse.toLowerCase());
 
+    const matchMajor =
+      filterMajor === 'all' ||
+      (s.major || '').toLowerCase() === filterMajor.toLowerCase();
+
     const matchStatus =
       filterStatus === 'all' ||
       (filterStatus === 'registered' && s.isRegistered) ||
       (filterStatus === 'unregistered' && !s.isRegistered);
 
-    return matchQuery && matchCourse && matchStatus;
+    return matchQuery && matchCourse && matchMajor && matchStatus;
   });
 
   const openAddStudentModal = () => {
@@ -92,9 +97,9 @@ export const LecturerStudentManagementView: React.FC<LecturerStudentManagementVi
     setFormName('');
     setFormNim('');
     setFormEmail('');
-    setFormMajor('Informatika');
+    setFormMajor('Sains Informasi Geografi');
     setFormClassSection('Kelas A');
-    setFormSelectedCourses(courses.length > 0 ? [courses[0].code] : []);
+    setFormSelectedCourses([]); // Opsional: Dosen dapat memasukkan mahasiswa tanpa kelas terlebih dahulu
     setIsStudentModalOpen(true);
   };
 
@@ -103,7 +108,7 @@ export const LecturerStudentManagementView: React.FC<LecturerStudentManagementVi
     setFormName(student.name);
     setFormNim(student.nim);
     setFormEmail(student.email);
-    setFormMajor(student.major || 'Informatika');
+    setFormMajor(student.major || 'Sains Informasi Geografi');
     setFormClassSection(student.classSection || 'Kelas A');
     setFormSelectedCourses(student.enrolledCourseCodes || []);
     setIsStudentModalOpen(true);
@@ -377,6 +382,20 @@ export const LecturerStudentManagementView: React.FC<LecturerStudentManagementVi
             </select>
           </div>
 
+          {/* Major Filter */}
+          <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
+            <GraduationCap className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <select
+              value={filterMajor}
+              onChange={(e) => setFilterMajor(e.target.value)}
+              className="py-1.5 px-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200"
+            >
+              <option value="all">Semua Jurusan</option>
+              <option value="Sains Informasi Geografi">Sains Informasi Geografi</option>
+              <option value="Pendidikan Geografi">Pendidikan Geografi</option>
+            </select>
+          </div>
+
           {/* Status Filter */}
           <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
             <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -460,7 +479,7 @@ export const LecturerStudentManagementView: React.FC<LecturerStudentManagementVi
                             {std.name}
                           </span>
                           <span className="text-[11px] text-slate-400">
-                            {std.major || 'Informatika'} • {std.classSection || 'Kelas A'}
+                            {std.major || 'Sains Informasi Geografi'} • {std.classSection || 'Kelas A'}
                           </span>
                         </div>
                       </div>
@@ -488,7 +507,9 @@ export const LecturerStudentManagementView: React.FC<LecturerStudentManagementVi
                           </span>
                         ))}
                         {(std.enrolledCourseCodes || []).length === 0 && (
-                          <span className="text-[11px] text-slate-400 italic">Belum dipilih</span>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                            Bebas Kelas (Belum Diatur)
+                          </span>
                         )}
                       </div>
                     </td>
@@ -588,13 +609,14 @@ export const LecturerStudentManagementView: React.FC<LecturerStudentManagementVi
                   <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Program Studi
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={formMajor}
                     onChange={(e) => setFormMajor(e.target.value)}
-                    placeholder="Informatika / SIG"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
-                  />
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-medium"
+                  >
+                    <option value="Sains Informasi Geografi">Sains Informasi Geografi</option>
+                    <option value="Pendidikan Geografi">Pendidikan Geografi</option>
+                  </select>
                 </div>
               </div>
 
@@ -617,13 +639,16 @@ export const LecturerStudentManagementView: React.FC<LecturerStudentManagementVi
 
               {/* Course Assignment Checkboxes */}
               <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Pilih Kelas Perkuliahan yang Diikuti:
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-0.5">
+                  Pilih Kelas Perkuliahan (Opsional - Bisa diatur nanti):
                 </label>
+                <p className="text-[11px] text-slate-400 mb-2">
+                  Anda dapat mendaftarkan mahasiswa ke basis data master terlebih dahulu tanpa memasukkannya ke kelas sekarang.
+                </p>
                 <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 max-h-40 overflow-y-auto">
                   {courses.length === 0 ? (
                     <p className="text-[11px] text-slate-400 italic">
-                      Belum ada kelas perkuliahan. Buat kelas baru di Manajemen Kelas.
+                      Belum ada kelas perkuliahan. Mahasiswa tetap akan tersimpan di database master.
                     </p>
                   ) : (
                     courses.map((crs) => {
