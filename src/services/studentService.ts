@@ -552,7 +552,7 @@ export const studentService = {
         name: s.name.trim(),
         nim: s.nim.trim(),
         email: cleanEmail,
-        major: s.major || 'Informatika',
+        major: s.major || 'Sains Informasi Geografi',
         classSection: s.classSection || 'Kelas A',
         enrolledCourseCodes: s.enrolledCourseCodes || [],
         avatarUrl: getInitialsAvatar(s.name, false),
@@ -643,7 +643,7 @@ export const studentService = {
       nim: s.nim || '10123001',
       name: s.name || 'Mahasiswa',
       email: s.email || `${s.nim}@student.ac.id`,
-      major: s.major || (s.courseCode === 'GEO-301' ? 'Sistem Informasi Geografis' : 'Informatika'),
+      major: s.major || 'Sains Informasi Geografi',
       classSection: s.classSection || 'Kelas A',
       enrolledCourseCodes: s.enrolledCourseCodes || (s.courseCode ? [s.courseCode] : []),
     }));

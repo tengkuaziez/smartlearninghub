@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   Users,
   Search,
@@ -19,6 +19,11 @@ import {
   UserPlus,
   Layers,
   ArrowRight,
+  FileSpreadsheet,
+  FileDown,
+  Download,
+  CloudUpload,
+  Check,
 } from 'lucide-react';
 import { studentService, getInitialsAvatar } from '../../services/studentService.ts';
 import { myJourneySyncService } from '../../services/myJourneySyncService.ts';
@@ -51,14 +56,39 @@ export const LecturerStudentManagementView: React.FC<LecturerStudentManagementVi
   const [formClassSection, setFormClassSection] = useState('Kelas A');
   const [formSelectedCourses, setFormSelectedCourses] = useState<string[]>([]);
 
-  // Modal: Bulk Import (CSV / Text / JSON)
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [importMode, setImportMode] = useState<'text' | 'csv' | 'myjourney'>('text');
-  const [importText, setImportText] = useState('');
-  const [importError, setImportError] = useState<string | null>(null);
+  // Modal: Impor Data Mahasiswa via CSV (Persis My Journey)
+  const [isCsvImportModalOpen, setIsCsvImportModalOpen] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvParsedStudents, setCsvParsedStudents] = useState<Array<{ name: string; nim: string; email: string }>>([]);
+  const [csvParseError, setCsvParseError] = useState<string | null>(null);
+  const [isCsvDragging, setIsCsvDragging] = useState(false);
+  const [csvTargetClass, setCsvTargetClass] = useState('Kelas A');
+  const [isCustomClass, setIsCustomClass] = useState(false);
+  const [customClassName, setCustomClassName] = useState('');
+  const [csvSelectedCourseCode, setCsvSelectedCourseCode] = useState('');
+  const csvFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Load Master Students
   const masterStudents = studentService.getMasterStudents();
+
+  // Daftar Kelas Besar yang Tersedia (Rombel)
+  const existingClassSections = useMemo(() => {
+    const list = new Set<string>([
+      'Kelas A',
+      'Kelas B',
+      'Kelas C',
+      'Kelas D',
+      'Kelas E',
+      'Kelas F',
+    ]);
+    masterStudents.forEach((s) => {
+      if (s.classSection) list.add(s.classSection);
+    });
+    courses.forEach((c) => {
+      if (c.section) list.add(c.section);
+    });
+    return Array.from(list);
+  }, [masterStudents, courses]);
 
   // Stats
   const totalStudents = masterStudents.length;
@@ -172,82 +202,196 @@ export const LecturerStudentManagementView: React.FC<LecturerStudentManagementVi
     }
   };
 
-  const handleProcessImport = (e: React.FormEvent) => {
-    e.preventDefault();
-    setImportError(null);
+  // =========================================================================
+  // LOGIKA IMPOR CSV MAHASISWA (PERSIS MY JOURNEY)
+  // =========================================================================
+  const handleOpenCsvImportModal = () => {
+    setCsvFile(null);
+    setCsvParsedStudents([]);
+    setCsvParseError(null);
+    setIsCustomClass(false);
+    setCustomClassName('');
+    setCsvTargetClass(courses[0]?.section || 'Kelas A');
+    setCsvSelectedCourseCode(courses[0]?.code || '');
+    setIsCsvImportModalOpen(true);
+  };
 
-    if (!importText.trim()) {
-      setImportError('Silakan masukkan data teks mahasiswa terlebih dahulu.');
+  const handleDownloadCsvTemplate = () => {
+    const templateHeader = 'Mahasiswa,NIM,email\n';
+    const sampleRows = [
+      'Budi Santoso,220401001,budi.santoso@mhs.ac.id',
+      'Siti Rahmawati,220401002,siti.rahma@mhs.ac.id',
+      'Ahmad Fauzi,220401003,ahmad.fauzi@mhs.ac.id',
+      'Dewi Lestari,220401004,dewi.lestari@mhs.ac.id',
+      'Rian Pratama Putra,220401005,rian.pratama@mhs.ac.id',
+    ].join('\n');
+    const blob = new Blob([templateHeader + sampleRows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'template_import_mahasiswa.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    setNotification('Format template CSV mahasiswa berhasil diunduh.');
+    setTimeout(() => setNotification(null), 4000);
+  };
+
+  const parseCsvText = (text: string) => {
+    setCsvParseError(null);
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (lines.length < 1) {
+      setCsvParseError('Berkas CSV kosong atau tidak memiliki data baris.');
+      setCsvParsedStudents([]);
       return;
     }
 
-    try {
-      const parsedList: Array<Omit<MasterStudent, 'id'>> = [];
+    // Tentukan separator koma (,), titik-koma (;), atau tab (\t)
+    const firstLine = lines[0];
+    let sep = ',';
+    if (firstLine.includes(';') && firstLine.split(';').length >= firstLine.split(',').length) {
+      sep = ';';
+    } else if (firstLine.includes('\t') && firstLine.split('\t').length >= firstLine.split(',').length) {
+      sep = '\t';
+    }
 
-      // Mode JSON
-      if (importText.trim().startsWith('[') || importText.trim().startsWith('{')) {
-        const json = JSON.parse(importText.trim());
-        const arr = Array.isArray(json) ? json : json.students || [json];
-        arr.forEach((item: any) => {
-          if (item && item.email) {
-            parsedList.push({
-              name: item.name || 'Mahasiswa',
-              nim: item.nim || '10123001',
-              email: item.email.trim().toLowerCase(),
-              major: item.major || item.courseName || 'Informatika',
-              classSection: item.classSection || 'Kelas A',
-              enrolledCourseCodes: item.enrolledCourseCodes || (item.courseCode ? [item.courseCode] : []),
-            });
-          }
-        });
-      } else {
-        // Mode CSV / Delimited Lines: NIM, Nama, Email, KodeKelas
-        const lines = importText.split('\n');
-        lines.forEach((line) => {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed.startsWith('NIM') || trimmed.startsWith('nim')) return;
-          const parts = trimmed.split(/[,;\t]/).map((p) => p.trim());
-          if (parts.length >= 3) {
-            parsedList.push({
-              nim: parts[0],
-              name: parts[1],
-              email: parts[2].toLowerCase(),
-              major: parts[4] || 'Informatika',
-              classSection: 'Kelas A',
-              enrolledCourseCodes: parts[3] ? [parts[3]] : [],
-            });
-          }
+    const splitLine = (line: string): string[] => {
+      const res: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"' || char === "'") {
+          inQuotes = !inQuotes;
+        } else if (char === sep && !inQuotes) {
+          res.push(current.trim().replace(/^["']|["']$/g, ''));
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      res.push(current.trim().replace(/^["']|["']$/g, ''));
+      return res;
+    };
+
+    const firstCols = splitLine(firstLine).map((h) => h.toLowerCase());
+    const isHeaderRow = firstCols.some((c) =>
+      c.includes('mahasiswa') || c.includes('nama') || c.includes('nim') || c.includes('email')
+    );
+
+    let nameIdx = 0;
+    let nimIdx = 1;
+    let emailIdx = 2;
+
+    if (isHeaderRow) {
+      const foundName = firstCols.findIndex((h) => h.includes('mahasiswa') || h.includes('nama') || h.includes('name'));
+      const foundNim = firstCols.findIndex((h) => h.includes('nim') || h.includes('npm') || h.includes('id') || h.includes('nomor'));
+      const foundEmail = firstCols.findIndex((h) => h.includes('email') || h.includes('mail'));
+
+      if (foundName !== -1) nameIdx = foundName;
+      if (foundNim !== -1) nimIdx = foundNim;
+      if (foundEmail !== -1) emailIdx = foundEmail;
+    }
+
+    const startIdx = isHeaderRow ? 1 : 0;
+    const parsed: Array<{ name: string; nim: string; email: string }> = [];
+
+    for (let i = startIdx; i < lines.length; i++) {
+      const cols = splitLine(lines[i]);
+      if (cols.length === 0 || (cols.length === 1 && !cols[0])) continue;
+      const name = cols[nameIdx] || '';
+      const nim = cols[nimIdx] || '';
+      const email = cols[emailIdx] || (nim ? `${nim.toLowerCase().replace(/[^a-z0-9]/g, '')}@mhs.ac.id` : '');
+
+      if (name || nim) {
+        parsed.push({
+          name: name || `Mahasiswa ${nim}`,
+          nim: nim || `MHS-${Date.now().toString().substring(7)}-${i}`,
+          email,
         });
       }
+    }
 
-      if (parsedList.length === 0) {
-        setImportError('Tidak ada baris data mahasiswa yang valid terbaca. Periksa format teks Anda.');
-        return;
-      }
-
-      const res = studentService.addMasterStudentsBulk(parsedList);
-      setIsImportModalOpen(false);
-      setImportText('');
-      onDataUpdated();
-      setNotification(`Berhasil mengimpor ${parsedList.length} mahasiswa (${res.added} baru, ${res.updated} diperbarui).`);
-      setTimeout(() => setNotification(null), 5000);
-    } catch (err: any) {
-      setImportError('Gagal memproses impor: ' + err.message);
+    if (parsed.length === 0) {
+      setCsvParseError('Gagal membaca data mahasiswa dari berkas CSV. Pastikan kolom sesuai format: Mahasiswa, NIM, email.');
+    } else {
+      setCsvParsedStudents(parsed);
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const content = ev.target?.result as string;
-        if (content) {
-          setImportText(content);
-        }
-      };
-      reader.readAsText(file);
+  const handleCsvFileSelect = (file: File) => {
+    if (!file.name.toLowerCase().endsWith('.csv') && !file.name.toLowerCase().endsWith('.txt')) {
+      setCsvParseError('Harap pilih berkas dengan format .csv atau .txt');
+      return;
     }
+    setCsvFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      if (text) parseCsvText(text);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleCsvDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsCsvDragging(true);
+  };
+
+  const handleCsvDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsCsvDragging(false);
+  };
+
+  const handleCsvDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsCsvDragging(false);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      handleCsvFileSelect(files[0]);
+    }
+  };
+
+  const handleConfirmCsvImport = () => {
+    if (csvParsedStudents.length === 0) {
+      setCsvParseError('Belum ada data mahasiswa valid yang terbaca dari CSV.');
+      return;
+    }
+
+    const finalClassSection = isCustomClass
+      ? customClassName.trim() || 'Kelas A'
+      : csvTargetClass;
+
+    const selectedCourse = courses.find((c) => c.code === csvSelectedCourseCode || c.id === csvSelectedCourseCode);
+    const enrolledCodes = csvSelectedCourseCode ? [selectedCourse?.code || csvSelectedCourseCode] : [];
+
+    // Tentukan prodi default resmi
+    const detectedMajor = selectedCourse?.title?.toLowerCase().includes('pendidikan') || selectedCourse?.code?.toLowerCase().includes('pgeo')
+      ? 'Pendidikan Geografi'
+      : 'Sains Informasi Geografi';
+
+    const studentsToAdd: Array<Omit<MasterStudent, 'id'>> = csvParsedStudents.map((item) => ({
+      name: item.name,
+      nim: item.nim,
+      email: item.email || `${item.nim.toLowerCase().replace(/[^a-z0-9]/g, '')}@mhs.ac.id`,
+      major: detectedMajor,
+      classSection: finalClassSection,
+      enrolledCourseCodes: enrolledCodes,
+      isRegistered: false,
+    }));
+
+    const res = studentService.addMasterStudentsBulk(studentsToAdd);
+    setIsCsvImportModalOpen(false);
+    setCsvFile(null);
+    setCsvParsedStudents([]);
+    setCsvParseError(null);
+    onDataUpdated();
+    setNotification(`Berhasil mengimpor ${studentsToAdd.length} mahasiswa (${res.added} baru, ${res.updated} diperbarui) ke ${finalClassSection}!`);
+    setTimeout(() => setNotification(null), 5000);
   };
 
   return (
@@ -281,11 +425,11 @@ export const LecturerStudentManagementView: React.FC<LecturerStudentManagementVi
           </button>
 
           <button
-            onClick={() => setIsImportModalOpen(true)}
-            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs border border-slate-200 dark:border-slate-700 shadow-xs transition-all"
+            onClick={handleOpenCsvImportModal}
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs border border-slate-200 dark:border-slate-700 shadow-xs transition-all cursor-pointer"
           >
-            <Upload className="w-4 h-4 text-slate-500" />
-            <span>Impor Data (CSV/Teks)</span>
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span>Impor via CSV</span>
           </button>
 
           <button
@@ -700,110 +844,284 @@ export const LecturerStudentManagementView: React.FC<LecturerStudentManagementVi
         </div>
       )}
 
-      {/* MODAL 2: BULK IMPORT STUDENTS */}
-      {isImportModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md">
-          <div
-            className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col"
-            role="dialog"
-            aria-modal="true"
-          >
-            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2">
-                <Upload className="w-5 h-5 text-indigo-600" />
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  Impor Data Mahasiswa Masal
-                </h3>
+      {/* ========================================================= */}
+      {/* MODAL: IMPOR DATA MAHASISWA VIA CSV (PERSIS MY JOURNEY)   */}
+      {/* ========================================================= */}
+      {isCsvImportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-[#131D33] border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800">
+                  <FileSpreadsheet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm sm:text-base">
+                    Impor Data Mahasiswa via CSV
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Daftarkan mahasiswa baru secara masal ke dalam Kelas Besar yang ditentukan.
+                  </p>
+                </div>
               </div>
               <button
-                onClick={() => setIsImportModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                type="button"
+                onClick={() => setIsCsvImportModalOpen(false)}
+                className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleProcessImport} className="p-6 space-y-4 overflow-y-auto text-xs">
-              <div className="flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 font-semibold">
+            {/* Content Body */}
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1 text-xs">
+              {/* Template CSV Download Banner */}
+              <div className="p-3.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
+                    <FileDown className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span>Format Kolom CSV: Mahasiswa | NIM | email</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
+                    Gunakan file CSV atau TXT dengan pemisah koma (,) atau titik-koma (;).
+                  </p>
+                </div>
                 <button
                   type="button"
-                  onClick={() => setImportMode('text')}
-                  className={`flex-1 py-1.5 rounded-lg transition-all ${
-                    importMode === 'text'
-                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                      : 'text-slate-500 hover:text-slate-900'
-                  }`}
+                  onClick={handleDownloadCsvTemplate}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-semibold text-xs flex items-center gap-1.5 shadow-xs shrink-0 self-start sm:self-auto transition-colors cursor-pointer"
                 >
-                  Tempel Teks / CSV
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setImportMode('csv')}
-                  className={`flex-1 py-1.5 rounded-lg transition-all ${
-                    importMode === 'csv'
-                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                      : 'text-slate-500 hover:text-slate-900'
-                  }`}
-                >
-                  Unggah Berkas CSV
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Format CSV</span>
                 </button>
               </div>
 
-              {importMode === 'csv' ? (
+              {/* Class & Course Selection */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 bg-slate-50 dark:bg-slate-900/60 p-3.5 rounded-lg border border-slate-200 dark:border-slate-800">
+                {/* Kelas Besar Target */}
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                    Pilih Berkas CSV Daftar Mahasiswa
+                  <label className="block font-bold text-slate-800 dark:text-slate-200 mb-1">
+                    Target Kelas Besar (Rombel) <span className="text-rose-500">*</span>
                   </label>
-                  <input
-                    type="file"
-                    accept=".csv,.txt"
-                    onChange={handleFileUpload}
-                    className="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-                  />
-                  <p className="text-[11px] text-slate-400 mt-2">
-                    Format kolom baris: <code>NIM, Nama Lengkap, Email, Kode Kelas</code>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-1.5">
+                    Kelas kelompok angkatan mahasiswa (bukan kelas per mata kuliah).
                   </p>
+                  <select
+                    value={isCustomClass ? '__CUSTOM__' : csvTargetClass}
+                    onChange={(e) => {
+                      if (e.target.value === '__CUSTOM__') {
+                        setIsCustomClass(true);
+                      } else {
+                        setIsCustomClass(false);
+                        setCsvTargetClass(e.target.value);
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-slate-800 dark:text-slate-200 outline-none focus:border-indigo-500 font-semibold text-xs"
+                  >
+                    {existingClassSections.map((sec) => (
+                      <option key={sec} value={sec}>
+                        {sec}
+                      </option>
+                    ))}
+                    <option value="__CUSTOM__">+ Buat / Ketik Nama Kelas Baru...</option>
+                  </select>
+
+                  {isCustomClass && (
+                    <input
+                      type="text"
+                      value={customClassName}
+                      onChange={(e) => setCustomClassName(e.target.value)}
+                      placeholder="Contoh: Kelas C, Kelas Internasional, Angkatan 2026"
+                      className="w-full mt-2 px-3 py-1.5 bg-white dark:bg-slate-900 border border-indigo-400 dark:border-indigo-600 rounded-md text-slate-800 dark:text-slate-200 outline-none text-xs"
+                      autoFocus
+                    />
+                  )}
                 </div>
-              ) : (
+
+                {/* Mata Kuliah Awal */}
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Tempel Baris Data Mahasiswa:
+                  <label className="block font-bold text-slate-800 dark:text-slate-200 mb-1">
+                    Mata Kuliah Terdaftar (Opsional)
                   </label>
-                  <p className="text-[11px] text-slate-400 mb-2 leading-relaxed">
-                    Satu baris per mahasiswa dengan format: <code>NIM, Nama, Email, KodeKelas</code> (atau format JSON My Journey).
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-1.5">
+                    Daftarkan mahasiswa ini ke mata kuliah berikut (bisa ditambah nanti).
                   </p>
-                  <textarea
-                    rows={7}
-                    value={importText}
-                    onChange={(e) => setImportText(e.target.value)}
-                    placeholder={"3222431013, Tengku Aziz, tengku.aziz@student.ac.id, GEO-301\n10123001, Rafi Alamsyah, rafi.alamsyah@student.ac.id, GEO-301\n10123014, Annisa Fitri, annisa.fitri@student.ac.id, IF-405"}
-                    className="w-full p-3 font-mono text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
-                  />
+                  <select
+                    value={csvSelectedCourseCode}
+                    onChange={(e) => setCsvSelectedCourseCode(e.target.value)}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-slate-800 dark:text-slate-200 outline-none focus:border-indigo-500 text-xs"
+                  >
+                    <option value="">-- Tidak Terikat Matkul Tertentu --</option>
+                    {courses.map((c) => (
+                      <option key={c.id} value={c.code}>
+                        {c.code} - {c.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* File Dropzone */}
+              <div>
+                <label className="block font-bold text-slate-800 dark:text-slate-200 mb-1">
+                  Pilih Berkas CSV Mahasiswa <span className="text-rose-500">*</span>
+                </label>
+
+                <input
+                  ref={csvFileInputRef}
+                  type="file"
+                  accept=".csv,.txt"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleCsvFileSelect(f);
+                  }}
+                  className="hidden"
+                />
+
+                {!csvFile ? (
+                  <div
+                    onDragOver={handleCsvDragOver}
+                    onDragEnter={handleCsvDragOver}
+                    onDragLeave={handleCsvDragLeave}
+                    onDrop={handleCsvDrop}
+                    onClick={() => csvFileInputRef.current?.click()}
+                    className={`p-6 border-2 border-dashed rounded-xl text-center cursor-pointer transition-all ${
+                      isCsvDragging
+                        ? 'border-indigo-500 bg-indigo-50/80 dark:bg-indigo-950/40 ring-4 ring-indigo-500/20 shadow-md'
+                        : 'border-slate-200 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500 bg-slate-50/50 dark:bg-slate-900/30'
+                    }`}
+                  >
+                    <CloudUpload className={`w-8 h-8 mx-auto mb-2 transition-transform ${isCsvDragging ? 'text-indigo-600 scale-110' : 'text-indigo-500'}`} />
+                    <div className="font-bold text-slate-800 dark:text-slate-200">
+                      {isCsvDragging ? 'Lepaskan Berkas CSV di Sini...' : 'Pilih atau Seret Berkas CSV ke Sini'}
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                      Mendukung format file .CSV atau .TXT (Maksimal 10 MB)
+                    </p>
+                    <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-md font-semibold text-xs shadow-xs hover:bg-slate-50">
+                      <Upload className="w-3.5 h-3.5 text-indigo-500" />
+                      <span>Jelajahi Berkas di Komputer</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between p-3 bg-indigo-50/70 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 rounded-lg">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <FileSpreadsheet className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-900 dark:text-slate-100 truncate">
+                          {csvFile.name}
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                          {(csvFile.size / 1024).toFixed(1)} KB • {csvParsedStudents.length} baris data terbaca
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCsvFile(null);
+                        setCsvParsedStudents([]);
+                        setCsvParseError(null);
+                        if (csvFileInputRef.current) csvFileInputRef.current.value = '';
+                      }}
+                      className="p-1 text-slate-400 hover:text-rose-500 rounded hover:bg-white dark:hover:bg-slate-800 transition-colors"
+                      title="Ganti Berkas"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Error Message */}
+              {csvParseError && (
+                <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{csvParseError}</span>
                 </div>
               )}
 
-              {importError && (
-                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 text-rose-700 text-xs">
-                  {importError}
+              {/* Parsed Preview Table */}
+              {csvParsedStudents.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-800 dark:text-slate-200">
+                      Pratinjau Data ({csvParsedStudents.length} Mahasiswa Siap Diimpor)
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                      Masuk ke: {isCustomClass ? (customClassName || 'Kelas Baru') : csvTargetClass}
+                    </span>
+                  </div>
+
+                  <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden max-h-52 overflow-y-auto">
+                    <table className="w-full text-left text-[11px]">
+                      <thead className="bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 font-semibold sticky top-0">
+                        <tr>
+                          <th className="py-2 px-3 w-10 text-center">#</th>
+                          <th className="py-2 px-3">Mahasiswa</th>
+                          <th className="py-2 px-3 font-mono">NIM</th>
+                          <th className="py-2 px-3">Email</th>
+                          <th className="py-2 px-3">Kelas Besar</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {csvParsedStudents.map((st, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                            <td className="py-1.5 px-3 text-center text-slate-400">{idx + 1}</td>
+                            <td className="py-1.5 px-3 font-semibold text-slate-900 dark:text-slate-100">
+                              {st.name}
+                            </td>
+                            <td className="py-1.5 px-3 font-mono text-indigo-600 dark:text-indigo-400 font-semibold">
+                              {st.nim}
+                            </td>
+                            <td className="py-1.5 px-3 text-slate-600 dark:text-slate-400">
+                              {st.email}
+                            </td>
+                            <td className="py-1.5 px-3 font-medium text-slate-700 dark:text-slate-300">
+                              {isCustomClass ? (customClassName || 'Kelas Baru') : csvTargetClass}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
+            </div>
 
-              <div className="pt-2 flex items-center justify-end gap-2">
+            {/* Footer Buttons */}
+            <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-900/50">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:inline">
+                {csvParsedStudents.length > 0
+                  ? `${csvParsedStudents.length} calon mahasiswa akan didaftarkan.`
+                  : 'Pilih berkas CSV untuk melihat pratinjau data.'}
+              </span>
+              <div className="flex items-center gap-2 ml-auto">
                 <button
                   type="button"
-                  onClick={() => setIsImportModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100"
+                  onClick={() => setIsCsvImportModalOpen(false)}
+                  className="px-3.5 py-1.5 text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md font-semibold transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"
+                  type="button"
+                  disabled={csvParsedStudents.length === 0}
+                  onClick={handleConfirmCsvImport}
+                  className={`px-4 py-1.5 text-xs font-semibold rounded-md shadow-xs flex items-center gap-1.5 transition-colors ${
+                    csvParsedStudents.length > 0
+                      ? 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                  }`}
                 >
-                  Proses & Simpan ke Database
+                  <Check className="w-3.5 h-3.5" />
+                  <span>
+                    Impor {csvParsedStudents.length > 0 ? `${csvParsedStudents.length} Mahasiswa` : 'Mahasiswa'}
+                  </span>
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
