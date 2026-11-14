@@ -95,7 +95,7 @@ export const LecturerSidebar: React.FC<LecturerSidebarProps> = ({
           />
           <div className="flex-1 min-w-0">
             <h4 className="text-sm font-bold text-white truncate">
-              {studentService.formatLecturerGreeting(user.name)}
+              {(user.name || '').replace(/^Pak\s+/i, '')}
             </h4>
             <p className="text-xs text-indigo-300 truncate font-mono">
               {user.email}

@@ -330,8 +330,8 @@ export const LecturerDashboardView: React.FC<LecturerDashboardViewProps> = ({
                         <span>Tim Dosen:</span>
                       </span>
                       <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[150px]">
-                        {studentService.formatLecturerGreeting(course.teacher?.name || 'Dosen')}
-                        {course.secondaryTeacher && ` & ${studentService.formatLecturerGreeting(course.secondaryTeacher.name)}`}
+                        {course.teacher?.name || 'Dosen Pengampu'}
+                        {course.secondaryTeacher && ` & ${course.secondaryTeacher.name}`}
                       </span>
                     </div>
 

@@ -470,20 +470,24 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                             </button>
                           </div>
                           <div className="flex flex-wrap gap-1">
-                            <button
-                              type="button"
-                              onClick={() => setQuickInviteEmail('miftahurridlo.688@gmail.com')}
-                              className="text-[10px] px-2 py-0.5 rounded bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50"
-                            >
-                              + Pak Miftah
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setQuickInviteEmail('altaf.aziz16@gmail.com')}
-                              className="text-[10px] px-2 py-0.5 rounded bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-blue-600 dark:text-blue-400 hover:bg-blue-50"
-                            >
-                              + Pak Tengku
-                            </button>
+                            {currentUser?.email?.toLowerCase() !== 'miftahurridlo.688@gmail.com' && (
+                              <button
+                                type="button"
+                                onClick={() => setQuickInviteEmail('miftahurridlo.688@gmail.com')}
+                                className="text-[10px] px-2 py-0.5 rounded bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50"
+                              >
+                                + Muhammad Miftahurrodlo
+                              </button>
+                            )}
+                            {currentUser?.email?.toLowerCase() !== 'altaf.aziz16@gmail.com' && (
+                              <button
+                                type="button"
+                                onClick={() => setQuickInviteEmail('altaf.aziz16@gmail.com')}
+                                className="text-[10px] px-2 py-0.5 rounded bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-blue-600 dark:text-blue-400 hover:bg-blue-50"
+                              >
+                                + Tengku Abdillah Azis
+                              </button>
+                            )}
                           </div>
                         </div>
                       )}
@@ -1017,20 +1021,24 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                   className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
                 <div className="flex flex-wrap gap-2 mt-2">
-                  <button
-                    type="button"
-                    onClick={() => setNewCourseCoLecturerEmail('miftahurridlo.688@gmail.com')}
-                    className="text-[11px] px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors"
-                  >
-                    + Pak Muhammad Miftahurrodlo, S.Pd., M.Sc
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNewCourseCoLecturerEmail('altaf.aziz16@gmail.com')}
-                    className="text-[11px] px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition-colors"
-                  >
-                    + Pak Tengku Abdillah Azis, S.Pd
-                  </button>
+                  {currentUser?.email?.toLowerCase() !== 'miftahurridlo.688@gmail.com' && (
+                    <button
+                      type="button"
+                      onClick={() => setNewCourseCoLecturerEmail('miftahurridlo.688@gmail.com')}
+                      className="text-[11px] px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors"
+                    >
+                      + Muhammad Miftahurrodlo, S.Pd., M.Sc
+                    </button>
+                  )}
+                  {currentUser?.email?.toLowerCase() !== 'altaf.aziz16@gmail.com' && (
+                    <button
+                      type="button"
+                      onClick={() => setNewCourseCoLecturerEmail('altaf.aziz16@gmail.com')}
+                      className="text-[11px] px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition-colors"
+                    >
+                      + Tengku Abdillah Azis, S.Pd
+                    </button>
+                  )}
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">
                   Rekan dosen akan menerima notifikasi konfirmasi keikutsertaan. Kelas akan otomatis muncul di akun beliau setelah disetujui.

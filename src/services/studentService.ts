@@ -56,7 +56,7 @@ const STORAGE_KEYS = {
   CUSTOM_ROSTER: 'slh_custom_roster',
 };
 
-const CURRENT_DATA_VERSION = 'v_reset_fresh_slate_2026_11_15_r1';
+const CURRENT_DATA_VERSION = 'v_reset_fresh_slate_2026_11_15_r2';
 
 // Automatic migration & purge of outdated dummy data (memulai kosongan & bersih)
 if (typeof window !== 'undefined') {
@@ -125,10 +125,10 @@ export const DEFAULT_LECTURERS: Record<string, AuthUser> = {
     email: 'altaf.aziz16@gmail.com',
     role: 'dosen',
     nidn: '0419058902',
-    title: 'Dosen Pengampu',
+    title: 'Dosen Pengampu Partner',
     department: 'Sains Informasi Geografi',
     avatarUrl: getInitialsAvatar('Tengku Abdillah Azis', true),
-    bio: 'Dosen Pengampu Smart Learning Hub.',
+    bio: 'Dosen & Peneliti Sains Informasi Geografi. Terhubung langsung dengan workspace riset, pengajaran, dan administrasi My Journey.',
     registeredAt: '2026-08-01',
   },
   'miftahurridlo.688@gmail.com': {
@@ -137,10 +137,10 @@ export const DEFAULT_LECTURERS: Record<string, AuthUser> = {
     email: 'miftahurridlo.688@gmail.com',
     role: 'dosen',
     nidn: '0412088501',
-    title: 'Dosen Pengampu',
+    title: 'Dosen Pengampu Utama',
     department: 'Pendidikan Geografi',
     avatarUrl: getInitialsAvatar('Muhammad Miftahurrodlo', true),
-    bio: 'Dosen Pengampu Smart Learning Hub.',
+    bio: 'Dosen & Peneliti Pendidikan Geografi. Terhubung langsung dengan kurikulum OBE dan manajemen pengajaran My Journey.',
     registeredAt: '2026-08-01',
   },
 };
@@ -339,14 +339,21 @@ export const studentService = {
         fullName = `${fullName}, ${suffix}`;
       }
 
+      const isAltaf = emailToSync.includes('altaf');
+      const defaultBio = isAltaf
+        ? 'Dosen & Peneliti Sains Informasi Geografi. Terhubung langsung dengan workspace riset, pengajaran, dan administrasi My Journey.'
+        : 'Dosen & Peneliti Pendidikan Geografi. Terhubung langsung dengan kurikulum OBE dan manajemen pengajaran My Journey.';
+      const defaultTitle = isAltaf ? 'Dosen Pengampu Partner' : 'Dosen Pengampu Utama';
+      const defaultDept = isAltaf ? 'Sains Informasi Geografi' : 'Pendidikan Geografi';
+
       const updated = this.updateLecturerProfile({
         name: fullName || foundProfileData.name,
-        title: foundProfileData.role || foundProfileData.title || 'Dosen Pengampu Utama',
-        department: foundProfileData.universityOrOrg || foundProfileData.department || 'Pendidikan Geografi / Sains Informasi Geografis',
+        title: foundProfileData.role || foundProfileData.title || defaultTitle,
+        department: foundProfileData.universityOrOrg || foundProfileData.department || defaultDept,
         avatarUrl: foundProfileData.avatarUrl && !foundProfileData.avatarUrl.includes('photo-1534528741775')
           ? foundProfileData.avatarUrl
           : getInitialsAvatar(fullName || foundProfileData.name, true),
-        bio: foundProfileData.bio || 'Dosen Pengampu Utama Smart Learning Hub & My Journey.',
+        bio: (foundProfileData.bio && !foundProfileData.bio.includes('Dosen Pengampu Smart Learning Hub.')) ? foundProfileData.bio : defaultBio,
         googleScholarUrl: foundProfileData.googleScholarUrl || '',
         sintaUrl: foundProfileData.sintaUrl || '',
         linkedinUrl: foundProfileData.linkedinUrl || '',
@@ -918,16 +925,21 @@ export const studentService = {
               const isAltaf = cleanEmail.includes('altaf');
               const cleanName = isAltaf ? 'Tengku Abdillah Azis, S.Pd' : 'Muhammad Miftahurrodlo, S.Pd., M.Sc';
               const cleanDept = isAltaf ? 'Sains Informasi Geografi' : 'Pendidikan Geografi';
+              const defaultTitle = isAltaf ? 'Dosen Pengampu Partner' : 'Dosen Pengampu Utama';
+              const defaultBio = isAltaf
+                ? 'Dosen & Peneliti Sains Informasi Geografi. Terhubung langsung dengan workspace riset, pengajaran, dan administrasi My Journey.'
+                : 'Dosen & Peneliti Pendidikan Geografi. Terhubung langsung dengan kurikulum OBE dan manajemen pengajaran My Journey.';
+
               const userObj: RegisteredUser = {
                 id: idx >= 0 ? regUsers[idx].id : (DEFAULT_LECTURERS[cleanEmail]?.id || `dos_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`),
                 name: cleanName,
                 email: cleanEmail,
                 role: 'dosen',
-                title: prof.title || prof.role || 'Dosen Pengampu',
-                department: cleanDept,
+                title: prof.title || prof.role || defaultTitle,
+                department: prof.department || cleanDept,
                 avatarUrl: prof.avatarUrl || getInitialsAvatar(cleanName, true),
-                bio: prof.bio || `${cleanName} — Dosen Pengampu Smart Learning Hub.`,
-                registeredAt: regUsers[idx]?.registeredAt || new Date().toISOString(),
+                bio: (prof.bio && !prof.bio.includes('Dosen Pengampu Smart Learning Hub.')) ? prof.bio : defaultBio,
+                registeredAt: regUsers[idx]?.registeredAt || '2026-08-01',
               };
 
               if (idx >= 0) {

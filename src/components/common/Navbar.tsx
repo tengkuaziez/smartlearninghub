@@ -217,9 +217,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 />
                 <div className="hidden sm:flex flex-col text-left leading-none">
                   <span className="text-xs font-semibold text-slate-900 dark:text-white">
-                    {currentUser.role === 'dosen'
-                      ? `Pak ${(currentUser.name || 'Dosen').replace(/^Pak\s+/i, '').split(' ')[0]}`
-                      : (currentUser.name || 'Pengguna').split(' ')[0]}
+                    {(currentUser.name || 'Pengguna').replace(/^Pak\s+/i, '').split(' ')[0]}
                   </span>
                   <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
                     {currentUser.role === 'dosen' ? 'Tim Dosen' : `NIM: ${currentUser.nim || '2208101'}`}
@@ -236,7 +234,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white dark:bg-slate-900 shadow-xl border border-slate-200 dark:border-slate-800 py-2 z-40 animate-in fade-in zoom-in-95 duration-150">
                     <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800">
                       <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                        {currentUser.role === 'dosen' ? studentService.formatLecturerGreeting(currentUser.name) : currentUser.name}
+                        {(currentUser.name || '').replace(/^Pak\s+/i, '')}
                       </p>
                       <p className="text-xs text-slate-500 dark:text-slate-400 truncate font-mono">
                         {currentUser.email}

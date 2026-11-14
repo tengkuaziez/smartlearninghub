@@ -265,9 +265,9 @@ export const LecturerClassDetailView: React.FC<LecturerClassDetailViewProps> = (
           </p>
 
           <div className="pt-2 flex flex-wrap items-center gap-3 text-xs text-slate-300">
-            <span>Dosen Utama: <strong>{studentService.formatLecturerGreeting(course.teacher.name)}</strong></span>
+            <span>Dosen Utama: <strong>{course.teacher.name}</strong></span>
             {course.secondaryTeacher ? (
-              <span>• Dosen Partner: <strong>{studentService.formatLecturerGreeting(course.secondaryTeacher.name)}</strong></span>
+              <span>• Dosen Partner: <strong>{course.secondaryTeacher.name}</strong></span>
             ) : course.pendingLecturerEmail ? (
               <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-200 border border-amber-400/30">
                 ⏳ Menunggu Konfirmasi Mitra: {course.pendingLecturerName || course.pendingLecturerEmail}

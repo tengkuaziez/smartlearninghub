@@ -171,14 +171,6 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
     }
   };
 
-  const handleSwitchLecturer = (targetEmail: string) => {
-    const res = studentService.login(targetEmail);
-    if (res.success && res.user) {
-      onUserChanged(res.user);
-      onDataRefreshed();
-    }
-  };
-
   const handleResetAllData = () => {
     if (window.confirm('PERINGATAN: Apakah Anda yakin ingin mengosongkan seluruh data kelas perkuliahan, mahasiswa, tugas, materi, dan berkas di Smart Learning Hub ke titik 0 bersih? Data akan selaras dengan My Journey yang telah dikosongkan.')) {
       const res = studentService.resetAllPlatformData();
@@ -197,10 +189,10 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
       email: 'altaf.aziz16@gmail.com',
       role: 'dosen' as const,
       nidn: '0419058902',
-      title: 'Dosen Pengampu',
+      title: 'Dosen Pengampu Partner',
       department: 'Sains Informasi Geografi',
       avatarUrl: getInitialsAvatar('Tengku Abdillah Azis', true),
-      bio: 'Dosen Pengampu Smart Learning Hub & My Journey.',
+      bio: 'Dosen & Peneliti Sains Informasi Geografi. Terhubung langsung dengan workspace riset, pengajaran, dan administrasi My Journey.',
       registeredAt: '2026-08-01',
     },
     registered.find((l) => l.email.toLowerCase() === 'miftahurridlo.688@gmail.com') || {
@@ -209,10 +201,10 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
       email: 'miftahurridlo.688@gmail.com',
       role: 'dosen' as const,
       nidn: '0412088501',
-      title: 'Dosen Pengampu',
+      title: 'Dosen Pengampu Utama',
       department: 'Pendidikan Geografi',
       avatarUrl: getInitialsAvatar('Muhammad Miftahurrodlo', true),
-      bio: 'Dosen Pengampu Smart Learning Hub & My Journey.',
+      bio: 'Dosen & Peneliti Pendidikan Geografi. Terhubung langsung dengan kurikulum OBE dan manajemen pengajaran My Journey.',
       registeredAt: '2026-08-01',
     },
   ];
@@ -343,7 +335,7 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
             2 Dosen Pengampu Terdaftar
           </h2>
           <span className="text-xs text-slate-500 dark:text-slate-400">
-            Klik "Gunakan Akun Ini" untuk beralih konteks kerja
+            Dua Akun Dosen Pengampu Terhubung My Journey
           </span>
         </div>
 
@@ -461,18 +453,15 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
                   </div>
                 </div>
 
-                {/* Switch Account Action */}
+                {/* Account Status / Profile Action */}
                 {!isActive ? (
-                  <button
-                    onClick={() => handleSwitchLecturer(displayUser.email)}
-                    className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <span>Gunakan Akun Ini</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="w-full py-2.5 px-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-medium text-center flex items-center justify-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-indigo-500" />
+                    <span>Rekan Kolaborasi Tim Dosen (Akun Terverifikasi My Journey)</span>
+                  </div>
                 ) : (
                   <div className="w-full py-2.5 px-4 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 text-xs font-bold text-center flex items-center justify-center gap-2">
-                    <span>✓ Akun Aktif di Perangkat Ini</span>
+                    <span>✓ Akun Anda Saat Ini</span>
                     <button
                       onClick={openEditModal}
                       className="underline text-[11px] hover:text-indigo-900 dark:hover:text-white"
