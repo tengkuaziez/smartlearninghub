@@ -24,7 +24,7 @@ import {
   ChevronRight,
   X
 } from 'lucide-react';
-import { studentService } from '../../services/studentService.ts';
+import { studentService, getInitialsAvatar, DEFAULT_LECTURERS } from '../../services/studentService.ts';
 import { myJourneySyncService } from '../../services/myJourneySyncService.ts';
 import { calculateAttendanceStats, formatIndonesianDate } from '../../utils/academicCalculations.ts';
 import type { 
@@ -83,6 +83,19 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
   const [quickInviteCourseId, setQuickInviteCourseId] = useState<string | null>(null);
   const [quickInviteEmail, setQuickInviteEmail] = useState('');
   const currentUser = studentService.getCurrentUser();
+  // Colleague Lecturers for "Add Friend" style co-teaching selection
+  const registeredLecturers = studentService.getRegisteredLecturers();
+  const colleagueLecturers = registeredLecturers.filter(
+    (l) => l.email.toLowerCase() !== currentUser?.email?.toLowerCase()
+  );
+  if (colleagueLecturers.length === 0) {
+    const isAltaf = currentUser?.email?.toLowerCase().includes('altaf');
+    colleagueLecturers.push(
+      isAltaf
+        ? DEFAULT_LECTURERS['miftahurridlo.688@gmail.com']
+        : DEFAULT_LECTURERS['altaf.aziz16@gmail.com']
+    );
+  }
 
   // New Student Form State
   const [newStudentName, setNewStudentName] = useState('');
@@ -444,50 +457,60 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                         </div>
                       )}
 
-                      {/* Quick Invite Form on Card */}
+                      {/* Quick Invite Form on Card ("Add Friend" Style) */}
                       {quickInviteCourseId === course.id && (
                         <div
                           onClick={(e) => e.stopPropagation()}
-                          className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-indigo-200 dark:border-indigo-800 space-y-2 mt-2 animate-in fade-in"
+                          className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-blue-200 dark:border-blue-800 space-y-2 mt-2 animate-in fade-in"
                         >
-                          <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300">
-                            Undang Rekan Dosen Pengampu:
-                          </label>
-                          <div className="flex gap-1.5">
-                            <input
-                              type="email"
-                              placeholder="email.dosen@univ.ac.id"
-                              value={quickInviteEmail}
-                              onChange={(e) => setQuickInviteEmail(e.target.value)}
-                              className="flex-1 px-2.5 py-1 text-xs rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 font-mono text-slate-800 dark:text-slate-200"
-                            />
+                          <div className="flex items-center justify-between">
+                            <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                              <Users className="w-3.5 h-3.5 text-blue-500" />
+                              <span>Pilih Rekan Dosen Terverifikasi:</span>
+                            </label>
                             <button
                               type="button"
-                              onClick={() => handleQuickInviteSubmit(course.id, quickInviteEmail)}
-                              className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-colors"
+                              onClick={() => setQuickInviteCourseId(null)}
+                              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                             >
-                              Kirim
+                              <X className="w-3.5 h-3.5" />
                             </button>
                           </div>
-                          <div className="flex flex-wrap gap-1">
-                            {currentUser?.email?.toLowerCase() !== 'miftahurridlo.688@gmail.com' && (
-                              <button
-                                type="button"
-                                onClick={() => setQuickInviteEmail('miftahurridlo.688@gmail.com')}
-                                className="text-[10px] px-2 py-0.5 rounded bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50"
+
+                          <div className="space-y-1.5">
+                            {colleagueLecturers.map((colleague) => (
+                              <div
+                                key={colleague.email}
+                                className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2"
                               >
-                                + Muhammad Miftahurrodlo
-                              </button>
-                            )}
-                            {currentUser?.email?.toLowerCase() !== 'altaf.aziz16@gmail.com' && (
-                              <button
-                                type="button"
-                                onClick={() => setQuickInviteEmail('altaf.aziz16@gmail.com')}
-                                className="text-[10px] px-2 py-0.5 rounded bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-blue-600 dark:text-blue-400 hover:bg-blue-50"
-                              >
-                                + Tengku Abdillah Azis
-                              </button>
-                            )}
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <img
+                                    src={colleague.avatarUrl || (colleague.email.includes('altaf') ? '/tengku_avatar.png' : getInitialsAvatar(colleague.name, true))}
+                                    alt={colleague.name}
+                                    className="w-7 h-7 rounded-lg object-cover shrink-0"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src = colleague.email.includes('altaf') ? '/tengku_avatar.png' : getInitialsAvatar(colleague.name, true);
+                                    }}
+                                  />
+                                  <div className="min-w-0">
+                                    <div className="font-bold text-[11px] text-slate-900 dark:text-white truncate">
+                                      {colleague.name}
+                                    </div>
+                                    <div className="text-[9px] text-slate-500 font-mono truncate">
+                                      {colleague.email}
+                                    </div>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuickInviteSubmit(course.id, colleague.email)}
+                                  className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] rounded-lg transition-colors flex items-center gap-1 shrink-0"
+                                >
+                                  <UserPlus className="w-3 h-3" />
+                                  <span>+ Tambahkan</span>
+                                </button>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       )}
@@ -1009,40 +1032,106 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                 />
               </div>
 
-              <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                  Undang Rekan Dosen Pengampu (Tim Teaching / Kolaborasi - Opsional)
-                </label>
-                <input
-                  type="email"
-                  placeholder="Contoh: miftahurridlo.688@gmail.com atau altaf.aziz16@gmail.com"
-                  value={newCourseCoLecturerEmail}
-                  onChange={(e) => setNewCourseCoLecturerEmail(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {currentUser?.email?.toLowerCase() !== 'miftahurridlo.688@gmail.com' && (
-                    <button
-                      type="button"
-                      onClick={() => setNewCourseCoLecturerEmail('miftahurridlo.688@gmail.com')}
-                      className="text-[11px] px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors"
-                    >
-                      + Muhammad Miftahurrodlo, S.Pd., M.Sc
-                    </button>
-                  )}
-                  {currentUser?.email?.toLowerCase() !== 'altaf.aziz16@gmail.com' && (
-                    <button
-                      type="button"
-                      onClick={() => setNewCourseCoLecturerEmail('altaf.aziz16@gmail.com')}
-                      className="text-[11px] px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition-colors"
-                    >
-                      + Tengku Abdillah Azis, S.Pd
-                    </button>
-                  )}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 text-xs">
+                    <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <span>Rekan Dosen Pengampu (Tim Teaching / Kolaborasi)</span>
+                  </label>
+                  <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
+                    <ShieldCheck className="w-3 h-3" />
+                    Akun Terverifikasi
+                  </span>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Rekan dosen akan menerima notifikasi konfirmasi keikutsertaan. Kelas akan otomatis muncul di akun beliau setelah disetujui.
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Tambahkan rekan dosen resmi My Journey untuk mengampu mata kuliah ini secara bersama-sama.
                 </p>
+
+                {/* Colleague Selection Cards ("Add Friend" Style) */}
+                <div className="space-y-2">
+                  {colleagueLecturers.map((colleague) => {
+                    const isSelected = newCourseCoLecturerEmail.toLowerCase() === colleague.email.toLowerCase();
+                    return (
+                      <div
+                        key={colleague.email}
+                        className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
+                          isSelected
+                            ? 'bg-blue-50/70 dark:bg-blue-950/40 border-blue-500 ring-2 ring-blue-500/20 shadow-xs'
+                            : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <img
+                            src={colleague.avatarUrl || (colleague.email.includes('altaf') ? '/tengku_avatar.png' : getInitialsAvatar(colleague.name, true))}
+                            alt={colleague.name}
+                            className="w-10 h-10 rounded-xl object-cover ring-1 ring-slate-200 dark:ring-slate-700 shrink-0"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = colleague.email.includes('altaf') ? '/tengku_avatar.png' : getInitialsAvatar(colleague.name, true);
+                            }}
+                          />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                                {colleague.name}
+                              </span>
+                              <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+                                NIDN: {colleague.nidn || '0412088501'}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                              {colleague.title || 'Dosen Pengampu'} • {colleague.department || 'Pendidikan Geografi'}
+                            </div>
+                            <div className="text-[10px] text-blue-600 dark:text-blue-400 font-mono truncate">
+                              {colleague.email}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Add / Added Button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setNewCourseCoLecturerEmail('');
+                            } else {
+                              setNewCourseCoLecturerEmail(colleague.email);
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                            isSelected
+                              ? 'bg-emerald-600 hover:bg-rose-600 text-white shadow-xs group'
+                              : 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs'
+                          }`}
+                        >
+                          {isSelected ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5 group-hover:hidden" />
+                              <X className="w-3.5 h-3.5 hidden group-hover:inline" />
+                              <span className="group-hover:hidden">✓ Terpilih</span>
+                              <span className="hidden group-hover:inline">Batalkan</span>
+                            </>
+                          ) : (
+                            <>
+                              <UserPlus className="w-3.5 h-3.5" />
+                              <span>+ Tambah Rekan</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {newCourseCoLecturerEmail ? (
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5 pt-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>Rekan dosen berhasil dipilih. Mata kuliah ini akan langsung muncul di akun beliau dan tersinkronisasi 2 arah.</span>
+                  </p>
+                ) : (
+                  <p className="text-[10px] text-slate-400 italic">
+                    Opsional: Klik <strong>+ Tambah Rekan</strong> jika mata kuliah ini diampu bersama tim dosen.
+                  </p>
+                )}
               </div>
 
               <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">

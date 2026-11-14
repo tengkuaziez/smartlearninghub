@@ -171,7 +171,7 @@ export const myJourneySyncService = {
       credits: c.code === 'IF-405' ? 2 : 3,
       syllabusOverview: c.rps?.shortDescription || `${c.totalMeetings} pertemuan kurikulum OBE`,
       primaryLecturer: c.teacher.name,
-      partnerLecturer: c.secondaryTeacher?.name || '-',
+      partnerLecturer: c.secondaryTeacher?.name || c.partnerLecturer || c.pendingLecturerName || (c.teacher.email.includes('altaf') ? 'Muhammad Miftahurrodlo, S.Pd., M.Sc' : 'Tengku Abdillah Azis, S.Pd'),
     }));
 
     // 2. Format Students

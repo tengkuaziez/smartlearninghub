@@ -128,6 +128,7 @@ export interface CourseClass {
   description: string;
   teacher: TeacherInfo;
   secondaryTeacher?: TeacherInfo; // Dosen partner (tim berdua)
+  partnerLecturer?: string; // Nama rekan dosen pengampu
   pendingLecturerEmail?: string; // Email rekan dosen yang diundang namun belum konfirmasi
   pendingLecturerName?: string;
   teamTeachers?: TeacherInfo[];
