@@ -46,14 +46,19 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
   // Edit Profile Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editName, setEditName] = useState(currentUser.name);
-  const [editTitle, setEditTitle] = useState(currentUser.title || 'Dosen Pengampu Utama');
-  const [editNidn, setEditNidn] = useState(currentUser.nidn || '');
-  const [editDept, setEditDept] = useState(currentUser.department || 'Pendidikan Geografi / Sains Informasi Geografis');
+  const [editTitle, setEditTitle] = useState(currentUser.title || (currentUser.email.toLowerCase() === 'altaf.aziz16@gmail.com' ? 'Tenaga Teknis Survei & Pemetaan / Dosen Pengampu Partner' : 'Dosen Pengampu Utama'));
+  const [editNidn, setEditNidn] = useState(currentUser.nidn || (currentUser.email.toLowerCase() === 'altaf.aziz16@gmail.com' ? '0419058902' : '0412088501'));
+  const [editDept, setEditDept] = useState(currentUser.department || (currentUser.email.toLowerCase() === 'altaf.aziz16@gmail.com' ? 'Sains Informasi Geografi' : 'Pendidikan Geografi'));
   const [editBio, setEditBio] = useState(currentUser.bio || 'Dosen Pengampu Smart Learning Hub & My Journey.');
-  const [editAvatarUrl, setEditAvatarUrl] = useState(currentUser.avatarUrl || '');
-  const [editScholar, setEditScholar] = useState(currentUser.googleScholarUrl || '');
-  const [editSinta, setEditSinta] = useState(currentUser.sintaUrl || '');
-  const [editLinkedin, setEditLinkedin] = useState(currentUser.linkedinUrl || '');
+  const [editAvatarUrl, setEditAvatarUrl] = useState(currentUser.avatarUrl || (currentUser.email.toLowerCase() === 'altaf.aziz16@gmail.com' ? '/tengku_avatar.png' : ''));
+  const [editScholar, setEditScholar] = useState(currentUser.googleScholarUrl || 'https://scholar.google.com/');
+  const [editSinta, setEditSinta] = useState(currentUser.sintaUrl || 'https://sinta.kemdikbud.go.id/');
+  const [editScopus, setEditScopus] = useState(currentUser.scopusUrl || 'https://www.scopus.com/');
+  const [editResearchGate, setEditResearchGate] = useState(currentUser.researchGateUrl || 'https://www.researchgate.net/');
+  const [editEmail, setEditEmail] = useState(currentUser.campusEmail || currentUser.email || '');
+  const [editLinkedin, setEditLinkedin] = useState(currentUser.linkedinUrl || 'https://linkedin.com/');
+  const [editInstagram, setEditInstagram] = useState(currentUser.instagramUrl || 'https://instagram.com/');
+  const [editFacebook, setEditFacebook] = useState(currentUser.facebookUrl || 'https://facebook.com/');
 
   // Import JSON Modal State
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -64,14 +69,19 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
 
   const openEditModal = () => {
     setEditName(currentUser.name);
-    setEditTitle(currentUser.title || 'Dosen Pengampu Utama');
-    setEditNidn(currentUser.nidn || '');
-    setEditDept(currentUser.department || 'Pendidikan Geografi / Sains Informasi Geografis');
+    setEditTitle(currentUser.title || (currentUser.email.toLowerCase() === 'altaf.aziz16@gmail.com' ? 'Tenaga Teknis Survei & Pemetaan / Dosen Pengampu Partner' : 'Dosen Pengampu Utama'));
+    setEditNidn(currentUser.nidn || (currentUser.email.toLowerCase() === 'altaf.aziz16@gmail.com' ? '0419058902' : '0412088501'));
+    setEditDept(currentUser.department || (currentUser.email.toLowerCase() === 'altaf.aziz16@gmail.com' ? 'Sains Informasi Geografi' : 'Pendidikan Geografi'));
     setEditBio(currentUser.bio || 'Dosen Pengampu Smart Learning Hub & My Journey.');
-    setEditAvatarUrl(currentUser.avatarUrl || '');
-    setEditScholar(currentUser.googleScholarUrl || '');
-    setEditSinta(currentUser.sintaUrl || '');
-    setEditLinkedin(currentUser.linkedinUrl || '');
+    setEditAvatarUrl(currentUser.avatarUrl || (currentUser.email.toLowerCase() === 'altaf.aziz16@gmail.com' ? '/tengku_avatar.png' : ''));
+    setEditScholar(currentUser.googleScholarUrl || 'https://scholar.google.com/');
+    setEditSinta(currentUser.sintaUrl || 'https://sinta.kemdikbud.go.id/');
+    setEditScopus(currentUser.scopusUrl || 'https://www.scopus.com/');
+    setEditResearchGate(currentUser.researchGateUrl || 'https://www.researchgate.net/');
+    setEditEmail(currentUser.campusEmail || currentUser.email || '');
+    setEditLinkedin(currentUser.linkedinUrl || 'https://linkedin.com/');
+    setEditInstagram(currentUser.instagramUrl || 'https://instagram.com/');
+    setEditFacebook(currentUser.facebookUrl || 'https://facebook.com/');
     setIsEditModalOpen(true);
   };
 
@@ -96,16 +106,22 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const isAltaf = currentUser.email.toLowerCase() === 'altaf.aziz16@gmail.com';
       const updated = studentService.updateLecturerProfile({
         name: editName.trim(),
         title: editTitle.trim(),
         nidn: editNidn.trim(),
         department: editDept.trim(),
         bio: editBio.trim(),
-        avatarUrl: editAvatarUrl.trim() || getInitialsAvatar(editName.trim(), true),
+        avatarUrl: editAvatarUrl.trim() || (isAltaf ? '/tengku_avatar.png' : getInitialsAvatar(editName.trim(), true)),
         googleScholarUrl: editScholar.trim(),
         sintaUrl: editSinta.trim(),
+        scopusUrl: editScopus.trim(),
+        researchGateUrl: editResearchGate.trim(),
+        campusEmail: editEmail.trim(),
         linkedinUrl: editLinkedin.trim(),
+        instagramUrl: editInstagram.trim(),
+        facebookUrl: editFacebook.trim(),
       });
 
       onUserChanged(updated);
@@ -170,32 +186,93 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
     }
   };
 
+  const renderAcademicSocialLinks = (user: AuthUser) => {
+    const links: { key: string; title: string; href: string; icon: string }[] = [];
+
+    if (user.googleScholarUrl) {
+      const href = user.googleScholarUrl.startsWith('http') ? user.googleScholarUrl : `https://${user.googleScholarUrl}`;
+      links.push({ key: 'scholar', title: 'Google Scholar', href, icon: '/icons/scholar.png' });
+    }
+    if (user.sintaUrl) {
+      const href = user.sintaUrl.startsWith('http') ? user.sintaUrl : `https://${user.sintaUrl}`;
+      links.push({ key: 'sinta', title: 'SINTA Kemdikbud', href, icon: '/icons/sinta.png' });
+    }
+    if (user.scopusUrl) {
+      const href = user.scopusUrl.startsWith('http') ? user.scopusUrl : `https://${user.scopusUrl}`;
+      links.push({ key: 'scopus', title: 'Scopus Author ID', href, icon: '/icons/scopus.png' });
+    }
+    if (user.orcidUrl) {
+      const href = user.orcidUrl.startsWith('http') ? user.orcidUrl : `https://${user.orcidUrl}`;
+      links.push({ key: 'orcid', title: 'ORCID', href, icon: '/icons/orcid.png' });
+    }
+    if (user.researchGateUrl) {
+      const href = user.researchGateUrl.startsWith('http') ? user.researchGateUrl : `https://${user.researchGateUrl}`;
+      links.push({ key: 'rg', title: 'ResearchGate', href, icon: '/icons/researchgate.png' });
+    }
+    const emailContact = user.campusEmail || user.email;
+    if (emailContact) {
+      links.push({ key: 'email', title: `Email: ${emailContact}`, href: `mailto:${emailContact}`, icon: '/icons/email.svg' });
+    }
+    if (user.linkedinUrl) {
+      const href = user.linkedinUrl.startsWith('http') ? user.linkedinUrl : `https://${user.linkedinUrl}`;
+      links.push({ key: 'linkedin', title: 'LinkedIn', href, icon: '/icons/linkedin.png' });
+    }
+    if (user.instagramUrl) {
+      const href = user.instagramUrl.startsWith('http')
+        ? user.instagramUrl
+        : (user.instagramUrl.startsWith('@') ? `https://instagram.com/${user.instagramUrl.slice(1)}` : `https://instagram.com/${user.instagramUrl}`);
+      links.push({ key: 'instagram', title: 'Instagram', href, icon: '/icons/instagram.png' });
+    }
+    if (user.facebookUrl) {
+      const href = user.facebookUrl.startsWith('http') ? user.facebookUrl : `https://${user.facebookUrl}`;
+      links.push({ key: 'facebook', title: 'Facebook', href, icon: '/icons/facebook.png' });
+    }
+    if (user.websiteUrl) {
+      const href = user.websiteUrl.startsWith('http') ? user.websiteUrl : `https://${user.websiteUrl}`;
+      links.push({ key: 'web', title: 'Website', href, icon: '/icons/web.svg' });
+    }
+
+    if (links.length === 0) return null;
+
+    return (
+      <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
+          Tautan Akademik & Media Sosial:
+        </span>
+        <div className="flex items-center flex-wrap gap-2">
+          {links.map((link) => (
+            <a
+              key={link.key}
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={link.title}
+              className="w-8 h-8 p-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500 hover:scale-110 shadow-2xs transition-all flex items-center justify-center shrink-0 group"
+            >
+              <img src={link.icon} alt={link.title} className="w-full h-full object-contain" />
+            </a>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   // Build the list of the 2 official lecturers
   const registered = studentService.getRegisteredLecturers();
+  const altafSaved = registered.find((l) => l.email.toLowerCase() === 'altaf.aziz16@gmail.com') || DEFAULT_LECTURERS['altaf.aziz16@gmail.com'];
+  const miftahSaved = registered.find((l) => l.email.toLowerCase() === 'miftahurridlo.688@gmail.com') || DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'];
+
   const lecturerList: AuthUser[] = [
-    registered.find((l) => l.email.toLowerCase() === 'altaf.aziz16@gmail.com') || {
-      id: 'dos_02',
-      name: currentUser.email.toLowerCase() === 'altaf.aziz16@gmail.com' ? currentUser.name : 'Tengku Abdillah Azis, S.Pd',
-      email: 'altaf.aziz16@gmail.com',
-      role: 'dosen' as const,
-      nidn: '0419058902',
-      title: 'Dosen Pengampu Partner',
-      department: 'Sains Informasi Geografi',
-      avatarUrl: getInitialsAvatar('Tengku Abdillah Azis', true),
-      bio: 'Dosen & Peneliti Sains Informasi Geografi. Terhubung langsung dengan workspace riset, pengajaran, dan administrasi My Journey.',
-      registeredAt: '2026-08-01',
+    {
+      ...DEFAULT_LECTURERS['altaf.aziz16@gmail.com'],
+      ...altafSaved,
+      avatarUrl: (altafSaved.avatarUrl && !altafSaved.avatarUrl.includes('academic_avatar') && !altafSaved.avatarUrl.includes('ui-avatars') && !altafSaved.avatarUrl.includes('photo-')) ? altafSaved.avatarUrl : '/tengku_avatar.png',
+      title: altafSaved.title || 'Tenaga Teknis Survei & Pemetaan / Dosen Pengampu Partner',
     },
-    registered.find((l) => l.email.toLowerCase() === 'miftahurridlo.688@gmail.com') || {
-      id: 'dos_01',
-      name: currentUser.email.toLowerCase() === 'miftahurridlo.688@gmail.com' ? currentUser.name : 'Muhammad Miftahurrodlo, S.Pd., M.Sc',
-      email: 'miftahurridlo.688@gmail.com',
-      role: 'dosen' as const,
-      nidn: '0412088501',
-      title: 'Dosen Pengampu Utama',
-      department: 'Pendidikan Geografi',
-      avatarUrl: getInitialsAvatar('Muhammad Miftahurrodlo', true),
-      bio: 'Dosen & Peneliti Pendidikan Geografi. Terhubung langsung dengan kurikulum OBE dan manajemen pengajaran My Journey.',
-      registeredAt: '2026-08-01',
+    {
+      ...DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'],
+      ...miftahSaved,
+      campusEmail: miftahSaved.campusEmail || 'mmridlogeo@unimed.ac.id',
     },
   ];
 
@@ -367,11 +444,11 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
                 {/* Profile Avatar & Details */}
                 <div className="flex items-start gap-4 mb-4">
                   <img
-                    src={displayUser.avatarUrl || DEFAULT_LECTURERS[displayUser.email]?.avatarUrl || getInitialsAvatar(displayUser.name, true)}
+                    src={displayUser.avatarUrl || (displayUser.email.toLowerCase().includes('altaf') ? '/tengku_avatar.png' : getInitialsAvatar(displayUser.name, true))}
                     alt={displayUser.name}
                     className="w-16 h-16 rounded-2xl object-cover ring-2 ring-slate-200 dark:ring-slate-700 shrink-0 bg-indigo-50 dark:bg-slate-800"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = getInitialsAvatar(displayUser.name, true);
+                      (e.target as HTMLImageElement).src = displayUser.email.toLowerCase().includes('altaf') ? '/tengku_avatar.png' : getInitialsAvatar(displayUser.name, true);
                     }}
                   />
                   <div className="flex-1 min-w-0">
@@ -390,7 +467,7 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
                       )}
                     </div>
                     <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">
-                      {isPrimary ? 'Dosen Pengampu Utama' : 'Dosen Pengampu Partner'}
+                      {displayUser.title || (isPrimary ? 'Dosen Pengampu Utama' : 'Tenaga Teknis Survei & Pemetaan / Dosen Pengampu Partner')}
                     </p>
                     <div className="flex items-center gap-1.5 text-xs text-slate-500 font-mono mt-1">
                       <Mail className="w-3 h-3 text-slate-400 shrink-0" />
@@ -409,7 +486,12 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
                 <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/80 text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
                   {displayUser.bio || (isPrimary
                     ? 'Dosen Pengampu Utama Smart Learning Hub & My Journey. Koordinator kurikulum OBE dan penanggung jawab sinkronisasi pengajaran.'
-                    : 'Dosen Pengampu Partner Smart Learning Hub & My Journey. Pengampu kelas komputasi dan penanggung jawab materi praktikum.')}
+                    : 'Tenaga Teknis Survei & Pemetaan dan Dosen Pengampu Partner Sains Informasi Geografi. Terhubung langsung dengan workspace riset, pemetaan, dan administrasi perkuliahan My Journey.')}
+                </div>
+
+                {/* Academic & Social Links Bar */}
+                <div className="mb-4">
+                  {renderAcademicSocialLinks(displayUser)}
                 </div>
 
                 {/* Taught Classes Pill List */}
@@ -585,9 +667,22 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
                         className="hidden"
                       />
                     </label>
-                    <p className="text-[11px] text-slate-400">
-                      Atau tempel URL gambar langsung di bawah.
-                    </p>
+                    <div className="flex items-center gap-2 pt-1 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => setEditAvatarUrl('/tengku_avatar.png')}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
+                      >
+                        Pakai Pas Foto Jas & Dasi Merah
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditAvatarUrl(getInitialsAvatar(editName, true))}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                      >
+                        Pakai Avatar Inisial
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -597,7 +692,7 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
                     type="url"
                     value={editAvatarUrl.startsWith('data:') ? '' : editAvatarUrl}
                     onChange={(e) => setEditAvatarUrl(e.target.value)}
-                    placeholder="https://example.com/foto-anda.jpg"
+                    placeholder="https://example.com/foto-anda.jpg atau /tengku_avatar.png"
                     className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
                   />
                 </div>
@@ -675,25 +770,91 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
               </div>
 
               {/* External Links */}
-              <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+              <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <span className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Tautan Profil Akademik (Opsional)
+                  Tautan Profil Akademik & Media Sosial (Sesuai My Journey)
                 </span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <input
-                    type="url"
-                    value={editScholar}
-                    onChange={(e) => setEditScholar(e.target.value)}
-                    placeholder="URL Google Scholar"
-                    className="px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
-                  />
-                  <input
-                    type="url"
-                    value={editSinta}
-                    onChange={(e) => setEditSinta(e.target.value)}
-                    placeholder="URL Profil SINTA"
-                    className="px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
-                  />
+                  <div>
+                    <label className="block text-[10px] text-slate-400 mb-0.5">Google Scholar</label>
+                    <input
+                      type="url"
+                      value={editScholar}
+                      onChange={(e) => setEditScholar(e.target.value)}
+                      placeholder="https://scholar.google.com/..."
+                      className="w-full px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-400 mb-0.5">SINTA Kemdikbud</label>
+                    <input
+                      type="url"
+                      value={editSinta}
+                      onChange={(e) => setEditSinta(e.target.value)}
+                      placeholder="https://sinta.kemdikbud.go.id/..."
+                      className="w-full px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-400 mb-0.5">Scopus Author ID</label>
+                    <input
+                      type="url"
+                      value={editScopus}
+                      onChange={(e) => setEditScopus(e.target.value)}
+                      placeholder="https://www.scopus.com/..."
+                      className="w-full px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-400 mb-0.5">ResearchGate</label>
+                    <input
+                      type="url"
+                      value={editResearchGate}
+                      onChange={(e) => setEditResearchGate(e.target.value)}
+                      placeholder="https://www.researchgate.net/profile/..."
+                      className="w-full px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-400 mb-0.5">Email Kontak / Kampus</label>
+                    <input
+                      type="text"
+                      value={editEmail}
+                      onChange={(e) => setEditEmail(e.target.value)}
+                      placeholder="email@unimed.ac.id"
+                      className="w-full px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-400 mb-0.5">LinkedIn</label>
+                    <input
+                      type="url"
+                      value={editLinkedin}
+                      onChange={(e) => setEditLinkedin(e.target.value)}
+                      placeholder="https://linkedin.com/in/..."
+                      className="w-full px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-400 mb-0.5">Instagram</label>
+                    <input
+                      type="text"
+                      value={editInstagram}
+                      onChange={(e) => setEditInstagram(e.target.value)}
+                      placeholder="https://instagram.com/... atau @username"
+                      className="w-full px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-400 mb-0.5">Facebook</label>
+                    <input
+                      type="url"
+                      value={editFacebook}
+                      onChange={(e) => setEditFacebook(e.target.value)}
+                      placeholder="https://facebook.com/..."
+                      className="w-full px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                    />
+                  </div>
                 </div>
               </div>
 

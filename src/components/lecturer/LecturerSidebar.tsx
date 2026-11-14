@@ -13,7 +13,7 @@ import {
   Users
 } from 'lucide-react';
 import { Logo } from '../common/Logo.tsx';
-import { studentService } from '../../services/studentService.ts';
+import { studentService, getInitialsAvatar } from '../../services/studentService.ts';
 import type { AuthUser } from '../../types/index.ts';
 
 export type LecturerNavTab = 
@@ -89,9 +89,12 @@ export const LecturerSidebar: React.FC<LecturerSidebarProps> = ({
       <div className="p-4 mx-3 my-3 rounded-2xl bg-indigo-950/40 border border-indigo-800/60">
         <div className="flex items-center gap-3">
           <img
-            src={user.avatarUrl}
+            src={user.avatarUrl || (user.email?.toLowerCase().includes('altaf') ? '/tengku_avatar.png' : getInitialsAvatar(user.name, true))}
             alt={user.name}
             className="w-10 h-10 rounded-full object-cover ring-2 ring-indigo-400"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = user.email?.toLowerCase().includes('altaf') ? '/tengku_avatar.png' : getInitialsAvatar(user.name, true);
+            }}
           />
           <div className="flex-1 min-w-0">
             <h4 className="text-sm font-bold text-white truncate">

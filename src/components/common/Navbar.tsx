@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { Logo } from './Logo.tsx';
 import { MiniCalendarWidget } from './MiniCalendarWidget.tsx';
-import { studentService } from '../../services/studentService.ts';
+import { studentService, getInitialsAvatar } from '../../services/studentService.ts';
 import type { AuthUser, StudentNotification } from '../../types/index.ts';
 
 interface NavbarProps {
@@ -211,9 +211,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                 aria-label="Menu profil"
               >
                 <img
-                  src={currentUser.avatarUrl}
+                  src={currentUser.avatarUrl || (currentUser.email?.toLowerCase().includes('altaf') ? '/tengku_avatar.png' : getInitialsAvatar(currentUser.name, currentUser.role === 'dosen'))}
                   alt={currentUser.name}
                   className="w-8 h-8 rounded-full object-cover ring-2 ring-blue-600/30 dark:ring-blue-400/30"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = currentUser.email?.toLowerCase().includes('altaf') ? '/tengku_avatar.png' : getInitialsAvatar(currentUser.name, currentUser.role === 'dosen');
+                  }}
                 />
                 <div className="hidden sm:flex flex-col text-left leading-none">
                   <span className="text-xs font-semibold text-slate-900 dark:text-white">

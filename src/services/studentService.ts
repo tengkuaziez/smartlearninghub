@@ -123,24 +123,38 @@ export const DEFAULT_LECTURERS: Record<string, AuthUser> = {
     id: 'dos_altaf',
     name: 'Tengku Abdillah Azis, S.Pd',
     email: 'altaf.aziz16@gmail.com',
+    campusEmail: 'altaf.aziz16@gmail.com',
     role: 'dosen',
     nidn: '0419058902',
-    title: 'Dosen Pengampu Partner',
+    title: 'Tenaga Teknis Survei & Pemetaan / Dosen Pengampu Partner',
     department: 'Sains Informasi Geografi',
-    avatarUrl: '/academic_avatar_1792141179472.jpg',
-    bio: 'Dosen & Peneliti Sains Informasi Geografi. Terhubung langsung dengan workspace riset, pengajaran, dan administrasi My Journey.',
+    avatarUrl: '/tengku_avatar.png',
+    bio: 'Tenaga Teknis Survei & Pemetaan dan Dosen Pengampu Partner Sains Informasi Geografi. Terhubung langsung dengan workspace riset, pemetaan, dan administrasi perkuliahan My Journey.',
+    googleScholarUrl: 'https://scholar.google.com/',
+    sintaUrl: 'https://sinta.kemdikbud.go.id/',
+    scopusUrl: 'https://www.scopus.com/',
+    researchGateUrl: 'https://www.researchgate.net/',
+    linkedinUrl: 'https://linkedin.com/',
+    instagramUrl: 'https://instagram.com/',
+    facebookUrl: 'https://facebook.com/',
     registeredAt: '2026-08-01',
   },
   'miftahurridlo.688@gmail.com': {
     id: 'dos_miftah',
     name: 'Muhammad Miftahurrodlo, S.Pd., M.Sc',
     email: 'miftahurridlo.688@gmail.com',
+    campusEmail: 'mmridlogeo@unimed.ac.id',
     role: 'dosen',
     nidn: '0412088501',
     title: 'Dosen Pengampu Utama',
     department: 'Pendidikan Geografi',
     avatarUrl: getInitialsAvatar('Muhammad Miftahurrodlo', true),
     bio: 'Dosen & Peneliti Pendidikan Geografi. Terhubung langsung dengan kurikulum OBE dan manajemen pengajaran My Journey.',
+    googleScholarUrl: 'https://scholar.google.com/',
+    sintaUrl: 'https://sinta.kemdikbud.go.id/',
+    scopusUrl: 'https://www.scopus.com/',
+    researchGateUrl: 'https://www.researchgate.net/',
+    linkedinUrl: 'https://linkedin.com/',
     registeredAt: '2026-08-01',
   },
 };
@@ -184,9 +198,36 @@ export const studentService = {
   // Current Authenticated User (Lecturer or Student or null if not logged in)
   getCurrentUser(): AuthUser | null {
     const user = getStorage<AuthUser | null>(STORAGE_KEYS.CURRENT_USER, null);
-    if (user && user.avatarUrl && (user.avatarUrl.includes('photo-1534528741775') || user.avatarUrl.includes('photo-1507003211169'))) {
-      user.avatarUrl = getInitialsAvatar(user.name, user.role === 'dosen');
-      setStorage(STORAGE_KEYS.CURRENT_USER, user);
+    if (user) {
+      let modified = false;
+      const isAltaf = user.email.toLowerCase() === 'altaf.aziz16@gmail.com';
+      if (isAltaf) {
+        if (!user.avatarUrl || user.avatarUrl.includes('academic_avatar') || user.avatarUrl.includes('ui-avatars') || user.avatarUrl.includes('photo-')) {
+          user.avatarUrl = '/tengku_avatar.png';
+          modified = true;
+        }
+        if (!user.title || user.title === 'Dosen Pengampu Partner' || user.title === 'Dosen & Peneliti') {
+          user.title = 'Tenaga Teknis Survei & Pemetaan / Dosen Pengampu Partner';
+          modified = true;
+        }
+        if (!user.googleScholarUrl) {
+          user.googleScholarUrl = DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].googleScholarUrl;
+          user.sintaUrl = DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].sintaUrl;
+          user.scopusUrl = DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].scopusUrl;
+          user.researchGateUrl = DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].researchGateUrl;
+          user.campusEmail = DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].campusEmail;
+          user.linkedinUrl = DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].linkedinUrl;
+          user.instagramUrl = DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].instagramUrl;
+          user.facebookUrl = DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].facebookUrl;
+          modified = true;
+        }
+      } else if (user.avatarUrl && (user.avatarUrl.includes('photo-1534528741775') || user.avatarUrl.includes('photo-1507003211169') || user.avatarUrl.includes('academic_avatar'))) {
+        user.avatarUrl = getInitialsAvatar(user.name, user.role === 'dosen');
+        modified = true;
+      }
+      if (modified) {
+        setStorage(STORAGE_KEYS.CURRENT_USER, user);
+      }
     }
     return user;
   },
@@ -195,7 +236,11 @@ export const studentService = {
     if (!user) {
       localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
     } else {
-      if (user.avatarUrl && (user.avatarUrl.includes('photo-1534528741775') || user.avatarUrl.includes('photo-1507003211169'))) {
+      if (user.email.toLowerCase() === 'altaf.aziz16@gmail.com') {
+        if (!user.avatarUrl || user.avatarUrl.includes('ui-avatars') || user.avatarUrl.includes('photo-') || user.avatarUrl.includes('academic_avatar')) {
+          user.avatarUrl = '/tengku_avatar.png';
+        }
+      } else if (user.avatarUrl && (user.avatarUrl.includes('photo-1534528741775') || user.avatarUrl.includes('photo-1507003211169') || user.avatarUrl.includes('academic_avatar'))) {
         user.avatarUrl = getInitialsAvatar(user.name, user.role === 'dosen');
       }
       setStorage(STORAGE_KEYS.CURRENT_USER, user);
@@ -223,7 +268,37 @@ export const studentService = {
     }
 
     users.forEach((u) => {
-      if (u.avatarUrl && (u.avatarUrl.includes('photo-1534528741775') || u.avatarUrl.includes('photo-1507003211169'))) {
+      if (u.email.toLowerCase() === altafEmail) {
+        if (!u.avatarUrl || u.avatarUrl.includes('academic_avatar') || u.avatarUrl.includes('ui-avatars') || u.avatarUrl.includes('photo-')) {
+          u.avatarUrl = '/tengku_avatar.png';
+          modified = true;
+        }
+        if (!u.title || u.title === 'Dosen Pengampu Partner' || u.title === 'Dosen & Peneliti') {
+          u.title = 'Tenaga Teknis Survei & Pemetaan / Dosen Pengampu Partner';
+          modified = true;
+        }
+        if (!u.googleScholarUrl) {
+          u.googleScholarUrl = DEFAULT_LECTURERS[altafEmail].googleScholarUrl;
+          u.sintaUrl = DEFAULT_LECTURERS[altafEmail].sintaUrl;
+          u.scopusUrl = DEFAULT_LECTURERS[altafEmail].scopusUrl;
+          u.researchGateUrl = DEFAULT_LECTURERS[altafEmail].researchGateUrl;
+          u.campusEmail = DEFAULT_LECTURERS[altafEmail].campusEmail;
+          u.linkedinUrl = DEFAULT_LECTURERS[altafEmail].linkedinUrl;
+          u.instagramUrl = DEFAULT_LECTURERS[altafEmail].instagramUrl;
+          u.facebookUrl = DEFAULT_LECTURERS[altafEmail].facebookUrl;
+          modified = true;
+        }
+      } else if (u.email.toLowerCase() === miftahEmail) {
+        if (!u.campusEmail) {
+          u.campusEmail = DEFAULT_LECTURERS[miftahEmail].campusEmail;
+          u.googleScholarUrl = DEFAULT_LECTURERS[miftahEmail].googleScholarUrl;
+          u.sintaUrl = DEFAULT_LECTURERS[miftahEmail].sintaUrl;
+          u.scopusUrl = DEFAULT_LECTURERS[miftahEmail].scopusUrl;
+          u.researchGateUrl = DEFAULT_LECTURERS[miftahEmail].researchGateUrl;
+          u.linkedinUrl = DEFAULT_LECTURERS[miftahEmail].linkedinUrl;
+          modified = true;
+        }
+      } else if (u.avatarUrl && (u.avatarUrl.includes('photo-1534528741775') || u.avatarUrl.includes('photo-1507003211169') || u.avatarUrl.includes('academic_avatar'))) {
         u.avatarUrl = getInitialsAvatar(u.name, u.role === 'dosen');
         modified = true;
       }
@@ -363,8 +438,16 @@ export const studentService = {
       }
     } catch {}
 
+    const isAltaf = emailToSync.includes('altaf');
+    const defaultLecturer = DEFAULT_LECTURERS[emailToSync] || (isAltaf ? DEFAULT_LECTURERS['altaf.aziz16@gmail.com'] : DEFAULT_LECTURERS['miftahurridlo.688@gmail.com']);
+
+    // Jika belum ditemukan dari cloud/storage, gunakan profil terverifikasi My Journey sebagai basis
+    if (!foundProfileData) {
+      foundProfileData = { ...defaultLecturer };
+    }
+
     if (foundProfileData) {
-      let fullName = foundProfileData.name || '';
+      let fullName = foundProfileData.name || defaultLecturer.name;
       if (foundProfileData.titlePrefix) {
         fullName = `${foundProfileData.titlePrefix} ${fullName}`;
       }
@@ -373,35 +456,41 @@ export const studentService = {
         fullName = `${fullName}, ${suffix}`;
       }
 
-      const isAltaf = emailToSync.includes('altaf');
       const defaultBio = isAltaf
-        ? 'Dosen & Peneliti Sains Informasi Geografi. Terhubung langsung dengan workspace riset, pengajaran, dan administrasi My Journey.'
+        ? 'Tenaga Teknis Survei & Pemetaan dan Dosen Pengampu Partner Sains Informasi Geografi. Terhubung langsung dengan workspace riset, pemetaan, dan administrasi perkuliahan My Journey.'
         : 'Dosen & Peneliti Pendidikan Geografi. Terhubung langsung dengan kurikulum OBE dan manajemen pengajaran My Journey.';
-      const defaultTitle = isAltaf ? 'Dosen Pengampu Partner' : 'Dosen Pengampu Utama';
+      const defaultTitle = isAltaf ? 'Tenaga Teknis Survei & Pemetaan / Dosen Pengampu Partner' : 'Dosen Pengampu Utama';
       const defaultDept = isAltaf ? 'Sains Informasi Geografi' : 'Pendidikan Geografi';
 
       let targetAvatar = foundProfileData.avatarUrl;
-      if (!targetAvatar || targetAvatar.includes('photo-1534528741775') || (isAltaf && targetAvatar.includes('ui-avatars.com'))) {
-        targetAvatar = isAltaf ? '/academic_avatar_1792141179472.jpg' : getInitialsAvatar(fullName || foundProfileData.name, true);
-      } else if (targetAvatar.includes('academic_avatar')) {
-        targetAvatar = '/academic_avatar_1792141179472.jpg';
+      if (isAltaf) {
+        targetAvatar = '/tengku_avatar.png';
+      } else if (!targetAvatar || targetAvatar.includes('photo-1534528741775') || targetAvatar.includes('academic_avatar')) {
+        targetAvatar = getInitialsAvatar(fullName || foundProfileData.name, true);
       }
 
       const updated = this.updateLecturerProfile({
         name: fullName || foundProfileData.name,
         nidn: isAltaf ? '0419058902' : '0412088501',
-        title: defaultTitle,
+        title: (foundProfileData.role && foundProfileData.role !== 'Dosen & Peneliti') ? foundProfileData.role : defaultTitle,
         department: foundProfileData.universityOrOrg || foundProfileData.department || defaultDept,
         avatarUrl: targetAvatar,
         bio: (foundProfileData.bio && !foundProfileData.bio.includes('Dosen Pengampu Smart Learning Hub.')) ? foundProfileData.bio : defaultBio,
-        googleScholarUrl: foundProfileData.googleScholarUrl || '',
-        sintaUrl: foundProfileData.sintaUrl || '',
-        linkedinUrl: foundProfileData.linkedinUrl || '',
+        googleScholarUrl: foundProfileData.googleScholarUrl || defaultLecturer.googleScholarUrl || 'https://scholar.google.com/',
+        sintaUrl: foundProfileData.sintaUrl || defaultLecturer.sintaUrl || 'https://sinta.kemdikbud.go.id/',
+        scopusUrl: foundProfileData.scopusUrl || defaultLecturer.scopusUrl || 'https://www.scopus.com/',
+        orcidUrl: foundProfileData.orcidUrl || '',
+        researchGateUrl: foundProfileData.researchGateUrl || defaultLecturer.researchGateUrl || 'https://www.researchgate.net/',
+        campusEmail: foundProfileData.campusEmail || (isAltaf ? 'altaf.aziz16@gmail.com' : 'mmridlogeo@unimed.ac.id'),
+        linkedinUrl: foundProfileData.linkedinUrl || defaultLecturer.linkedinUrl || 'https://linkedin.com/',
+        instagramUrl: foundProfileData.instagramUrl || defaultLecturer.instagramUrl || 'https://instagram.com/',
+        facebookUrl: foundProfileData.facebookUrl || defaultLecturer.facebookUrl || 'https://facebook.com/',
+        websiteUrl: foundProfileData.websiteUrl || '',
       });
 
       return {
         success: true,
-        message: 'Profil berhasil disinkronkan dengan My Journey!',
+        message: 'Profil berhasil disinkronkan 1:1 dengan My Journey!',
         profile: updated,
       };
     }
@@ -429,17 +518,33 @@ export const studentService = {
         fullName = `${fullName}, ${suffix}`;
       }
 
+      const isAltaf = (parsed.email || '').toLowerCase().includes('altaf') || fullName.toLowerCase().includes('tengku');
+      let targetAvatar = parsed.avatarUrl;
+      if (isAltaf) {
+        targetAvatar = '/tengku_avatar.png';
+      } else if (!targetAvatar || targetAvatar.includes('photo-1534528741775') || targetAvatar.includes('academic_avatar')) {
+        targetAvatar = getInitialsAvatar(fullName || parsed.name, true);
+      }
+
       const updated = this.updateLecturerProfile({
         name: fullName || parsed.name,
-        title: parsed.role || parsed.title || 'Dosen Pengampu Utama',
-        department: parsed.universityOrOrg || parsed.department || 'Pendidikan Geografi / Sains Informasi Geografis',
-        avatarUrl: parsed.avatarUrl && !parsed.avatarUrl.includes('photo-1534528741775')
-          ? parsed.avatarUrl
-          : getInitialsAvatar(fullName || parsed.name, true),
-        bio: parsed.bio || 'Dosen Pengampu Utama Smart Learning Hub & My Journey.',
+        title: parsed.role || parsed.title || (isAltaf ? 'Tenaga Teknis Survei & Pemetaan / Dosen Pengampu Partner' : 'Dosen Pengampu Utama'),
+        nidn: isAltaf ? '0419058902' : '0412088501',
+        department: parsed.universityOrOrg || parsed.department || (isAltaf ? 'Sains Informasi Geografi' : 'Pendidikan Geografi'),
+        avatarUrl: targetAvatar,
+        bio: parsed.bio || (isAltaf
+          ? 'Tenaga Teknis Survei & Pemetaan dan Dosen Pengampu Partner Sains Informasi Geografi. Terhubung langsung dengan workspace riset, pemetaan, dan administrasi perkuliahan My Journey.'
+          : 'Dosen & Peneliti Pendidikan Geografi. Terhubung langsung dengan kurikulum OBE dan manajemen pengajaran My Journey.'),
         googleScholarUrl: parsed.googleScholarUrl || '',
         sintaUrl: parsed.sintaUrl || '',
+        scopusUrl: parsed.scopusUrl || '',
+        orcidUrl: parsed.orcidUrl || '',
+        researchGateUrl: parsed.researchGateUrl || '',
+        campusEmail: parsed.campusEmail || (isAltaf ? 'altaf.aziz16@gmail.com' : 'mmridlogeo@unimed.ac.id'),
         linkedinUrl: parsed.linkedinUrl || '',
+        instagramUrl: parsed.instagramUrl || '',
+        facebookUrl: parsed.facebookUrl || '',
+        websiteUrl: parsed.websiteUrl || '',
       });
 
       return {
@@ -970,7 +1075,7 @@ export const studentService = {
                 ? 'Dosen & Peneliti Sains Informasi Geografi. Terhubung langsung dengan workspace riset, pengajaran, dan administrasi My Journey.'
                 : 'Dosen & Peneliti Pendidikan Geografi. Terhubung langsung dengan kurikulum OBE dan manajemen pengajaran My Journey.';
 
-              const targetAvatar = isAltaf ? '/academic_avatar_1792141179472.jpg' : (prof.avatarUrl || getInitialsAvatar(cleanName, true));
+              const targetAvatar = isAltaf ? '/tengku_avatar.png' : (prof.avatarUrl || getInitialsAvatar(cleanName, true));
 
               const userObj: RegisteredUser = {
                 id: idx >= 0 ? regUsers[idx].id : (DEFAULT_LECTURERS[cleanEmail]?.id || `dos_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`),
@@ -1135,7 +1240,7 @@ export const studentService = {
         const defaultBio = isAltaf
           ? 'Dosen & Peneliti Sains Informasi Geografi. Terhubung langsung dengan workspace riset, pengajaran, dan administrasi My Journey.'
           : 'Dosen & Peneliti Pendidikan Geografi. Terhubung langsung dengan kurikulum OBE dan manajemen pengajaran My Journey.';
-        const defaultAvatar = isAltaf ? '/academic_avatar_1792141179472.jpg' : getInitialsAvatar(defaultName, true);
+        const defaultAvatar = isAltaf ? '/tengku_avatar.png' : getInitialsAvatar(defaultName, true);
         const fullName = defaultName;
 
         // Cek profil dari tabel profiles Supabase My Journey
@@ -1152,7 +1257,7 @@ export const studentService = {
             if (supaProfile.bio) supaBio = supaProfile.bio;
             if (supaProfile.university_or_org) supaDept = supaProfile.university_or_org;
             if (supaProfile.avatar_url && !supaProfile.avatar_url.includes('ui-avatars')) {
-              supaAvatar = supaProfile.avatar_url.includes('academic_avatar') ? '/academic_avatar_1792141179472.jpg' : supaProfile.avatar_url;
+              supaAvatar = supaProfile.avatar_url.includes('academic_avatar') ? '/tengku_avatar.png' : supaProfile.avatar_url;
             }
           }
         } catch {}

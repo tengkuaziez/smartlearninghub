@@ -8,12 +8,19 @@ export interface AuthUser {
   avatarUrl: string;
   nim?: string; // Mahasiswa only
   nidn?: string; // Dosen only
-  title?: string; // Dosen title (e.g. "Dosen Pengampu Utama")
+  title?: string; // Dosen title (e.g. "Dosen Pengampu Utama" / "Tenaga Teknis Survei & Pemetaan")
   department?: string;
   bio?: string;
   googleScholarUrl?: string;
   sintaUrl?: string;
+  scopusUrl?: string;
+  orcidUrl?: string;
+  researchGateUrl?: string;
+  campusEmail?: string;
   linkedinUrl?: string;
+  instagramUrl?: string;
+  facebookUrl?: string;
+  websiteUrl?: string;
   registeredAt: string;
 }
 
