@@ -241,6 +241,28 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
     }
   };
 
+  // Check pending invitations for current lecturer
+  const allExistingCourses = studentService.getAllCourses();
+  const pendingInvitations = allExistingCourses.filter(
+    (c) => c.pendingLecturerEmail?.toLowerCase() === currentUser?.email?.toLowerCase()
+  );
+
+  const handleAcceptInvitation = (courseId: string) => {
+    const res = studentService.acceptCourseInvitation(courseId, currentUser?.email);
+    if (res.success) {
+      onDataUpdated();
+    }
+  };
+
+  const handleDeclineInvitation = (courseId: string) => {
+    if (confirm('Tolak undangan kolaborasi mengajar ini?')) {
+      const res = studentService.declineCourseInvitation(courseId, currentUser?.email);
+      if (res.success) {
+        onDataUpdated();
+      }
+    }
+  };
+
   // Handle Delete Course
   const handleDeleteCourse = (courseId: string, courseTitle: string) => {
     if (confirm(`Apakah Anda yakin ingin menghapus kelas "${courseTitle}"? Semua data pertemuan dan silabus akan dihapus.`)) {
@@ -276,6 +298,11 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
           >
             <BookOpen className="w-3.5 h-3.5" />
             <span>1. Kelas ({courses.length})</span>
+            {pendingInvitations.length > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white animate-pulse">
+                +{pendingInvitations.length} Undangan
+              </span>
+            )}
           </button>
 
           <button
@@ -363,6 +390,59 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
       {/* ========================================================= */}
       {activeSubTab === 'kelas' && (
         <div className="space-y-4">
+          {/* Action Banner: Undangan Tim Mengajar dari Rekan Dosen */}
+          {pendingInvitations.length > 0 && (
+            <div className="space-y-3 mb-5">
+              {pendingInvitations.map((inv) => (
+                <div
+                  key={inv.id}
+                  className="p-4 sm:p-5 rounded-2xl bg-linear-to-r from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/30 border-2 border-amber-300 dark:border-amber-700/60 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4"
+                >
+                  <div className="flex items-start gap-3.5">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                      <Mail className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 dark:text-amber-300 bg-amber-200/80 dark:bg-amber-900/60 px-2 py-0.5 rounded-md">
+                          Undangan Tim Dosen Baru
+                        </span>
+                        <span className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                          Menunggu Persetujuan Anda
+                        </span>
+                      </div>
+                      <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white mt-1">
+                        {studentService.formatLecturerGreeting(inv.teacher.name)} mengundang Anda bergabung mengampu mata kuliah:
+                      </h4>
+                      <div className="text-xs font-semibold text-indigo-700 dark:text-indigo-400 mt-0.5">
+                        {inv.code} — {inv.title} ({inv.semester})
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        Jadwal: {inv.scheduleDay}, {inv.scheduleTime} • Ruang: {inv.room}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2.5 self-end md:self-center shrink-0">
+                    <button
+                      onClick={() => handleAcceptInvitation(inv.id)}
+                      className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs hover:shadow transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      Terima Undangan
+                    </button>
+                    <button
+                      onClick={() => handleDeclineInvitation(inv.id)}
+                      className="px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 border border-rose-200 dark:border-rose-900 text-xs font-semibold shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                      Tolak
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {courses.length === 0 ? (
             <div className="p-12 text-center rounded-3xl bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-800 space-y-4">
               <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 mx-auto flex items-center justify-center font-bold">

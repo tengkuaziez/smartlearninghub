@@ -37,6 +37,19 @@ import { validateEmailAccess } from '../utils/academicCalculations.ts';
 import { supabase, isSupabaseConfigured } from './supabaseClient.ts';
 import { supabaseDataService, LECTURER_USER_ID } from './supabaseDataService.ts';
 
+// Helper sinkronisasi Google Sheets / My Journey yang aman dari circular dependency
+const myJourneySyncService = {
+  triggerDebouncedAutoSync: () => {
+    try { (studentService as any)?._syncDelegate?.triggerDebouncedAutoSync?.(); } catch {}
+  },
+  deleteCourseFromGoogleSheets: async (courseId: string) => {
+    try { return await (studentService as any)?._syncDelegate?.deleteCourseFromGoogleSheets?.(courseId); } catch { return false; }
+  },
+  pushTeachingToGoogleSheets: async () => {
+    try { return await (studentService as any)?._syncDelegate?.pushTeachingToGoogleSheets?.(); } catch { return { success: false }; }
+  },
+};
+
 const STORAGE_KEYS = {
   DATA_VERSION: 'slh_data_version',
   CURRENT_USER: 'slh_current_user',
@@ -148,13 +161,15 @@ export const DEFAULT_LECTURERS: Record<string, AuthUser> = {
     nidn: '0412088501',
     title: 'Dosen Pengampu Utama',
     department: 'Pendidikan Geografi',
-    avatarUrl: getInitialsAvatar('Muhammad Miftahurrodlo', true),
+    avatarUrl: '/miftah_avatar.png',
     bio: 'Dosen & Peneliti Pendidikan Geografi. Terhubung langsung dengan kurikulum OBE dan manajemen pengajaran My Journey.',
     googleScholarUrl: 'https://scholar.google.com/',
     sintaUrl: 'https://sinta.kemdikbud.go.id/',
     scopusUrl: 'https://www.scopus.com/',
     researchGateUrl: 'https://www.researchgate.net/',
     linkedinUrl: 'https://linkedin.com/',
+    instagramUrl: 'https://instagram.com/',
+    facebookUrl: 'https://facebook.com/',
     registeredAt: '2026-08-01',
   },
 };
@@ -239,12 +254,18 @@ export const studentService = {
           user.campusEmail = 'mmridlogeo@unimed.ac.id';
           modified = true;
         }
+        if (!user.avatarUrl || user.avatarUrl.includes('ui-avatars') || user.avatarUrl.includes('photo-') || user.avatarUrl.includes('academic_avatar')) {
+          user.avatarUrl = '/miftah_avatar.png';
+          modified = true;
+        }
         if (!user.googleScholarUrl) {
           user.googleScholarUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].googleScholarUrl || 'https://scholar.google.com/';
           user.sintaUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].sintaUrl || 'https://sinta.kemdikbud.go.id/';
           user.scopusUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].scopusUrl || 'https://www.scopus.com/';
           user.researchGateUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].researchGateUrl || 'https://www.researchgate.net/';
           user.linkedinUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].linkedinUrl || 'https://linkedin.com/';
+          user.instagramUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].instagramUrl || 'https://instagram.com/';
+          user.facebookUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].facebookUrl || 'https://facebook.com/';
           modified = true;
         }
       } else if (user.avatarUrl && (user.avatarUrl.includes('photo-1534528741775') || user.avatarUrl.includes('photo-1507003211169') || user.avatarUrl.includes('academic_avatar'))) {
@@ -265,6 +286,10 @@ export const studentService = {
       if (user.email.toLowerCase() === 'altaf.aziz16@gmail.com') {
         if (!user.avatarUrl || user.avatarUrl.includes('ui-avatars') || user.avatarUrl.includes('photo-') || user.avatarUrl.includes('academic_avatar')) {
           user.avatarUrl = '/tengku_avatar.png';
+        }
+      } else if (user.email.toLowerCase() === 'miftahurridlo.688@gmail.com') {
+        if (!user.avatarUrl || user.avatarUrl.includes('ui-avatars') || user.avatarUrl.includes('photo-') || user.avatarUrl.includes('academic_avatar')) {
+          user.avatarUrl = '/miftah_avatar.png';
         }
       } else if (user.avatarUrl && (user.avatarUrl.includes('photo-1534528741775') || user.avatarUrl.includes('photo-1507003211169') || user.avatarUrl.includes('academic_avatar'))) {
         user.avatarUrl = getInitialsAvatar(user.name, user.role === 'dosen');
@@ -331,12 +356,18 @@ export const studentService = {
           u.campusEmail = 'mmridlogeo@unimed.ac.id';
           modified = true;
         }
+        if (!u.avatarUrl || u.avatarUrl.includes('ui-avatars') || u.avatarUrl.includes('photo-') || u.avatarUrl.includes('academic_avatar')) {
+          u.avatarUrl = '/miftah_avatar.png';
+          modified = true;
+        }
         if (!u.googleScholarUrl) {
           u.googleScholarUrl = DEFAULT_LECTURERS[miftahEmail].googleScholarUrl || 'https://scholar.google.com/';
           u.sintaUrl = DEFAULT_LECTURERS[miftahEmail].sintaUrl || 'https://sinta.kemdikbud.go.id/';
           u.scopusUrl = DEFAULT_LECTURERS[miftahEmail].scopusUrl || 'https://www.scopus.com/';
           u.researchGateUrl = DEFAULT_LECTURERS[miftahEmail].researchGateUrl || 'https://www.researchgate.net/';
           u.linkedinUrl = DEFAULT_LECTURERS[miftahEmail].linkedinUrl || 'https://linkedin.com/';
+          u.instagramUrl = DEFAULT_LECTURERS[miftahEmail].instagramUrl || 'https://instagram.com/';
+          u.facebookUrl = DEFAULT_LECTURERS[miftahEmail].facebookUrl || 'https://facebook.com/';
           modified = true;
         }
       } else if (u.avatarUrl && (u.avatarUrl.includes('photo-1534528741775') || u.avatarUrl.includes('photo-1507003211169') || u.avatarUrl.includes('academic_avatar'))) {
@@ -1119,7 +1150,11 @@ export const studentService = {
                 ? 'Tenaga Teknis Survei & Pemetaan dan Dosen Pengampu Partner Sains Informasi Geografi. Terhubung langsung dengan workspace riset, pemetaan, dan administrasi perkuliahan My Journey.'
                 : 'Dosen & Peneliti Pendidikan Geografi. Terhubung langsung dengan kurikulum OBE dan manajemen pengajaran My Journey.';
 
-              const targetAvatar = isAltaf ? '/tengku_avatar.png' : (existingUser?.avatarUrl || prof.avatarUrl || defaultData.avatarUrl || getInitialsAvatar(cleanName, true));
+              const targetAvatar = isAltaf
+                ? '/tengku_avatar.png'
+                : (prof.avatarUrl && !prof.avatarUrl.includes('ui-avatars') && !prof.avatarUrl.includes('photo-') && !prof.avatarUrl.includes('academic_avatar')
+                  ? prof.avatarUrl
+                  : '/miftah_avatar.png');
 
               const userObj: RegisteredUser = {
                 ...defaultData,
@@ -1142,8 +1177,8 @@ export const studentService = {
                 orcidUrl: existingUser?.orcidUrl || defaultData.orcidUrl || '',
                 researchGateUrl: existingUser?.researchGateUrl || defaultData.researchGateUrl || 'https://www.researchgate.net/',
                 linkedinUrl: existingUser?.linkedinUrl || defaultData.linkedinUrl || 'https://linkedin.com/',
-                instagramUrl: existingUser?.instagramUrl || defaultData.instagramUrl || (isAltaf ? 'https://instagram.com/' : undefined),
-                facebookUrl: existingUser?.facebookUrl || defaultData.facebookUrl || (isAltaf ? 'https://facebook.com/' : undefined),
+                instagramUrl: existingUser?.instagramUrl || defaultData.instagramUrl || 'https://instagram.com/',
+                facebookUrl: existingUser?.facebookUrl || defaultData.facebookUrl || 'https://facebook.com/',
                 registeredAt: existingUser?.registeredAt || defaultData.registeredAt || '2026-08-01',
               };
 
@@ -1168,8 +1203,14 @@ export const studentService = {
             const allMeetings = this.getMeetings();
             let coursesUpdated = false;
 
+            const deletedIds = getStorage<string[]>('slh_deleted_course_ids', []);
             json.data.Courses.forEach((sheetCourse: any) => {
               if (!sheetCourse.code && !sheetCourse.name) return;
+              const sheetCourseId = sheetCourse.id || course_;
+              if (deletedIds.includes(sheetCourseId)) {
+                myJourneySyncService.deleteCourseFromGoogleSheets(sheetCourseId).catch(() => {});
+                return;
+              }
               const courseCode = String(sheetCourse.code || '').trim().toUpperCase();
               const courseName = String(sheetCourse.name || sheetCourse.title || '').trim();
               const courseId = sheetCourse.id || `course_${courseCode.replace(/[^a-zA-Z0-9]/g, '_')}`;
@@ -1749,8 +1790,13 @@ export const studentService = {
   // Courses
   getAllCourses(): CourseClass[] {
     const courses = getStorage<CourseClass[]>(STORAGE_KEYS.COURSES, initialCourses);
+    const deletedIds = getStorage<string[]>('slh_deleted_course_ids', []);
+    const filtered = courses.filter((c) => !deletedIds.includes(c.id));
+    if (filtered.length !== courses.length) {
+      setStorage(STORAGE_KEYS.COURSES, filtered);
+    }
     let updatedNeeded = false;
-    const synced = courses.map((c) => {
+    const synced = filtered.map((c) => {
       if (!c.rps && initialCourseRps[c.id]) {
         updatedNeeded = true;
         return { ...c, rps: initialCourseRps[c.id] };
@@ -1805,31 +1851,29 @@ export const studentService = {
     }
     const emailToFilter = (studentEmail || user?.email || '').toLowerCase().trim();
 
-    // If currentUser is dosen: return courses where lecturer is primary teacher OR secondary teacher OR pending teacher OR in teamTeachers
+    // If currentUser is dosen: return courses where lecturer is creator OR accepted partner
     if (user?.role === 'dosen') {
-      const isMiftah = emailToFilter.includes('miftah');
-      const isAltaf = emailToFilter.includes('altaf');
-
       return courses.filter((c) => {
         const primary = (c.teacher?.email || '').toLowerCase().trim();
         const secondary = (c.secondaryTeacher?.email || '').toLowerCase().trim();
         const pending = (c.pendingLecturerEmail || '').toLowerCase().trim();
         const isTeam = (c.teamTeachers || []).some((t) => (t.email || '').toLowerCase().trim() === emailToFilter);
 
-        // Direct email match
-        if (primary === emailToFilter || secondary === emailToFilter || pending === emailToFilter || isTeam) {
+        // Dosen pembuat kelas selalu melihat kelasnya
+        if (primary === emailToFilter) {
           return true;
         }
 
-        // Match by partnerLecturer / pendingLecturerName
-        const partnerName = (c.partnerLecturer || c.pendingLecturerName || '').toLowerCase();
-        if (isMiftah && partnerName.includes('miftah')) return true;
-        if (isAltaf && (partnerName.includes('tengku') || partnerName.includes('aziz') || partnerName.includes('azis'))) return true;
+        // Jika ada status undangan pending untuk dosen ini, JANGAN tampilkan di kelas aktif sebelum diterima
+        if (pending === emailToFilter) {
+          return false;
+        }
 
-        // Since Tengku & Miftah are the shared co-teaching pair for Smart Learning Hub,
-        // any class created by either of them belongs to their joint teaching portal!
-        const isCreatedByCoLecturer = primary.includes('altaf') || primary.includes('miftah');
-        if ((isAltaf || isMiftah) && isCreatedByCoLecturer) {
+        // Jika sudah resmi diterima sebagai secondaryTeacher atau ada di teamTeachers (tanpa pending)
+        if (secondary === emailToFilter && !c.pendingLecturerEmail) {
+          return true;
+        }
+        if (isTeam && !c.pendingLecturerEmail) {
           return true;
         }
 
@@ -1938,27 +1982,13 @@ export const studentService = {
       const isMiftah = invitedEmail.includes('miftah');
       const partnerUser = DEFAULT_LECTURERS[invitedEmail] || this.getRegisteredLecturers().find((l) => l.email.toLowerCase() === invitedEmail) || (isMiftah ? DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'] : DEFAULT_LECTURERS['altaf.aziz16@gmail.com']);
       const partnerName = partnerUser?.name || (isMiftah ? 'Muhammad Miftahurrodlo, S.Pd., M.Sc' : 'Tengku Abdillah Azis, S.Pd');
-      const partnerDept = partnerUser?.department || (isMiftah ? 'Pendidikan Geografi' : 'Sains Informasi Geografi');
-      const partnerTitle = partnerUser?.title || (isMiftah ? 'Dosen Pengampu Utama' : 'Tenaga Teknis Survei & Pemetaan / Dosen Pengampu Partner');
-      const partnerAvatar = partnerUser?.avatarUrl || (isMiftah ? getInitialsAvatar(partnerName, true) : '/tengku_avatar.png');
 
-      const secondaryTeacherObj: TeacherInfo = {
-        id: partnerUser?.id || (isMiftah ? 'dos_miftah' : 'dos_altaf'),
-        name: partnerName,
-        title: partnerTitle,
-        email: invitedEmail,
-        avatarUrl: partnerAvatar,
-        department: partnerDept,
-      };
-
-      newCourse.secondaryTeacher = secondaryTeacherObj;
-      newCourse.partnerLecturer = partnerName;
-      newCourse.pendingLecturerEmail = invitedEmail;
+      // Set status PENDING: Rekan dosen baru resmi menjadi secondaryTeacher setelah menerima undangan
+      newCourse.pendingLecturerEmail = invitedEmail.toLowerCase();
       newCourse.pendingLecturerName = partnerName;
-      newCourse.teamTeachers = [
-        newCourse.teacher,
-        secondaryTeacherObj,
-      ];
+      newCourse.secondaryTeacher = undefined;
+      newCourse.partnerLecturer = undefined;
+      newCourse.teamTeachers = [newCourse.teacher];
     }
 
     // Auto generate 16 meetings for OBE matrix
@@ -1993,8 +2023,9 @@ export const studentService = {
       });
     }
 
-    // Kirim sinkronisasi ke Supabase Cloud (My Journey Unified DB)
+    // Kirim sinkronisasi ke Supabase Cloud (My Journey Unified DB) & Google Sheets
     supabaseDataService.saveCourse(newCourse).catch(() => {});
+    myJourneySyncService.triggerDebouncedAutoSync();
 
     this.addActivity({
       title: 'Mata Kuliah Baru Dibuat',
@@ -2073,14 +2104,11 @@ export const studentService = {
 
     const updatedCourse: CourseClass = {
       ...course,
-      secondaryTeacher: secondaryTeacherObj,
-      partnerLecturer: partnerName,
       pendingLecturerEmail: cleanEmail,
       pendingLecturerName: partnerName,
-      teamTeachers: [
-        course.teacher,
-        secondaryTeacherObj,
-      ],
+      secondaryTeacher: undefined,
+      partnerLecturer: undefined,
+      teamTeachers: [course.teacher],
     };
     courses[courseIndex] = updatedCourse;
     setStorage(STORAGE_KEYS.COURSES, courses);
@@ -2106,6 +2134,115 @@ export const studentService = {
     return {
       success: true,
       message: `Undangan berhasil dikirim ke ${partnerName} (${cleanEmail}). Notifikasi konfirmasi telah diteruskan.`,
+    };
+  },
+
+  // Terima undangan mengajar langsung dari courseId
+  acceptCourseInvitation(courseId: string, lecturerEmail?: string): { success: boolean; message: string } {
+    const currentLecturer = this.getCurrentUser() || defaultLecturerUser;
+    const email = (lecturerEmail || currentLecturer.email).toLowerCase().trim();
+    const isMiftah = email.includes('miftah');
+    const partnerUser = DEFAULT_LECTURERS[email] || (isMiftah ? DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'] : DEFAULT_LECTURERS['altaf.aziz16@gmail.com']);
+    const partnerName = partnerUser?.name || (isMiftah ? 'Muhammad Miftahurrodlo, S.Pd., M.Sc' : 'Tengku Abdillah Azis, S.Pd');
+    const partnerAvatar = isMiftah ? '/miftah_avatar.png' : '/tengku_avatar.png';
+
+    const courses = this.getAllCourses();
+    const courseIndex = courses.findIndex((c) => c.id === courseId);
+    if (courseIndex === -1) {
+      return { success: false, message: 'Kelas tidak ditemukan.' };
+    }
+
+    const course = courses[courseIndex];
+    const secondaryTeacherObj: TeacherInfo = {
+      id: partnerUser?.id || (isMiftah ? 'dos_miftah' : 'dos_altaf'),
+      name: partnerName,
+      title: partnerUser?.title || (isMiftah ? 'Dosen Pengampu Utama' : 'Tenaga Teknis Survei & Pemetaan / Dosen Pengampu Partner'),
+      email: email,
+      avatarUrl: partnerAvatar,
+      department: partnerUser?.department || (isMiftah ? 'Pendidikan Geografi' : 'Sains Informasi Geografi'),
+    };
+
+    const updatedCourse: CourseClass = {
+      ...course,
+      secondaryTeacher: secondaryTeacherObj,
+      partnerLecturer: partnerName,
+      pendingLecturerEmail: undefined,
+      pendingLecturerName: undefined,
+      teamTeachers: [course.teacher, secondaryTeacherObj],
+    };
+
+    courses[courseIndex] = updatedCourse;
+    setStorage(STORAGE_KEYS.COURSES, courses);
+
+    supabaseDataService.saveCourse(updatedCourse).catch(() => {});
+    myJourneySyncService.triggerDebouncedAutoSync();
+
+    // Perbarui notifikasi terkait
+    const notifications = getStorage<StudentNotification[]>(STORAGE_KEYS.NOTIFICATIONS, initialNotifications);
+    const updatedNotifs = notifications.map((n) => {
+      if (n.type === 'invitation' && n.invitationData?.courseId === courseId) {
+        return {
+          ...n,
+          isRead: true,
+          invitationData: {
+            ...n.invitationData,
+            status: 'accepted' as const,
+          },
+        };
+      }
+      return n;
+    });
+    setStorage(STORAGE_KEYS.NOTIFICATIONS, updatedNotifs);
+
+    this.addActivity({
+      title: 'Undangan Kolaborasi Diterima',
+      description: `${this.formatLecturerGreeting(partnerName)} telah resmi bergabung mengampu kelas ${course.code} - ${course.title} bersama ${this.formatLecturerGreeting(course.teacher.name)}.`,
+      type: 'course',
+      courseTitle: course.title,
+    });
+
+    return {
+      success: true,
+      message: `Selamat! Anda telah resmi bergabung sebagai tim dosen kelas ${course.code} - ${course.title}.`,
+    };
+  },
+
+  // Tolak undangan mengajar langsung dari courseId
+  declineCourseInvitation(courseId: string, lecturerEmail?: string): { success: boolean; message: string } {
+    const courses = this.getAllCourses();
+    const courseIndex = courses.findIndex((c) => c.id === courseId);
+    if (courseIndex !== -1) {
+      const course = courses[courseIndex];
+      const updatedCourse: CourseClass = {
+        ...course,
+        pendingLecturerEmail: undefined,
+        pendingLecturerName: undefined,
+      };
+      courses[courseIndex] = updatedCourse;
+      setStorage(STORAGE_KEYS.COURSES, courses);
+      supabaseDataService.saveCourse(updatedCourse).catch(() => {});
+      myJourneySyncService.triggerDebouncedAutoSync();
+    }
+
+    const notifications = getStorage<StudentNotification[]>(STORAGE_KEYS.NOTIFICATIONS, initialNotifications);
+    const updatedNotifs = notifications.map((n) => {
+      if (n.type === 'invitation' && n.invitationData?.courseId === courseId) {
+        return {
+          ...n,
+          isRead: true,
+          invitationData: {
+            ...n.invitationData,
+            status: 'declined' as const,
+          },
+        };
+      }
+      return n;
+    });
+    setStorage(STORAGE_KEYS.NOTIFICATIONS, updatedNotifs);
+
+    return {
+      success: true,
+      message: 'Undangan kolaborasi telah ditolak.',
     };
   },
 
@@ -2273,15 +2410,27 @@ export const studentService = {
     };
   },
 
-  // Lecturer Action: Delete Course
+  // Lecturer Action: Delete Course (Sinkronisasi 2 Arah: Lokal, Supabase & Google Sheets)
   deleteCourse(courseId: string): void {
+    // Catat ID yang dihapus agar tidak pernah ter-restore saat sync cloud berikutnya
+    const deletedIds = getStorage<string[]>('slh_deleted_course_ids', []);
+    if (!deletedIds.includes(courseId)) {
+      setStorage('slh_deleted_course_ids', [...deletedIds, courseId]);
+    }
+
     const courses = this.getAllCourses().filter((c) => c.id !== courseId);
     setStorage(STORAGE_KEYS.COURSES, courses);
     const meetings = this.getMeetings().filter((m) => m.courseId !== courseId);
     setStorage(STORAGE_KEYS.MEETINGS, meetings);
 
-    // Kirim sinkronisasi ke Supabase Cloud (My Journey Unified DB)
+    // Kirim delete ke Supabase Cloud (My Journey Unified DB)
     supabaseDataService.deleteCourse(courseId).catch(() => {});
+
+    // Kirim delete ke Google Sheets
+    myJourneySyncService.deleteCourseFromGoogleSheets(courseId).catch(() => {});
+
+    // Perbarui daftar teaching di Google Sheets
+    myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
   },
 
   // Lecturer Action: Register Student with Details and enroll to course

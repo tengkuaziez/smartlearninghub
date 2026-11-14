@@ -272,7 +272,17 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
     {
       ...DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'],
       ...miftahSaved,
+      avatarUrl: (miftahSaved.avatarUrl && !miftahSaved.avatarUrl.includes('academic_avatar') && !miftahSaved.avatarUrl.includes('ui-avatars') && !miftahSaved.avatarUrl.includes('photo-')) ? miftahSaved.avatarUrl : '/miftah_avatar.png',
+      title: miftahSaved.title || 'Dosen Pengampu Utama',
+      department: miftahSaved.department || 'Pendidikan Geografi',
+      googleScholarUrl: miftahSaved.googleScholarUrl || 'https://scholar.google.com/',
+      sintaUrl: miftahSaved.sintaUrl || 'https://sinta.kemdikbud.go.id/',
+      scopusUrl: miftahSaved.scopusUrl || 'https://www.scopus.com/',
+      researchGateUrl: miftahSaved.researchGateUrl || 'https://www.researchgate.net/',
       campusEmail: miftahSaved.campusEmail || 'mmridlogeo@unimed.ac.id',
+      linkedinUrl: miftahSaved.linkedinUrl || 'https://linkedin.com/',
+      instagramUrl: miftahSaved.instagramUrl || 'https://instagram.com/',
+      facebookUrl: miftahSaved.facebookUrl || 'https://facebook.com/',
     },
   ];
 
@@ -444,7 +454,7 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
                 {/* Profile Avatar & Details */}
                 <div className="flex items-start gap-4 mb-4">
                   <img
-                    src={displayUser.avatarUrl || (displayUser.email.toLowerCase().includes('altaf') ? '/tengku_avatar.png' : getInitialsAvatar(displayUser.name, true))}
+                    src={displayUser.avatarUrl || (displayUser.email.toLowerCase().includes('altaf') ? '/tengku_avatar.png' : '/miftah_avatar.png')}
                     alt={displayUser.name}
                     className="w-16 h-16 rounded-2xl object-cover ring-2 ring-slate-200 dark:ring-slate-700 shrink-0 bg-indigo-50 dark:bg-slate-800"
                     onError={(e) => {

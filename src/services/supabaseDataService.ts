@@ -24,6 +24,29 @@ import type {
 export const LECTURER_USER_ID = 'd342423d-fce0-4b54-896f-4c4b27e70dc0';
 
 export const supabaseDataService = {
+  /**
+   * Mendapatkan ID user Supabase yang sedang login secara dinamis
+   */
+  async getActiveAuthUserId(): Promise<string | null> {
+    if (!isSupabaseConfigured() || !supabase) return null;
+    try {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user?.id) return data.user.id;
+    } catch {}
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem('slh_current_user');
+        if (raw) {
+          const u = JSON.parse(raw);
+          if (u?.id && u.id.length > 20 && !u.id.startsWith('dos_')) {
+            return u.id;
+          }
+        }
+      }
+    } catch {}
+    return null;
+  },
+
   // =========================================================================
   // 1. MATA KULIAH (COURSES) - Berbagi 2 Arah dengan My Journey
   // =========================================================================
@@ -82,28 +105,29 @@ export const supabaseDataService = {
   async saveCourse(course: CourseClass): Promise<boolean> {
     if (!isSupabaseConfigured() || !supabase || !course.id) return false;
     try {
+      const activeUserId = (await this.getActiveAuthUserId()) || LECTURER_USER_ID;
       const payload = {
         id: course.id,
-        user_id: LECTURER_USER_ID,
+        user_id: activeUserId,
         data: {
           id: course.id,
           code: course.code,
           name: course.title,
-          room: course.room,
-          status: course.status === 'active' ? 'Aktif' : 'Direncanakan',
-          credits: course.credits,
-          section: course.section,
-          schedule: course.schedule,
-          semester: course.semester,
-          academicYear: course.academicYear,
-          description: course.description,
-          syllabusOverview: course.syllabusOverview,
+          room: course.room || 'Lab Komputasi Spasial Lt. 3',
+          status: 'Aktif',
+          credits: course.credits || 3,
+          section: course.section || 'Kelas C',
+          schedule: `${course.scheduleDay || 'Senin'}, ${course.scheduleTime || '08:00 - 10:30 WIB'}`,
+          semester: course.semester || 'Semester 3',
+          academicYear: course.academicYear || '2026/2027 Ganjil',
+          description: course.description || '',
+          syllabusOverview: course.syllabusOverview || `${course.totalMeetings || 16} pertemuan kurikulum OBE`,
           enrolledCount: (course.enrolledStudentEmails || []).length,
           enrolledStudentEmails: course.enrolledStudentEmails || [],
-          primaryLecturer: course.primaryLecturer,
-          partnerLecturer: course.partnerLecturer,
-          color: course.color,
-          category: course.category,
+          primaryLecturer: course.teacher?.name || course.primaryLecturer || 'Tengku Abdillah Azis, S.Pd',
+          partnerLecturer: course.secondaryTeacher?.name || course.partnerLecturer || '',
+          color: course.color || 'blue',
+          category: course.category || 'Geografi & Komputasi',
         },
         updated_at: new Date().toISOString(),
       };
@@ -173,10 +197,11 @@ export const supabaseDataService = {
   async saveStudent(student: MasterStudent): Promise<boolean> {
     if (!isSupabaseConfigured() || !supabase || !student.id) return false;
     try {
+      const activeUserId = (await this.getActiveAuthUserId()) || LECTURER_USER_ID;
       const cleanEmail = student.email.trim().toLowerCase();
       const payload = {
         id: student.id,
-        user_id: LECTURER_USER_ID,
+        user_id: activeUserId,
         data: {
           id: student.id,
           nim: student.nim,
@@ -212,9 +237,10 @@ export const supabaseDataService = {
   async saveStudentsBulk(students: MasterStudent[]): Promise<boolean> {
     if (!isSupabaseConfigured() || !supabase || students.length === 0) return false;
     try {
+      const activeUserId = (await this.getActiveAuthUserId()) || LECTURER_USER_ID;
       const rows = students.map((student) => ({
         id: student.id,
-        user_id: LECTURER_USER_ID,
+        user_id: activeUserId,
         data: {
           id: student.id,
           nim: student.nim,

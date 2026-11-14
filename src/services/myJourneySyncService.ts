@@ -171,7 +171,7 @@ export const myJourneySyncService = {
       credits: c.code === 'IF-405' ? 2 : 3,
       syllabusOverview: c.rps?.shortDescription || `${c.totalMeetings} pertemuan kurikulum OBE`,
       primaryLecturer: c.teacher.name,
-      partnerLecturer: c.secondaryTeacher?.name || c.partnerLecturer || c.pendingLecturerName || (c.teacher.email.includes('altaf') ? 'Muhammad Miftahurrodlo, S.Pd., M.Sc' : 'Tengku Abdillah Azis, S.Pd'),
+      partnerLecturer: c.secondaryTeacher?.name || c.partnerLecturer || '',
     }));
 
     // 2. Format Students
@@ -262,23 +262,49 @@ export const myJourneySyncService = {
 
     // 6. Profiles from registered lecturers
     const registeredLecturers = studentService.getRegisteredLecturers();
-    const profilesPayload = registeredLecturers.map((lec) => ({
-      email: lec.email,
-      name: lec.name,
-      title: lec.title || 'Dosen Pengampu',
-      role: 'Dosen & Peneliti',
-      department: lec.department || 'Teknologi Informasi',
-      avatarUrl: lec.avatarUrl,
-    }));
+    const profilesPayload = registeredLecturers.map((lec) => {
+      const isMiftah = lec.email.toLowerCase().includes('miftah');
+      const isAltaf = lec.email.toLowerCase().includes('altaf');
+      const targetAvatar = isMiftah ? '/miftah_avatar.png' : isAltaf ? '/tengku_avatar.png' : (lec.avatarUrl || '');
+
+      return {
+        email: lec.email,
+        name: lec.name,
+        title: lec.title || (isMiftah ? 'Dosen Pengampu Utama' : 'Tenaga Teknis Survei & Pemetaan / Dosen Pengampu Partner'),
+        role: 'Dosen & Peneliti',
+        department: lec.department || (isMiftah ? 'Pendidikan Geografi' : 'Sains Informasi Geografi'),
+        avatarUrl: targetAvatar,
+        nidn: lec.nidn || (isMiftah ? '0412088501' : '0419058902'),
+        googleScholarUrl: lec.googleScholarUrl || 'https://scholar.google.com/',
+        sintaUrl: lec.sintaUrl || 'https://sinta.kemdikbud.go.id/',
+        scopusUrl: lec.scopusUrl || 'https://www.scopus.com/',
+        orcidUrl: lec.orcidUrl || '',
+        researchGateUrl: lec.researchGateUrl || 'https://www.researchgate.net/',
+        campusEmail: lec.campusEmail || (isMiftah ? 'mmridlogeo@unimed.ac.id' : 'altaf.aziz16@gmail.com'),
+        linkedinUrl: lec.linkedinUrl || 'https://linkedin.com/',
+        instagramUrl: lec.instagramUrl || 'https://instagram.com/',
+        facebookUrl: lec.facebookUrl || 'https://facebook.com/',
+      };
+    });
 
     if (profilesPayload.length === 0) {
       profilesPayload.push({
         email: uploaderEmail,
-        name: 'Muhammad Miftahurridlo',
+        name: 'Muhammad Miftahurridlo, S.Pd., M.Sc',
         title: 'Dosen Pengampu Utama',
         role: 'Dosen & Peneliti',
-        department: 'Pendidikan Geografi / Sains Informasi Geografis',
-        avatarUrl: studentService.getCurrentUser()?.avatarUrl || '',
+        department: 'Pendidikan Geografi',
+        avatarUrl: '/miftah_avatar.png',
+        nidn: '0412088501',
+        googleScholarUrl: 'https://scholar.google.com/',
+        sintaUrl: 'https://sinta.kemdikbud.go.id/',
+        scopusUrl: 'https://www.scopus.com/',
+        orcidUrl: '',
+        researchGateUrl: 'https://www.researchgate.net/',
+        campusEmail: 'mmridlogeo@unimed.ac.id',
+        linkedinUrl: 'https://linkedin.com/',
+        instagramUrl: 'https://instagram.com/',
+        facebookUrl: 'https://facebook.com/',
       });
     }
 
@@ -370,6 +396,34 @@ export const myJourneySyncService = {
   /**
    * Tarik pembaruan Teaching dari Google Sheets & Supabase (sinkronisasi menyeluruh)
    */
+  /**
+   * Hapus mata kuliah dari Google Sheets (Courses)
+   */
+  async deleteCourseFromGoogleSheets(courseId: string): Promise<boolean> {
+    const url = googleDriveService.getGasApiUrl();
+    if (!url || !courseId) return false;
+
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify({
+          action: 'deleteItem',
+          table: 'Courses',
+          id: courseId,
+        }),
+      });
+      if (!res.ok) return false;
+      const json = await res.json();
+      return json.status === 'success';
+    } catch (e) {
+      console.warn('[MyJourneySync] Gagal menghapus course dari Google Sheets:', e);
+      return false;
+    }
+  },
+
   async pullTeachingFromGoogleSheets(): Promise<SyncResult> {
     try {
       const result = await studentService.syncAllFromMyJourneyCloud();
@@ -411,3 +465,8 @@ export const myJourneySyncService = {
     }, 2500); // Tunggu 2.5 detik debounce agar tidak flooding request
   },
 };
+
+// Hubungkan syncDelegate ke studentService untuk menghindari circular dependency
+try {
+  (studentService as any)._syncDelegate = myJourneySyncService;
+} catch {}
