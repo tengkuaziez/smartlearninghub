@@ -307,7 +307,7 @@ export default function App() {
 
   // Active course / meeting references
   const currentCourse = selectedCourseId
-    ? allLecturerCourses.find((c) => c.id === selectedCourseId)
+    ? (allLecturerCourses.find((c) => c.id === selectedCourseId) || courses.find((c) => c.id === selectedCourseId))
     : undefined;
 
   const currentMeeting = selectedMeetingId

@@ -132,6 +132,8 @@ export interface CourseClass {
   pendingLecturerEmail?: string; // Email rekan dosen yang diundang namun belum konfirmasi
   pendingLecturerName?: string;
   teamTeachers?: TeacherInfo[];
+  section?: string; // Seksi/Kelas (e.g. Kelas A, Kelas B, Kelas C)
+  credits?: number; // Bobot SKS (e.g. 2, 3, 4)
   semester: string;
   academicYear: string;
   room: string;

@@ -23,7 +23,8 @@ import {
   Sliders,
   Search,
   X,
-  Sparkles
+  Sparkles,
+  Edit3
 } from 'lucide-react';
 import { studentService } from '../../services/studentService.ts';
 import { RpsView } from '../classes/RpsView.tsx';
@@ -89,6 +90,48 @@ export const LecturerClassDetailView: React.FC<LecturerClassDetailViewProps> = (
   const [annTitle, setAnnTitle] = useState('');
   const [annContent, setAnnContent] = useState('');
   const [annSuccess, setAnnSuccess] = useState(false);
+
+  // Edit Course Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editCode, setEditCode] = useState(course.code);
+  const [editTitle, setEditTitle] = useState(course.title);
+  const [editSection, setEditSection] = useState(course.section || 'Kelas A');
+  const [editCredits, setEditCredits] = useState<number>(course.credits || 3);
+  const [editSemester, setEditSemester] = useState(course.semester || 'Semester 5');
+  const [editDay, setEditDay] = useState(course.scheduleDay || 'Senin');
+  const [editTime, setEditTime] = useState(course.scheduleTime || '08:00 - 10:30 WIB');
+  const [editRoom, setEditRoom] = useState(course.room || 'Lab Komputasi Spasial Lt. 3');
+  const [editDesc, setEditDesc] = useState(course.description || '');
+
+  const handleOpenEditModal = () => {
+    setEditCode(course.code);
+    setEditTitle(course.title);
+    setEditSection(course.section || 'Kelas A');
+    setEditCredits(course.credits || 3);
+    setEditSemester(course.semester || 'Semester 5');
+    setEditDay(course.scheduleDay || 'Senin');
+    setEditTime(course.scheduleTime || '08:00 - 10:30 WIB');
+    setEditRoom(course.room || 'Lab Komputasi Spasial Lt. 3');
+    setEditDesc(course.description || '');
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEditCourse = (e: React.FormEvent) => {
+    e.preventDefault();
+    studentService.updateCourse(course.id, {
+      code: editCode,
+      title: editTitle,
+      section: editSection,
+      credits: Number(editCredits) || 3,
+      semester: editSemester,
+      scheduleDay: editDay,
+      scheduleTime: editTime,
+      room: editRoom,
+      description: editDesc,
+    });
+    setIsEditModalOpen(false);
+    onDataUpdated();
+  };
 
   // Filters for this class
   const classMeetings = [...meetings.filter((m) => m.courseId === course.id)].sort(
@@ -250,7 +293,7 @@ export const LecturerClassDetailView: React.FC<LecturerClassDetailViewProps> = (
               {course.code}
             </span>
             <span className="text-xs font-semibold px-2 py-0.5 rounded bg-white/10 text-white">
-              {course.semester} • {course.academicYear}
+              {course.section || 'Kelas A'} • {course.credits || 3} SKS • {course.semester}
             </span>
             <span className="text-xs text-slate-300">
               {course.scheduleDay}, {course.scheduleTime} ({course.room})
@@ -265,8 +308,8 @@ export const LecturerClassDetailView: React.FC<LecturerClassDetailViewProps> = (
           </p>
 
           <div className="pt-2 flex flex-wrap items-center gap-3 text-xs text-slate-300">
-            <span>Dosen Utama: <strong>{course.teacher.name}</strong></span>
-            {course.secondaryTeacher ? (
+            <span>Dosen Utama: <strong>{course.teacher?.name || course.primaryLecturer || 'Dosen Pengampu'}</strong></span>
+            {course.secondaryTeacher?.name ? (
               <span>• Dosen Partner: <strong>{course.secondaryTeacher.name}</strong></span>
             ) : course.pendingLecturerEmail ? (
               <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-200 border border-amber-400/30">
@@ -276,12 +319,22 @@ export const LecturerClassDetailView: React.FC<LecturerClassDetailViewProps> = (
           </div>
         </div>
 
-        {/* Active Session Status or Guidance */}
+        {/* Active Session Status or Guidance & Edit Button */}
         <div className="shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <button
+            type="button"
+            onClick={handleOpenEditModal}
+            className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold border border-white/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs"
+            title="Edit Detail & Jadwal Kelas"
+          >
+            <Edit3 className="w-3.5 h-3.5 text-blue-300" />
+            <span>Edit Kelas</span>
+          </button>
+
           {activeMeetingSession ? (
             <button
               onClick={() => onOpenQrBroadcast(activeMeetingSession)}
-              className="px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md flex items-center justify-center gap-2 transition-all animate-pulse"
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md flex items-center justify-center gap-2 transition-all animate-pulse"
             >
               <QrCode className="w-4 h-4" />
               <span>Buka Proyektor Sesi #{activeMeetingSession.meetingNumber} (LIVE)</span>
@@ -1321,6 +1374,181 @@ export const LecturerClassDetailView: React.FC<LecturerClassDetailViewProps> = (
                 </p>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL: EDIT DETAIL KELAS */}
+      {/* ========================================================= */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Edit3 className="w-5 h-5 text-blue-600" />
+                  <span>Edit Rincian Kelas Kuliah</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Perubahan akan otomatis tersinkronisasi ke Google Sheets dan My Journey.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="p-1 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditCourse} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Kode Mata Kuliah
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: SIG atau GEO-301"
+                    value={editCode}
+                    onChange={(e) => setEditCode(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Nama Mata Kuliah
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: Sains Informasi Geografi"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Kelas / Seksi
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: Kelas A"
+                    value={editSection}
+                    onChange={(e) => setEditSection(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Bobot SKS
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={6}
+                    required
+                    value={editCredits}
+                    onChange={(e) => setEditCredits(Number(e.target.value) || 3)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Semester
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Semester 5"
+                    value={editSemester}
+                    onChange={(e) => setEditSemester(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Hari Kuliah
+                  </label>
+                  <select
+                    value={editDay}
+                    onChange={(e) => setEditDay(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  >
+                    <option value="Senin">Senin</option>
+                    <option value="Selasa">Selasa</option>
+                    <option value="Rabu">Rabu</option>
+                    <option value="Kamis">Kamis</option>
+                    <option value="Jumat">Jumat</option>
+                    <option value="Sabtu">Sabtu</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Jam Sesi Perkuliahan
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: 08:00 - 10:30 WIB"
+                    value={editTime}
+                    onChange={(e) => setEditTime(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                  Ruang Kelas / Lab
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Lab Komputasi Spasial Lt. 3"
+                  value={editRoom}
+                  onChange={(e) => setEditRoom(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                  Deskripsi / Pengantar Singkat
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Deskripsi silabus dan capaian perkuliahan..."
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer"
+                >
+                  Simpan Perubahan
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

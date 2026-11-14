@@ -116,7 +116,7 @@ export const supabaseDataService = {
           room: course.room || 'Lab Komputasi Spasial Lt. 3',
           status: 'Aktif',
           credits: course.credits || 3,
-          section: course.section || 'Kelas C',
+          section: course.section || 'Kelas A',
           schedule: `${course.scheduleDay || 'Senin'}, ${course.scheduleTime || '08:00 - 10:30 WIB'}`,
           semester: course.semester || 'Semester 3',
           academicYear: course.academicYear || '2026/2027 Ganjil',

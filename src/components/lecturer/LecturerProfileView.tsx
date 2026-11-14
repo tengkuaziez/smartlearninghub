@@ -22,7 +22,7 @@ import {
   X,
   FileCode2,
 } from 'lucide-react';
-import { studentService, getInitialsAvatar, DEFAULT_LECTURERS } from '../../services/studentService.ts';
+import { studentService, getInitialsAvatar, DEFAULT_LECTURERS, isValidProfileUrl } from '../../services/studentService.ts';
 import { LECTURER_WHITELIST_EMAILS } from '../../data/mockData.ts';
 import { myJourneySyncService } from '../../services/myJourneySyncService.ts';
 import type { AuthUser, CourseClass } from '../../types/index.ts';
@@ -188,47 +188,50 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
 
   const renderAcademicSocialLinks = (user: AuthUser) => {
     const links: { key: string; title: string; href: string; icon: string }[] = [];
+    const isAltaf = user.email.toLowerCase().includes('altaf');
 
-    if (user.googleScholarUrl) {
-      const href = user.googleScholarUrl.startsWith('http') ? user.googleScholarUrl : `https://${user.googleScholarUrl}`;
+    if (isValidProfileUrl(user.googleScholarUrl)) {
+      const href = user.googleScholarUrl!.startsWith('http') ? user.googleScholarUrl! : `https://${user.googleScholarUrl}`;
       links.push({ key: 'scholar', title: 'Google Scholar', href, icon: '/icons/scholar.png' });
     }
-    if (user.sintaUrl) {
-      const href = user.sintaUrl.startsWith('http') ? user.sintaUrl : `https://${user.sintaUrl}`;
+    // Pak Tengku tidak memiliki akun SINTA atau Scopus
+    if (!isAltaf && isValidProfileUrl(user.sintaUrl)) {
+      const href = user.sintaUrl!.startsWith('http') ? user.sintaUrl! : `https://${user.sintaUrl}`;
       links.push({ key: 'sinta', title: 'SINTA Kemdikbud', href, icon: '/icons/sinta.png' });
     }
-    if (user.scopusUrl) {
-      const href = user.scopusUrl.startsWith('http') ? user.scopusUrl : `https://${user.scopusUrl}`;
+    if (!isAltaf && isValidProfileUrl(user.scopusUrl)) {
+      const href = user.scopusUrl!.startsWith('http') ? user.scopusUrl! : `https://${user.scopusUrl}`;
       links.push({ key: 'scopus', title: 'Scopus Author ID', href, icon: '/icons/scopus.png' });
     }
-    if (user.orcidUrl) {
-      const href = user.orcidUrl.startsWith('http') ? user.orcidUrl : `https://${user.orcidUrl}`;
+    if (isValidProfileUrl(user.orcidUrl)) {
+      const href = user.orcidUrl!.startsWith('http') ? user.orcidUrl! : `https://${user.orcidUrl}`;
       links.push({ key: 'orcid', title: 'ORCID', href, icon: '/icons/orcid.png' });
     }
-    if (user.researchGateUrl) {
-      const href = user.researchGateUrl.startsWith('http') ? user.researchGateUrl : `https://${user.researchGateUrl}`;
+    if (isValidProfileUrl(user.researchGateUrl)) {
+      const href = user.researchGateUrl!.startsWith('http') ? user.researchGateUrl! : `https://${user.researchGateUrl}`;
       links.push({ key: 'rg', title: 'ResearchGate', href, icon: '/icons/researchgate.png' });
     }
     const emailContact = user.campusEmail || user.email;
-    if (emailContact) {
+    if (emailContact && emailContact.includes('@')) {
       links.push({ key: 'email', title: `Email: ${emailContact}`, href: `mailto:${emailContact}`, icon: '/icons/email.svg' });
     }
-    if (user.linkedinUrl) {
-      const href = user.linkedinUrl.startsWith('http') ? user.linkedinUrl : `https://${user.linkedinUrl}`;
+    if (isValidProfileUrl(user.linkedinUrl)) {
+      const href = user.linkedinUrl!.startsWith('http') ? user.linkedinUrl! : `https://${user.linkedinUrl}`;
       links.push({ key: 'linkedin', title: 'LinkedIn', href, icon: '/icons/linkedin.png' });
     }
-    if (user.instagramUrl) {
-      const href = user.instagramUrl.startsWith('http')
-        ? user.instagramUrl
-        : (user.instagramUrl.startsWith('@') ? `https://instagram.com/${user.instagramUrl.slice(1)}` : `https://instagram.com/${user.instagramUrl}`);
+    if (isValidProfileUrl(user.instagramUrl)) {
+      const raw = user.instagramUrl!;
+      const href = raw.startsWith('http')
+        ? raw
+        : (raw.startsWith('@') ? `https://instagram.com/${raw.slice(1)}` : `https://instagram.com/${raw}`);
       links.push({ key: 'instagram', title: 'Instagram', href, icon: '/icons/instagram.png' });
     }
-    if (user.facebookUrl) {
-      const href = user.facebookUrl.startsWith('http') ? user.facebookUrl : `https://${user.facebookUrl}`;
+    if (isValidProfileUrl(user.facebookUrl)) {
+      const href = user.facebookUrl!.startsWith('http') ? user.facebookUrl! : `https://${user.facebookUrl}`;
       links.push({ key: 'facebook', title: 'Facebook', href, icon: '/icons/facebook.png' });
     }
-    if (user.websiteUrl) {
-      const href = user.websiteUrl.startsWith('http') ? user.websiteUrl : `https://${user.websiteUrl}`;
+    if (isValidProfileUrl(user.websiteUrl)) {
+      const href = user.websiteUrl!.startsWith('http') ? user.websiteUrl! : `https://${user.websiteUrl}`;
       links.push({ key: 'web', title: 'Website', href, icon: '/icons/web.svg' });
     }
 

@@ -74,6 +74,8 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
   // New Course Form State
   const [newCourseCode, setNewCourseCode] = useState('');
   const [newCourseTitle, setNewCourseTitle] = useState('');
+  const [newCourseSection, setNewCourseSection] = useState('Kelas A');
+  const [newCourseCredits, setNewCourseCredits] = useState<number>(3);
   const [newCourseRoom, setNewCourseRoom] = useState('Lab Komputasi Spasial Lt. 3');
   const [newCourseDay, setNewCourseDay] = useState('Senin');
   const [newCourseTime, setNewCourseTime] = useState('08:00 - 10:30 WIB');
@@ -82,6 +84,19 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
   const [newCourseCoLecturerEmail, setNewCourseCoLecturerEmail] = useState('');
   const [quickInviteCourseId, setQuickInviteCourseId] = useState<string | null>(null);
   const [quickInviteEmail, setQuickInviteEmail] = useState('');
+
+  // Edit Course Modal State
+  const [isEditCourseModalOpen, setIsEditCourseModalOpen] = useState(false);
+  const [editingCourse, setEditingCourse] = useState<CourseClass | null>(null);
+  const [editCourseCode, setEditCourseCode] = useState('');
+  const [editCourseTitle, setEditCourseTitle] = useState('');
+  const [editCourseSection, setEditCourseSection] = useState('Kelas A');
+  const [editCourseCredits, setEditCourseCredits] = useState<number>(3);
+  const [editCourseSemester, setEditCourseSemester] = useState('Semester 5');
+  const [editCourseDay, setEditCourseDay] = useState('Senin');
+  const [editCourseTime, setEditCourseTime] = useState('08:00 - 10:30 WIB');
+  const [editCourseRoom, setEditCourseRoom] = useState('Lab Komputasi Spasial Lt. 3');
+  const [editCourseDesc, setEditCourseDesc] = useState('');
   const currentUser = studentService.getCurrentUser();
   // Colleague Lecturers for "Add Friend" style co-teaching selection
   const registeredLecturers = studentService.getRegisteredLecturers();
@@ -157,6 +172,8 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
     studentService.createCourse({
       code: newCourseCode,
       title: newCourseTitle,
+      section: newCourseSection,
+      credits: Number(newCourseCredits) || 3,
       description: newCourseDesc,
       room: newCourseRoom,
       scheduleDay: newCourseDay,
@@ -170,9 +187,45 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
     setNewCourseCode('');
     setNewCourseTitle('');
     setNewCourseDesc('');
+    setNewCourseSection('Kelas A');
+    setNewCourseCredits(3);
     setNewCourseCoLecturerEmail('');
     // Auto-sync pembaruan ke Google Sheets & My Journey
     myJourneySyncService.triggerDebouncedAutoSync();
+  };
+
+  // Handle Edit Course Modal
+  const handleOpenEditCourse = (course: CourseClass) => {
+    setEditingCourse(course);
+    setEditCourseCode(course.code);
+    setEditCourseTitle(course.title);
+    setEditCourseSection(course.section || 'Kelas A');
+    setEditCourseCredits(course.credits || 3);
+    setEditCourseSemester(course.semester || 'Semester 5');
+    setEditCourseDay(course.scheduleDay || 'Senin');
+    setEditCourseTime(course.scheduleTime || '08:00 - 10:30 WIB');
+    setEditCourseRoom(course.room || 'Lab Komputasi Spasial Lt. 3');
+    setEditCourseDesc(course.description || '');
+    setIsEditCourseModalOpen(true);
+  };
+
+  const handleSaveEditCourse = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCourse) return;
+    studentService.updateCourse(editingCourse.id, {
+      code: editCourseCode,
+      title: editCourseTitle,
+      section: editCourseSection,
+      credits: Number(editCourseCredits) || 3,
+      semester: editCourseSemester,
+      scheduleDay: editCourseDay,
+      scheduleTime: editCourseTime,
+      room: editCourseRoom,
+      description: editCourseDesc,
+    });
+    setIsEditCourseModalOpen(false);
+    setEditingCourse(null);
+    onDataUpdated();
   };
 
   const handleQuickInviteSubmit = (courseId: string, email: string) => {
@@ -412,7 +465,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                         </span>
                       </div>
                       <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white mt-1">
-                        {studentService.formatLecturerGreeting(inv.teacher.name)} mengundang Anda bergabung mengampu mata kuliah:
+                        {studentService.formatLecturerGreeting(inv.teacher?.name || inv.primaryLecturer || 'Rekan Dosen')} mengundang Anda bergabung mengampu mata kuliah:
                       </h4>
                       <div className="text-xs font-semibold text-indigo-700 dark:text-indigo-400 mt-0.5">
                         {inv.code} — {inv.title} ({inv.semester})
@@ -487,7 +540,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                       </span>
 
                       <span className="text-xs font-medium text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 px-2.5 py-0.5 rounded-full">
-                        {course.semester || 'Kelas A'}
+                        {course.section || 'Kelas A'} • {course.credits || 3} SKS
                       </span>
                     </div>
 
@@ -511,11 +564,11 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
-                          👨‍🏫 {studentService.formatLecturerGreeting(course.teacher.name)}
-                          {course.secondaryTeacher && ` & ${studentService.formatLecturerGreeting(course.secondaryTeacher.name)}`}
+                          👨‍🏫 {studentService.formatLecturerGreeting(course.teacher?.name || course.primaryLecturer || 'Dosen Pengampu')}
+                          {course.secondaryTeacher?.name && ` & ${studentService.formatLecturerGreeting(course.secondaryTeacher.name)}`}
                         </span>
 
-                        {!course.secondaryTeacher && !course.pendingLecturerEmail && course.teacher.email.toLowerCase() === currentUser?.email.toLowerCase() && (
+                        {!course.secondaryTeacher && !course.pendingLecturerEmail && (course.teacher?.email || '').toLowerCase() === (currentUser?.email || '').toLowerCase() && (
                           <button
                             type="button"
                             onClick={(e) => {
@@ -607,10 +660,10 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            onOpenCourse(course.id);
+                            handleOpenEditCourse(course);
                           }}
-                          className="p-1 rounded text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                          title="Edit Kelas"
+                          className="p-1 rounded text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
+                          title="Edit Detail Kelas"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
@@ -1019,7 +1072,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                   <input
                     type="text"
                     required
-                    placeholder="Contoh: IF3104"
+                    placeholder="Contoh: SIG atau GEO-301"
                     value={newCourseCode}
                     onChange={(e) => setNewCourseCode(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -1027,30 +1080,59 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                 </div>
                 <div>
                   <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                    Semester & SKS
+                    Nama Mata Kuliah
                   </label>
                   <input
                     type="text"
-                    placeholder="Contoh: Kelas A • 3 SKS"
-                    value={newCourseSemester}
-                    onChange={(e) => setNewCourseSemester(e.target.value)}
+                    required
+                    placeholder="Contoh: Sains Informasi Geografi"
+                    value={newCourseTitle}
+                    onChange={(e) => setNewCourseTitle(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                  Nama Mata Kuliah
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: Cloud Native & Rekayasa Sistem Terdistribusi"
-                  value={newCourseTitle}
-                  onChange={(e) => setNewCourseTitle(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Kelas / Seksi
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: Kelas A"
+                    value={newCourseSection}
+                    onChange={(e) => setNewCourseSection(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Bobot SKS
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={6}
+                    required
+                    value={newCourseCredits}
+                    onChange={(e) => setNewCourseCredits(Number(e.target.value) || 3)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Semester
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Semester 5"
+                    value={newCourseSemester}
+                    onChange={(e) => setNewCourseSemester(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1227,6 +1309,187 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                   className="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
                 >
                   Simpan & Buat 16 Pertemuan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL: EDIT DETAIL KELAS */}
+      {/* ========================================================= */}
+      {isEditCourseModalOpen && editingCourse && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Edit3 className="w-5 h-5 text-blue-600" />
+                  <span>Edit Rincian Kelas Kuliah</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Perubahan akan otomatis tersinkronisasi ke Google Sheets dan My Journey.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setIsEditCourseModalOpen(false);
+                  setEditingCourse(null);
+                }}
+                className="p-1 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditCourse} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Kode Mata Kuliah
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: SIG atau GEO-301"
+                    value={editCourseCode}
+                    onChange={(e) => setEditCourseCode(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Nama Mata Kuliah
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: Sains Informasi Geografi"
+                    value={editCourseTitle}
+                    onChange={(e) => setEditCourseTitle(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Kelas / Seksi
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: Kelas A"
+                    value={editCourseSection}
+                    onChange={(e) => setEditCourseSection(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Bobot SKS
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={6}
+                    required
+                    value={editCourseCredits}
+                    onChange={(e) => setEditCourseCredits(Number(e.target.value) || 3)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Semester
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Semester 5"
+                    value={editCourseSemester}
+                    onChange={(e) => setEditCourseSemester(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Hari Kuliah
+                  </label>
+                  <select
+                    value={editCourseDay}
+                    onChange={(e) => setEditCourseDay(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  >
+                    <option value="Senin">Senin</option>
+                    <option value="Selasa">Selasa</option>
+                    <option value="Rabu">Rabu</option>
+                    <option value="Kamis">Kamis</option>
+                    <option value="Jumat">Jumat</option>
+                    <option value="Sabtu">Sabtu</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Jam Sesi Perkuliahan
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: 08:00 - 10:30 WIB"
+                    value={editCourseTime}
+                    onChange={(e) => setEditCourseTime(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                  Ruang Kelas / Lab
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Lab Komputasi Spasial Lt. 3"
+                  value={editCourseRoom}
+                  onChange={(e) => setEditCourseRoom(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                  Deskripsi / Pengantar Singkat
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Deskripsi silabus dan capaian perkuliahan..."
+                  value={editCourseDesc}
+                  onChange={(e) => setEditCourseDesc(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditCourseModalOpen(false);
+                    setEditingCourse(null);
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer"
+                >
+                  Simpan Perubahan
                 </button>
               </div>
             </form>
