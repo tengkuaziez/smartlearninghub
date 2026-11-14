@@ -149,40 +149,40 @@ export const isValidProfileUrl = (url?: string): boolean => {
 export const DEFAULT_LECTURERS: Record<string, AuthUser> = {
   'altaf.aziz16@gmail.com': {
     id: 'dos_altaf',
-    name: 'Tengku Abdillah Azis, S.Pd',
+    name: 'Tengku Abdillah Azis, S.Si',
     email: 'altaf.aziz16@gmail.com',
     campusEmail: 'altaf.aziz16@gmail.com',
     role: 'dosen',
     nidn: '0419058902',
     title: 'Tenaga Teknis Survei & Pemetaan / Dosen Pengampu Partner',
-    department: 'Sains Informasi Geografi',
+    department: 'Tenaga Teknis Survei dan Pemetaan BPN Kota Binjai • Geografi / Universitas Negeri Medan',
     avatarUrl: '/tengku_avatar.png',
-    bio: 'Tenaga Teknis Survei & Pemetaan dan Dosen Pengampu Partner Sains Informasi Geografi. Terhubung langsung dengan workspace riset, pemetaan, dan administrasi perkuliahan My Journey.',
-    googleScholarUrl: '',
+    bio: 'Tenaga Teknis Survei dan Pemetaan BPN Kota Binjai dan Dosen Pengampu Partner. Terhubung langsung dengan workspace riset, pemetaan, dan administrasi perkuliahan My Journey.',
+    googleScholarUrl: 'https://scholar.google.com/citations?user=TengkuAbdillahAzis',
     sintaUrl: '',
     scopusUrl: '',
-    researchGateUrl: '',
-    linkedinUrl: '',
-    instagramUrl: '',
-    facebookUrl: '',
+    researchGateUrl: 'https://www.researchgate.net/profile/Tengku-Abdillah-Azis',
+    linkedinUrl: 'https://www.linkedin.com/in/tengku-abdillah-azis',
+    instagramUrl: 'https://www.instagram.com/tengku_azis',
+    facebookUrl: 'https://www.facebook.com/tengku.azis',
     registeredAt: '2026-08-01',
   },
   'miftahurridlo.688@gmail.com': {
     id: 'dos_miftah',
-    name: 'Muhammad Miftahurrodlo, S.Pd., M.Sc',
+    name: 'Muhammad Miftahurrodlo, M.Sc.',
     email: 'miftahurridlo.688@gmail.com',
-    campusEmail: 'mmridlogeo@unimed.ac.id',
+    campusEmail: 'miftahurridlo.688@gmail.com',
     role: 'dosen',
     nidn: '0412088501',
     title: 'Dosen Pengampu Utama',
-    department: 'Pendidikan Geografi',
+    department: 'Universitas Negeri Medan',
     avatarUrl: '/miftah_avatar.png',
     bio: 'Dosen & Peneliti Pendidikan Geografi. Terhubung langsung dengan kurikulum OBE dan manajemen pengajaran My Journey.',
-    googleScholarUrl: '',
-    sintaUrl: '',
+    googleScholarUrl: 'https://scholar.google.com/citations?user=dZ60Jp0AAAAJ',
+    sintaUrl: 'https://sinta.kemdikbud.go.id/authors/profile/6684784',
     scopusUrl: '',
     researchGateUrl: '',
-    linkedinUrl: '',
+    linkedinUrl: 'https://www.linkedin.com/in/muhammad-miftahurridlo',
     instagramUrl: '',
     facebookUrl: '',
     registeredAt: '2026-08-01',
@@ -233,6 +233,10 @@ export const studentService = {
       const isAltaf = user.email.toLowerCase() === 'altaf.aziz16@gmail.com';
       const isMiftah = user.email.toLowerCase() === 'miftahurridlo.688@gmail.com';
       if (isAltaf) {
+        if (user.name && user.name.includes('S.Pd')) {
+          user.name = user.name.replace('S.Pd', 'S.Si');
+          modified = true;
+        }
         if (!user.avatarUrl || user.avatarUrl.includes('academic_avatar') || user.avatarUrl.includes('ui-avatars') || user.avatarUrl.includes('photo-')) {
           user.avatarUrl = '/tengku_avatar.png';
           modified = true;
@@ -241,18 +245,42 @@ export const studentService = {
           user.title = 'Tenaga Teknis Survei & Pemetaan / Dosen Pengampu Partner';
           modified = true;
         }
-        if (!user.googleScholarUrl) {
+        if (!user.department || user.department === 'Sains Informasi Geografi') {
+          user.department = 'Tenaga Teknis Survei dan Pemetaan BPN Kota Binjai • Geografi / Universitas Negeri Medan';
+          modified = true;
+        }
+        // Fill in real academic and social links from default if empty or generic
+        if (!user.googleScholarUrl || !isValidProfileUrl(user.googleScholarUrl)) {
           user.googleScholarUrl = DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].googleScholarUrl;
-          user.sintaUrl = DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].sintaUrl;
-          user.scopusUrl = DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].scopusUrl;
+          modified = true;
+        }
+        if (!user.researchGateUrl || !isValidProfileUrl(user.researchGateUrl)) {
           user.researchGateUrl = DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].researchGateUrl;
-          user.campusEmail = DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].campusEmail;
+          modified = true;
+        }
+        if (!user.linkedinUrl || !isValidProfileUrl(user.linkedinUrl)) {
           user.linkedinUrl = DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].linkedinUrl;
+          modified = true;
+        }
+        if (!user.instagramUrl || !isValidProfileUrl(user.instagramUrl)) {
           user.instagramUrl = DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].instagramUrl;
+          modified = true;
+        }
+        if (!user.facebookUrl || !isValidProfileUrl(user.facebookUrl)) {
           user.facebookUrl = DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].facebookUrl;
           modified = true;
         }
+        if (!user.campusEmail) {
+          user.campusEmail = 'altaf.aziz16@gmail.com';
+          modified = true;
+        }
+        if (user.sintaUrl) { user.sintaUrl = ''; modified = true; }
+        if (user.scopusUrl) { user.scopusUrl = ''; modified = true; }
       } else if (isMiftah) {
+        if (user.name && user.name.includes('S.Pd')) {
+          user.name = user.name.replace('S.Pd., ', '').replace('S.Pd, ', '').replace('S.Pd', '').trim();
+          modified = true;
+        }
         if (!user.title) {
           user.title = 'Dosen Pengampu Utama';
           modified = true;
@@ -262,27 +290,33 @@ export const studentService = {
           modified = true;
         }
         if (!user.department) {
-          user.department = 'Pendidikan Geografi';
+          user.department = 'Universitas Negeri Medan';
           modified = true;
         }
-        if (!user.campusEmail) {
-          user.campusEmail = 'mmridlogeo@unimed.ac.id';
+        if (!user.campusEmail || user.campusEmail === 'mmridlogeo@unimed.ac.id') {
+          user.campusEmail = 'miftahurridlo.688@gmail.com';
           modified = true;
         }
         if (!user.avatarUrl || user.avatarUrl.includes('ui-avatars') || user.avatarUrl.includes('photo-') || user.avatarUrl.includes('academic_avatar')) {
           user.avatarUrl = '/miftah_avatar.png';
           modified = true;
         }
-        if (!user.googleScholarUrl) {
-          user.googleScholarUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].googleScholarUrl || 'https://scholar.google.com/';
-          user.sintaUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].sintaUrl || 'https://sinta.kemdikbud.go.id/';
-          user.scopusUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].scopusUrl || 'https://www.scopus.com/';
-          user.researchGateUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].researchGateUrl || 'https://www.researchgate.net/';
-          user.linkedinUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].linkedinUrl || 'https://linkedin.com/';
-          user.instagramUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].instagramUrl || 'https://instagram.com/';
-          user.facebookUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].facebookUrl || 'https://facebook.com/';
+        if (!user.googleScholarUrl || !isValidProfileUrl(user.googleScholarUrl)) {
+          user.googleScholarUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].googleScholarUrl;
           modified = true;
         }
+        if (!user.sintaUrl || !isValidProfileUrl(user.sintaUrl)) {
+          user.sintaUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].sintaUrl;
+          modified = true;
+        }
+        if (!user.linkedinUrl || !isValidProfileUrl(user.linkedinUrl)) {
+          user.linkedinUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].linkedinUrl;
+          modified = true;
+        }
+        if (user.scopusUrl) { user.scopusUrl = ''; modified = true; }
+        if (user.researchGateUrl) { user.researchGateUrl = ''; modified = true; }
+        if (user.instagramUrl) { user.instagramUrl = ''; modified = true; }
+        if (user.facebookUrl) { user.facebookUrl = ''; modified = true; }
       } else if (user.avatarUrl && (user.avatarUrl.includes('photo-1534528741775') || user.avatarUrl.includes('photo-1507003211169') || user.avatarUrl.includes('academic_avatar'))) {
         user.avatarUrl = getInitialsAvatar(user.name, user.role === 'dosen');
         modified = true;
@@ -365,6 +399,10 @@ export const studentService = {
       }
 
       if (u.email.toLowerCase() === altafEmail) {
+        if (u.name && u.name.includes('S.Pd')) {
+          u.name = u.name.replace('S.Pd', 'S.Si');
+          modified = true;
+        }
         if (!u.avatarUrl || u.avatarUrl.includes('academic_avatar') || u.avatarUrl.includes('ui-avatars') || u.avatarUrl.includes('photo-')) {
           u.avatarUrl = '/tengku_avatar.png';
           modified = true;
@@ -373,10 +411,42 @@ export const studentService = {
           u.title = 'Tenaga Teknis Survei & Pemetaan / Dosen Pengampu Partner';
           modified = true;
         }
+        if (!u.department || u.department === 'Sains Informasi Geografi') {
+          u.department = 'Tenaga Teknis Survei dan Pemetaan BPN Kota Binjai • Geografi / Universitas Negeri Medan';
+          modified = true;
+        }
+        if (!u.googleScholarUrl || !isValidProfileUrl(u.googleScholarUrl)) {
+          u.googleScholarUrl = DEFAULT_LECTURERS[altafEmail].googleScholarUrl;
+          modified = true;
+        }
+        if (!u.researchGateUrl || !isValidProfileUrl(u.researchGateUrl)) {
+          u.researchGateUrl = DEFAULT_LECTURERS[altafEmail].researchGateUrl;
+          modified = true;
+        }
+        if (!u.linkedinUrl || !isValidProfileUrl(u.linkedinUrl)) {
+          u.linkedinUrl = DEFAULT_LECTURERS[altafEmail].linkedinUrl;
+          modified = true;
+        }
+        if (!u.instagramUrl || !isValidProfileUrl(u.instagramUrl)) {
+          u.instagramUrl = DEFAULT_LECTURERS[altafEmail].instagramUrl;
+          modified = true;
+        }
+        if (!u.facebookUrl || !isValidProfileUrl(u.facebookUrl)) {
+          u.facebookUrl = DEFAULT_LECTURERS[altafEmail].facebookUrl;
+          modified = true;
+        }
+        if (!u.campusEmail) {
+          u.campusEmail = 'altaf.aziz16@gmail.com';
+          modified = true;
+        }
         // Tengku specifically does not have Scopus or Sinta
         if (u.scopusUrl) { u.scopusUrl = ''; modified = true; }
         if (u.sintaUrl) { u.sintaUrl = ''; modified = true; }
       } else if (u.email.toLowerCase() === miftahEmail) {
+        if (u.name && u.name.includes('S.Pd')) {
+          u.name = u.name.replace('S.Pd., ', '').replace('S.Pd, ', '').replace('S.Pd', '').trim();
+          modified = true;
+        }
         if (!u.title) {
           u.title = 'Dosen Pengampu Utama';
           modified = true;
@@ -386,27 +456,33 @@ export const studentService = {
           modified = true;
         }
         if (!u.department) {
-          u.department = 'Pendidikan Geografi';
+          u.department = 'Universitas Negeri Medan';
           modified = true;
         }
-        if (!u.campusEmail) {
-          u.campusEmail = 'mmridlogeo@unimed.ac.id';
+        if (!u.campusEmail || u.campusEmail === 'mmridlogeo@unimed.ac.id') {
+          u.campusEmail = 'miftahurridlo.688@gmail.com';
           modified = true;
         }
         if (!u.avatarUrl || u.avatarUrl.includes('ui-avatars') || u.avatarUrl.includes('photo-') || u.avatarUrl.includes('academic_avatar')) {
           u.avatarUrl = '/miftah_avatar.png';
           modified = true;
         }
-        if (!u.googleScholarUrl) {
-          u.googleScholarUrl = DEFAULT_LECTURERS[miftahEmail].googleScholarUrl || 'https://scholar.google.com/';
-          u.sintaUrl = DEFAULT_LECTURERS[miftahEmail].sintaUrl || 'https://sinta.kemdikbud.go.id/';
-          u.scopusUrl = DEFAULT_LECTURERS[miftahEmail].scopusUrl || 'https://www.scopus.com/';
-          u.researchGateUrl = DEFAULT_LECTURERS[miftahEmail].researchGateUrl || 'https://www.researchgate.net/';
-          u.linkedinUrl = DEFAULT_LECTURERS[miftahEmail].linkedinUrl || 'https://linkedin.com/';
-          u.instagramUrl = DEFAULT_LECTURERS[miftahEmail].instagramUrl || 'https://instagram.com/';
-          u.facebookUrl = DEFAULT_LECTURERS[miftahEmail].facebookUrl || 'https://facebook.com/';
+        if (!u.googleScholarUrl || !isValidProfileUrl(u.googleScholarUrl)) {
+          u.googleScholarUrl = DEFAULT_LECTURERS[miftahEmail].googleScholarUrl;
           modified = true;
         }
+        if (!u.sintaUrl || !isValidProfileUrl(u.sintaUrl)) {
+          u.sintaUrl = DEFAULT_LECTURERS[miftahEmail].sintaUrl;
+          modified = true;
+        }
+        if (!u.linkedinUrl || !isValidProfileUrl(u.linkedinUrl)) {
+          u.linkedinUrl = DEFAULT_LECTURERS[miftahEmail].linkedinUrl;
+          modified = true;
+        }
+        if (u.scopusUrl) { u.scopusUrl = ''; modified = true; }
+        if (u.researchGateUrl) { u.researchGateUrl = ''; modified = true; }
+        if (u.instagramUrl) { u.instagramUrl = ''; modified = true; }
+        if (u.facebookUrl) { u.facebookUrl = ''; modified = true; }
       } else if (u.avatarUrl && (u.avatarUrl.includes('photo-1534528741775') || u.avatarUrl.includes('photo-1507003211169') || u.avatarUrl.includes('academic_avatar'))) {
         u.avatarUrl = getInitialsAvatar(u.name, u.role === 'dosen');
         modified = true;
@@ -505,8 +581,14 @@ export const studentService = {
               bio: supaProfile.bio || foundProfileData?.bio,
               googleScholarUrl: supaProfile.google_scholar_url,
               sintaUrl: supaProfile.sinta_url,
-              linkedinUrl: supaProfile.linkedin_url,
+              scopusUrl: supaProfile.scopus_url,
+              orcidUrl: supaProfile.orcid_url,
+              researchGateUrl: supaProfile.research_gate_url,
               campusEmail: supaProfile.campus_email,
+              linkedinUrl: supaProfile.linkedin_url,
+              instagramUrl: supaProfile.instagram_url,
+              facebookUrl: supaProfile.facebook_url,
+              websiteUrl: supaProfile.website_url,
             };
           }
         }
@@ -522,6 +604,19 @@ export const studentService = {
         const parsed = JSON.parse(rawMyJourney);
         if (parsed && (parsed.name || parsed.title)) {
           foundProfileData = { ...parsed, ...foundProfileData };
+        }
+      }
+      // Periksa juga scoped user profile jika ada
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('my_journey_u_') && key.endsWith('_user_profile')) {
+          try {
+            const parsed = JSON.parse(localStorage.getItem(key) || '{}');
+            if (parsed && (parsed.name || parsed.title)) {
+              foundProfileData = { ...parsed, ...foundProfileData };
+              break;
+            }
+          } catch {}
         }
       }
     } catch {}
@@ -540,6 +635,16 @@ export const studentService = {
               role: matched.role || foundProfileData?.role,
               department: matched.department || foundProfileData?.department,
               avatarUrl: matched.avatarUrl || foundProfileData?.avatarUrl,
+              googleScholarUrl: matched.googleScholarUrl || foundProfileData?.googleScholarUrl,
+              sintaUrl: matched.sintaUrl || foundProfileData?.sintaUrl,
+              scopusUrl: matched.scopusUrl || foundProfileData?.scopusUrl,
+              orcidUrl: matched.orcidUrl || foundProfileData?.orcidUrl,
+              researchGateUrl: matched.researchGateUrl || foundProfileData?.researchGateUrl,
+              campusEmail: matched.campusEmail || foundProfileData?.campusEmail,
+              linkedinUrl: matched.linkedinUrl || foundProfileData?.linkedinUrl,
+              instagramUrl: matched.instagramUrl || foundProfileData?.instagramUrl,
+              facebookUrl: matched.facebookUrl || foundProfileData?.facebookUrl,
+              websiteUrl: matched.websiteUrl || foundProfileData?.websiteUrl,
               ...foundProfileData,
             };
           }
@@ -560,22 +665,27 @@ export const studentService = {
       if (foundProfileData.titlePrefix) {
         fullName = `${foundProfileData.titlePrefix} ${fullName}`;
       }
-      const suffix = foundProfileData.titleSuffix || (foundProfileData.title && foundProfileData.title.includes('.') ? foundProfileData.title : '');
+      const suffix = foundProfileData.titleSuffix || (foundProfileData.title && foundProfileData.title.includes('.') ? foundProfileData.title : (isAltaf ? 'S.Si' : 'M.Sc.'));
       if (suffix && !fullName.includes(suffix)) {
-        fullName = `${fullName}, ${suffix}`;
+        fullName = `${fullName.replace(', S.Pd', '')}, ${suffix}`;
+      }
+      if (isAltaf) {
+        fullName = fullName.replace('S.Pd', 'S.Si');
+      } else {
+        fullName = fullName.replace('S.Pd., ', '');
       }
 
       const defaultBio = isAltaf
-        ? 'Tenaga Teknis Survei & Pemetaan dan Dosen Pengampu Partner Sains Informasi Geografi. Terhubung langsung dengan workspace riset, pemetaan, dan administrasi perkuliahan My Journey.'
+        ? 'Tenaga Teknis Survei dan Pemetaan BPN Kota Binjai dan Dosen Pengampu Partner. Terhubung langsung dengan workspace riset, pemetaan, dan administrasi perkuliahan My Journey.'
         : 'Dosen & Peneliti Pendidikan Geografi. Terhubung langsung dengan kurikulum OBE dan manajemen pengajaran My Journey.';
       const defaultTitle = isAltaf ? 'Tenaga Teknis Survei & Pemetaan / Dosen Pengampu Partner' : 'Dosen Pengampu Utama';
-      const defaultDept = isAltaf ? 'Sains Informasi Geografi' : 'Pendidikan Geografi';
+      const defaultDept = isAltaf ? 'Tenaga Teknis Survei dan Pemetaan BPN Kota Binjai • Geografi / Universitas Negeri Medan' : 'Universitas Negeri Medan';
 
       let targetAvatar = foundProfileData.avatarUrl;
       if (isAltaf) {
         targetAvatar = '/tengku_avatar.png';
       } else if (!targetAvatar || targetAvatar.includes('photo-1534528741775') || targetAvatar.includes('academic_avatar')) {
-        targetAvatar = getInitialsAvatar(fullName || foundProfileData.name, true);
+        targetAvatar = '/miftah_avatar.png';
       }
 
       const updated = this.updateLecturerProfile({
@@ -585,15 +695,15 @@ export const studentService = {
         department: foundProfileData.universityOrOrg || foundProfileData.department || defaultDept,
         avatarUrl: targetAvatar,
         bio: (foundProfileData.bio && !foundProfileData.bio.includes('Dosen Pengampu Smart Learning Hub.')) ? foundProfileData.bio : defaultBio,
-        googleScholarUrl: foundProfileData.googleScholarUrl || defaultLecturer.googleScholarUrl || 'https://scholar.google.com/',
-        sintaUrl: foundProfileData.sintaUrl || defaultLecturer.sintaUrl || 'https://sinta.kemdikbud.go.id/',
-        scopusUrl: foundProfileData.scopusUrl || defaultLecturer.scopusUrl || 'https://www.scopus.com/',
+        googleScholarUrl: foundProfileData.googleScholarUrl || defaultLecturer.googleScholarUrl || '',
+        sintaUrl: isAltaf ? '' : (foundProfileData.sintaUrl || defaultLecturer.sintaUrl || ''),
+        scopusUrl: isAltaf ? '' : (foundProfileData.scopusUrl || defaultLecturer.scopusUrl || ''),
         orcidUrl: foundProfileData.orcidUrl || '',
-        researchGateUrl: foundProfileData.researchGateUrl || defaultLecturer.researchGateUrl || 'https://www.researchgate.net/',
-        campusEmail: foundProfileData.campusEmail || (isAltaf ? 'altaf.aziz16@gmail.com' : 'mmridlogeo@unimed.ac.id'),
-        linkedinUrl: foundProfileData.linkedinUrl || defaultLecturer.linkedinUrl || 'https://linkedin.com/',
-        instagramUrl: foundProfileData.instagramUrl || defaultLecturer.instagramUrl || 'https://instagram.com/',
-        facebookUrl: foundProfileData.facebookUrl || defaultLecturer.facebookUrl || 'https://facebook.com/',
+        researchGateUrl: foundProfileData.researchGateUrl || defaultLecturer.researchGateUrl || '',
+        campusEmail: foundProfileData.campusEmail || defaultLecturer.campusEmail || (isAltaf ? 'altaf.aziz16@gmail.com' : 'miftahurridlo.688@gmail.com'),
+        linkedinUrl: foundProfileData.linkedinUrl || defaultLecturer.linkedinUrl || '',
+        instagramUrl: foundProfileData.instagramUrl || defaultLecturer.instagramUrl || '',
+        facebookUrl: foundProfileData.facebookUrl || defaultLecturer.facebookUrl || '',
         websiteUrl: foundProfileData.websiteUrl || '',
       });
 
@@ -1035,14 +1145,16 @@ export const studentService = {
         ['crs-1', 'crs-2', 'crs-3'].includes(c.id) ||
         ['IF-405', 'IF-208', 'GEO-301'].includes((c.code || '').toUpperCase());
 
-      const mergedCourses = [...syncedCourses];
-      currentCourses.forEach((c) => {
-        if (!isDummyCourse(c) && !mergedCourses.some((m) => m.id === c.id || m.code.toLowerCase() === c.code.toLowerCase())) {
-          mergedCourses.push(c);
-        }
-      });
+      // Supabase is authoritative: prune deleted courses, keep only recent offline courses (< 30s)
+      const supaIds = new Set(syncedCourses.map((c) => c.id));
+      const prunedCourses = syncedCourses.concat(
+        currentCourses.filter((c) => {
+          const isRecentOffline = (c as any)._localCreatedAt && Date.now() - (c as any)._localCreatedAt < 30000;
+          return isRecentOffline && !supaIds.has(c.id) && !isDummyCourse(c);
+        })
+      );
 
-      setStorage(STORAGE_KEYS.COURSES, mergedCourses);
+      setStorage(STORAGE_KEYS.COURSES, prunedCourses);
       return {
         success: true,
         count: syncedCourses.length,
@@ -1287,10 +1399,17 @@ export const studentService = {
               const scheduleDay = scheduleRaw.includes(',') ? scheduleRaw.split(',')[0].trim() : 'Senin';
               const scheduleTime = scheduleRaw.includes(',') ? scheduleRaw.split(',')[1].trim() : '08:00 - 10:30 WIB';
 
+              const partnerLecturerStr = (sheetCourse.partnerLecturer || '').trim();
+              const pendingLecturerEmailStr = (sheetCourse.pendingLecturerEmail || '').trim().toLowerCase();
+              const hasPendingInvitation = !!pendingLecturerEmailStr;
+              const isPartnerAccepted = partnerLecturerStr && partnerLecturerStr !== '-' && partnerLecturerStr !== '' && !hasPendingInvitation;
+
               const reconstructedCourse: CourseClass = {
                 id: courseId,
                 code: courseCode,
                 title: courseName,
+                section: sheetCourse.section || 'Kelas A',
+                credits: Number(sheetCourse.credits) || 3,
                 description: sheetCourse.description || `Mata kuliah ${courseName} semester ini diampu oleh tim dosen.`,
                 teacher: {
                   id: primaryTeacher.id,
@@ -1298,33 +1417,44 @@ export const studentService = {
                   title: primaryTeacher.title || 'Dosen Pengampu',
                   email: primaryTeacher.email,
                   avatarUrl: primaryTeacher.avatarUrl,
-                  department: primaryTeacher.department || 'Sains Informasi Geografi',
+                  department: primaryTeacher.department || 'Tenaga Teknis Survei dan Pemetaan BPN Kota Binjai • Geografi / Universitas Negeri Medan',
                 },
-                secondaryTeacher: {
+                secondaryTeacher: isPartnerAccepted ? {
                   id: secondaryTeacher.id,
                   name: secondaryTeacher.name,
-                  title: secondaryTeacher.title || 'Dosen Pengampu Partner',
+                  title: secondaryTeacher.title || 'Dosen Pengampu',
                   email: secondaryTeacher.email,
                   avatarUrl: secondaryTeacher.avatarUrl,
-                  department: secondaryTeacher.department || 'Pendidikan Geografi',
-                },
-                partnerLecturer: secondaryTeacher.name,
-                teamTeachers: [
+                  department: secondaryTeacher.department || 'Universitas Negeri Medan',
+                } : undefined,
+                partnerLecturer: isPartnerAccepted ? secondaryTeacher.name : undefined,
+                pendingLecturerEmail: hasPendingInvitation ? pendingLecturerEmailStr : undefined,
+                pendingLecturerName: hasPendingInvitation ? (sheetCourse.pendingLecturerName || secondaryTeacher.name) : undefined,
+                teamTeachers: isPartnerAccepted ? [
                   {
                     id: primaryTeacher.id,
                     name: primaryTeacher.name,
                     title: primaryTeacher.title || 'Dosen Pengampu',
                     email: primaryTeacher.email,
                     avatarUrl: primaryTeacher.avatarUrl,
-                    department: primaryTeacher.department || 'Sains Informasi Geografi',
+                    department: primaryTeacher.department || 'Tenaga Teknis Survei dan Pemetaan BPN Kota Binjai • Geografi / Universitas Negeri Medan',
                   },
                   {
                     id: secondaryTeacher.id,
                     name: secondaryTeacher.name,
-                    title: secondaryTeacher.title || 'Dosen Pengampu Partner',
+                    title: secondaryTeacher.title || 'Dosen Pengampu',
                     email: secondaryTeacher.email,
                     avatarUrl: secondaryTeacher.avatarUrl,
-                    department: secondaryTeacher.department || 'Pendidikan Geografi',
+                    department: secondaryTeacher.department || 'Universitas Negeri Medan',
+                  },
+                ] : [
+                  {
+                    id: primaryTeacher.id,
+                    name: primaryTeacher.name,
+                    title: primaryTeacher.title || 'Dosen Pengampu',
+                    email: primaryTeacher.email,
+                    avatarUrl: primaryTeacher.avatarUrl,
+                    department: primaryTeacher.department || 'Tenaga Teknis Survei dan Pemetaan BPN Kota Binjai • Geografi / Universitas Negeri Medan',
                   },
                 ],
                 semester: sheetCourse.semester || 'Semester 3',
@@ -1372,10 +1502,19 @@ export const studentService = {
               }
             });
 
-            if (coursesUpdated) {
-              setStorage(STORAGE_KEYS.COURSES, currentCourses);
-              setStorage(STORAGE_KEYS.MEETINGS, allMeetings);
-            }
+            // Prune local courses that were deleted from Google Sheets
+            const cloudCourseIds = new Set(json.data.Courses.map((sc: any) => sc.id).filter(Boolean));
+            const cloudCourseCodes = new Set(json.data.Courses.map((sc: any) => String(sc.code || '').trim().toUpperCase()).filter(Boolean));
+            const prunedCourses = currentCourses.filter((c) => {
+              const isRecentOffline = (c as any)._localCreatedAt && Date.now() - (c as any)._localCreatedAt < 30000;
+              if (isRecentOffline) return true;
+              return cloudCourseIds.has(c.id) || cloudCourseCodes.has(c.code.toUpperCase());
+            });
+
+            const validIds = new Set(prunedCourses.map((c) => c.id));
+            const prunedMeetings = allMeetings.filter((m) => validIds.has(m.courseId));
+            setStorage(STORAGE_KEYS.COURSES, prunedCourses);
+            setStorage(STORAGE_KEYS.MEETINGS, prunedMeetings);
           }
 
           // C. Mahasiswa Resmi dari Google Sheets (hanya mahasiswa nyata)
@@ -2408,6 +2547,15 @@ export const studentService = {
 
   // Tanggapi undangan kolaborasi mengajar (Terima / Tolak)
   respondToCourseInvitation(notificationId: string, response: 'accepted' | 'declined'): { success: boolean; message: string } {
+    if (notificationId.startsWith('notif_inv_')) {
+      const courseId = notificationId.replace('notif_inv_', '');
+      if (response === 'accepted') {
+        return this.acceptCourseInvitation(courseId, this.getCurrentUser()?.email);
+      } else {
+        return this.declineCourseInvitation(courseId, this.getCurrentUser()?.email);
+      }
+    }
+
     const notifications = getStorage<StudentNotification[]>(STORAGE_KEYS.NOTIFICATIONS, initialNotifications);
     const notifIndex = notifications.findIndex((n) => n.id === notificationId);
     if (notifIndex === -1) {
@@ -2530,13 +2678,31 @@ export const studentService = {
     const user = this.getCurrentUser();
     const clean = (email || user?.email || '').toLowerCase().trim();
     if (!clean) return [];
-    const notifs = getStorage<StudentNotification[]>(STORAGE_KEYS.NOTIFICATIONS, initialNotifications);
-    return notifs.filter(
-      (n) =>
-        n.type === 'invitation' &&
-        n.invitationData?.status === 'pending' &&
-        n.recipientEmail?.toLowerCase() === clean
-    );
+
+    // Prioritas 1: Bangkitkan secara dinamis langsung dari mata kuliah yang memiliki status pending untuk user ini
+    const courses = this.getAllCourses();
+    const pendingCourses = courses.filter((c) => (c.pendingLecturerEmail || '').toLowerCase() === clean);
+
+    return pendingCourses.map((c) => ({
+      id: `notif_inv_${c.id}`,
+      title: 'Undangan Kolaborasi Mengajar',
+      message: `${this.formatLecturerGreeting(c.teacher?.name || c.primaryLecturer || 'Dosen Pengampu')} mengundang Anda bergabung mengampu mata kuliah ${c.code} - ${c.title}.`,
+      type: 'invitation' as const,
+      timestamp: 'Menunggu Persetujuan',
+      isRead: false,
+      recipientEmail: clean,
+      linkTab: 'kelas',
+      linkId: c.id,
+      invitationData: {
+        courseId: c.id,
+        courseCode: c.code,
+        courseTitle: c.title,
+        inviterName: c.teacher?.name || c.primaryLecturer || 'Rekan Dosen',
+        inviterEmail: c.teacher?.email || '',
+        status: 'pending' as const,
+        sentAt: new Date().toISOString(),
+      },
+    }));
   },
 
   // Reset total data pengajaran & mahasiswa ke titik 0 bersih

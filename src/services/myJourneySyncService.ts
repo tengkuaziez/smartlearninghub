@@ -171,7 +171,11 @@ export const myJourneySyncService = {
       credits: c.credits || 3,
       syllabusOverview: c.rps?.shortDescription || `${c.totalMeetings} pertemuan kurikulum OBE`,
       primaryLecturer: c.teacher?.name || c.primaryLecturer || '',
+      primaryLecturerEmail: c.teacher?.email || '',
       partnerLecturer: c.secondaryTeacher?.name || c.partnerLecturer || '',
+      partnerLecturerEmail: c.secondaryTeacher?.email || '',
+      pendingLecturerEmail: c.pendingLecturerEmail || '',
+      pendingLecturerName: c.pendingLecturerName || '',
     }));
 
     // 2. Format Students
@@ -269,42 +273,42 @@ export const myJourneySyncService = {
 
       return {
         email: lec.email,
-        name: lec.name,
+        name: isAltaf ? (lec.name?.replace('S.Pd', 'S.Si') || 'Tengku Abdillah Azis, S.Si') : (lec.name?.replace('S.Pd., ', '') || 'Muhammad Miftahurrodlo, M.Sc.'),
         title: lec.title || (isMiftah ? 'Dosen Pengampu Utama' : 'Tenaga Teknis Survei & Pemetaan / Dosen Pengampu Partner'),
         role: 'Dosen & Peneliti',
-        department: lec.department || (isMiftah ? 'Pendidikan Geografi' : 'Sains Informasi Geografi'),
+        department: lec.department || (isMiftah ? 'Universitas Negeri Medan' : 'Tenaga Teknis Survei dan Pemetaan BPN Kota Binjai • Geografi / Universitas Negeri Medan'),
         avatarUrl: targetAvatar,
         nidn: lec.nidn || (isMiftah ? '0412088501' : '0419058902'),
-        googleScholarUrl: lec.googleScholarUrl || 'https://scholar.google.com/',
-        sintaUrl: lec.sintaUrl || 'https://sinta.kemdikbud.go.id/',
-        scopusUrl: lec.scopusUrl || 'https://www.scopus.com/',
+        googleScholarUrl: lec.googleScholarUrl || '',
+        sintaUrl: isAltaf ? '' : (lec.sintaUrl || ''),
+        scopusUrl: isAltaf ? '' : (lec.scopusUrl || ''),
         orcidUrl: lec.orcidUrl || '',
-        researchGateUrl: lec.researchGateUrl || 'https://www.researchgate.net/',
-        campusEmail: lec.campusEmail || (isMiftah ? 'mmridlogeo@unimed.ac.id' : 'altaf.aziz16@gmail.com'),
-        linkedinUrl: lec.linkedinUrl || 'https://linkedin.com/',
-        instagramUrl: lec.instagramUrl || 'https://instagram.com/',
-        facebookUrl: lec.facebookUrl || 'https://facebook.com/',
+        researchGateUrl: lec.researchGateUrl || '',
+        campusEmail: lec.campusEmail || (isMiftah ? 'miftahurridlo.688@gmail.com' : 'altaf.aziz16@gmail.com'),
+        linkedinUrl: lec.linkedinUrl || '',
+        instagramUrl: lec.instagramUrl || '',
+        facebookUrl: lec.facebookUrl || '',
       };
     });
 
     if (profilesPayload.length === 0) {
       profilesPayload.push({
         email: uploaderEmail,
-        name: 'Muhammad Miftahurridlo, S.Pd., M.Sc',
+        name: 'Muhammad Miftahurrodlo, M.Sc.',
         title: 'Dosen Pengampu Utama',
         role: 'Dosen & Peneliti',
-        department: 'Pendidikan Geografi',
+        department: 'Universitas Negeri Medan',
         avatarUrl: '/miftah_avatar.png',
         nidn: '0412088501',
-        googleScholarUrl: 'https://scholar.google.com/',
-        sintaUrl: 'https://sinta.kemdikbud.go.id/',
-        scopusUrl: 'https://www.scopus.com/',
+        googleScholarUrl: '',
+        sintaUrl: '',
+        scopusUrl: '',
         orcidUrl: '',
-        researchGateUrl: 'https://www.researchgate.net/',
-        campusEmail: 'mmridlogeo@unimed.ac.id',
-        linkedinUrl: 'https://linkedin.com/',
-        instagramUrl: 'https://instagram.com/',
-        facebookUrl: 'https://facebook.com/',
+        researchGateUrl: '',
+        campusEmail: 'miftahurridlo.688@gmail.com',
+        linkedinUrl: '',
+        instagramUrl: '',
+        facebookUrl: '',
       });
     }
 

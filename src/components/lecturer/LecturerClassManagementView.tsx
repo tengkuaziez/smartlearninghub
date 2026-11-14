@@ -300,26 +300,43 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
     (c) => c.pendingLecturerEmail?.toLowerCase() === currentUser?.email?.toLowerCase()
   );
 
-  const handleAcceptInvitation = (courseId: string) => {
+  // Filter kelas aktif: hanya kelas di mana user adalah dosen pengampu utama atau partner yang sudah menerima undangan.
+  // Kelas yang masih menunggu persetujuan (pending) hanya muncul di banner undangan atas!
+  const activeLecturerCourses = courses.filter((c) => {
+    const userEmail = (currentUser?.email || '').toLowerCase().trim();
+    if (c.pendingLecturerEmail?.toLowerCase() === userEmail) {
+      return false; // Tampilkan di banner persetujuan di atas
+    }
+    const isPrimary = (c.teacher?.email || '').toLowerCase() === userEmail ||
+      (c.primaryLecturer || '').toLowerCase().includes(userEmail.split('@')[0]);
+    const isPartner = (c.secondaryTeacher?.email || '').toLowerCase() === userEmail ||
+      (c.partnerLecturer && !c.pendingLecturerEmail && c.partnerLecturer.toLowerCase().includes(userEmail.split('@')[0]));
+    return isPrimary || isPartner;
+  });
+
+  const handleAcceptInvitation = async (courseId: string) => {
     const res = studentService.acceptCourseInvitation(courseId, currentUser?.email);
     if (res.success) {
+      await myJourneySyncService.pushTeachingToGoogleSheets();
       onDataUpdated();
     }
   };
 
-  const handleDeclineInvitation = (courseId: string) => {
+  const handleDeclineInvitation = async (courseId: string) => {
     if (confirm('Tolak undangan kolaborasi mengajar ini?')) {
       const res = studentService.declineCourseInvitation(courseId, currentUser?.email);
       if (res.success) {
+        await myJourneySyncService.pushTeachingToGoogleSheets();
         onDataUpdated();
       }
     }
   };
 
   // Handle Delete Course
-  const handleDeleteCourse = (courseId: string, courseTitle: string) => {
+  const handleDeleteCourse = async (courseId: string, courseTitle: string) => {
     if (confirm(`Apakah Anda yakin ingin menghapus kelas "${courseTitle}"? Semua data pertemuan dan silabus akan dihapus.`)) {
       studentService.deleteCourse(courseId);
+      await myJourneySyncService.pushTeachingToGoogleSheets();
       onDataUpdated();
     }
   };
@@ -350,7 +367,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
             }`}
           >
             <BookOpen className="w-3.5 h-3.5" />
-            <span>1. Kelas ({courses.length})</span>
+            <span>1. Kelas ({activeLecturerCourses.length})</span>
             {pendingInvitations.length > 0 && (
               <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white animate-pulse">
                 +{pendingInvitations.length} Undangan
@@ -496,7 +513,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
             </div>
           )}
 
-          {courses.length === 0 ? (
+          {activeLecturerCourses.length === 0 ? (
             <div className="p-12 text-center rounded-3xl bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-800 space-y-4">
               <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 mx-auto flex items-center justify-center font-bold">
                 <BookOpen className="w-7 h-7" />
@@ -527,7 +544,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-              {courses.map((course) => (
+              {activeLecturerCourses.map((course) => (
                 <div
                   key={course.id}
                   className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md transition-all flex flex-col justify-between"
@@ -1287,7 +1304,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                 {newCourseCoLecturerEmail ? (
                   <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5 pt-1">
                     <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                    <span>Rekan dosen berhasil dipilih. Mata kuliah ini akan langsung muncul di akun beliau dan tersinkronisasi 2 arah.</span>
+                    <span>Rekan dosen dipilih: Undangan kolaborasi tim dosen akan dikirimkan ke akun beliau untuk persetujuan (ACC) terlebih dahulu sebelum resmi bergabung.</span>
                   </p>
                 ) : (
                   <p className="text-[10px] text-slate-400 italic">

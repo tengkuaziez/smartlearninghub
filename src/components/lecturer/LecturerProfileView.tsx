@@ -51,14 +51,14 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
   const [editDept, setEditDept] = useState(currentUser.department || (currentUser.email.toLowerCase() === 'altaf.aziz16@gmail.com' ? 'Sains Informasi Geografi' : 'Pendidikan Geografi'));
   const [editBio, setEditBio] = useState(currentUser.bio || 'Dosen Pengampu Smart Learning Hub & My Journey.');
   const [editAvatarUrl, setEditAvatarUrl] = useState(currentUser.avatarUrl || (currentUser.email.toLowerCase() === 'altaf.aziz16@gmail.com' ? '/tengku_avatar.png' : ''));
-  const [editScholar, setEditScholar] = useState(currentUser.googleScholarUrl || 'https://scholar.google.com/');
-  const [editSinta, setEditSinta] = useState(currentUser.sintaUrl || 'https://sinta.kemdikbud.go.id/');
-  const [editScopus, setEditScopus] = useState(currentUser.scopusUrl || 'https://www.scopus.com/');
-  const [editResearchGate, setEditResearchGate] = useState(currentUser.researchGateUrl || 'https://www.researchgate.net/');
+  const [editScholar, setEditScholar] = useState(currentUser.googleScholarUrl || '');
+  const [editSinta, setEditSinta] = useState(currentUser.sintaUrl || '');
+  const [editScopus, setEditScopus] = useState(currentUser.scopusUrl || '');
+  const [editResearchGate, setEditResearchGate] = useState(currentUser.researchGateUrl || '');
   const [editEmail, setEditEmail] = useState(currentUser.campusEmail || currentUser.email || '');
-  const [editLinkedin, setEditLinkedin] = useState(currentUser.linkedinUrl || 'https://linkedin.com/');
-  const [editInstagram, setEditInstagram] = useState(currentUser.instagramUrl || 'https://instagram.com/');
-  const [editFacebook, setEditFacebook] = useState(currentUser.facebookUrl || 'https://facebook.com/');
+  const [editLinkedin, setEditLinkedin] = useState(currentUser.linkedinUrl || '');
+  const [editInstagram, setEditInstagram] = useState(currentUser.instagramUrl || '');
+  const [editFacebook, setEditFacebook] = useState(currentUser.facebookUrl || '');
 
   // Import JSON Modal State
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -74,14 +74,14 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
     setEditDept(currentUser.department || (currentUser.email.toLowerCase() === 'altaf.aziz16@gmail.com' ? 'Sains Informasi Geografi' : 'Pendidikan Geografi'));
     setEditBio(currentUser.bio || 'Dosen Pengampu Smart Learning Hub & My Journey.');
     setEditAvatarUrl(currentUser.avatarUrl || (currentUser.email.toLowerCase() === 'altaf.aziz16@gmail.com' ? '/tengku_avatar.png' : ''));
-    setEditScholar(currentUser.googleScholarUrl || 'https://scholar.google.com/');
-    setEditSinta(currentUser.sintaUrl || 'https://sinta.kemdikbud.go.id/');
-    setEditScopus(currentUser.scopusUrl || 'https://www.scopus.com/');
-    setEditResearchGate(currentUser.researchGateUrl || 'https://www.researchgate.net/');
+    setEditScholar(currentUser.googleScholarUrl || '');
+    setEditSinta(currentUser.sintaUrl || '');
+    setEditScopus(currentUser.scopusUrl || '');
+    setEditResearchGate(currentUser.researchGateUrl || '');
     setEditEmail(currentUser.campusEmail || currentUser.email || '');
-    setEditLinkedin(currentUser.linkedinUrl || 'https://linkedin.com/');
-    setEditInstagram(currentUser.instagramUrl || 'https://instagram.com/');
-    setEditFacebook(currentUser.facebookUrl || 'https://facebook.com/');
+    setEditLinkedin(currentUser.linkedinUrl || '');
+    setEditInstagram(currentUser.instagramUrl || '');
+    setEditFacebook(currentUser.facebookUrl || '');
     setIsEditModalOpen(true);
   };
 
@@ -269,23 +269,33 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
     {
       ...DEFAULT_LECTURERS['altaf.aziz16@gmail.com'],
       ...altafSaved,
-      avatarUrl: (altafSaved.avatarUrl && !altafSaved.avatarUrl.includes('academic_avatar') && !altafSaved.avatarUrl.includes('ui-avatars') && !altafSaved.avatarUrl.includes('photo-')) ? altafSaved.avatarUrl : '/tengku_avatar.png',
+      name: (altafSaved.name || DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].name).replace('S.Pd', 'S.Si'),
+      avatarUrl: '/tengku_avatar.png',
       title: altafSaved.title || 'Tenaga Teknis Survei & Pemetaan / Dosen Pengampu Partner',
+      department: altafSaved.department || 'Tenaga Teknis Survei dan Pemetaan BPN Kota Binjai • Geografi / Universitas Negeri Medan',
+      googleScholarUrl: altafSaved.googleScholarUrl || DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].googleScholarUrl || '',
+      researchGateUrl: altafSaved.researchGateUrl || DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].researchGateUrl || '',
+      linkedinUrl: altafSaved.linkedinUrl || DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].linkedinUrl || '',
+      instagramUrl: altafSaved.instagramUrl || DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].instagramUrl || '',
+      facebookUrl: altafSaved.facebookUrl || DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].facebookUrl || '',
+      scopusUrl: '',
+      sintaUrl: '',
     },
     {
       ...DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'],
       ...miftahSaved,
-      avatarUrl: (miftahSaved.avatarUrl && !miftahSaved.avatarUrl.includes('academic_avatar') && !miftahSaved.avatarUrl.includes('ui-avatars') && !miftahSaved.avatarUrl.includes('photo-')) ? miftahSaved.avatarUrl : '/miftah_avatar.png',
+      name: (miftahSaved.name || DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].name).replace('S.Pd., ', ''),
+      avatarUrl: '/miftah_avatar.png',
       title: miftahSaved.title || 'Dosen Pengampu Utama',
-      department: miftahSaved.department || 'Pendidikan Geografi',
-      googleScholarUrl: miftahSaved.googleScholarUrl || 'https://scholar.google.com/',
-      sintaUrl: miftahSaved.sintaUrl || 'https://sinta.kemdikbud.go.id/',
-      scopusUrl: miftahSaved.scopusUrl || 'https://www.scopus.com/',
-      researchGateUrl: miftahSaved.researchGateUrl || 'https://www.researchgate.net/',
-      campusEmail: miftahSaved.campusEmail || 'mmridlogeo@unimed.ac.id',
-      linkedinUrl: miftahSaved.linkedinUrl || 'https://linkedin.com/',
-      instagramUrl: miftahSaved.instagramUrl || 'https://instagram.com/',
-      facebookUrl: miftahSaved.facebookUrl || 'https://facebook.com/',
+      department: miftahSaved.department || 'Universitas Negeri Medan',
+      googleScholarUrl: miftahSaved.googleScholarUrl || DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].googleScholarUrl || '',
+      sintaUrl: miftahSaved.sintaUrl || DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].sintaUrl || '',
+      linkedinUrl: miftahSaved.linkedinUrl || DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].linkedinUrl || '',
+      campusEmail: 'miftahurridlo.688@gmail.com',
+      scopusUrl: '',
+      researchGateUrl: '',
+      instagramUrl: '',
+      facebookUrl: '',
     },
   ];
 
@@ -414,12 +424,28 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
           {lecturerList.map((lecturer) => {
             const isActive = currentUser.email.toLowerCase() === lecturer.email.toLowerCase();
             const isPrimary = lecturer.email === 'miftahurridlo.688@gmail.com';
-            const displayUser = isActive ? currentUser : lecturer;
+            const rawUser = isActive ? { ...lecturer, ...currentUser } : lecturer;
+            const displayUser = {
+              ...rawUser,
+              name: isPrimary
+                ? (rawUser.name || lecturer.name).replace('S.Pd., ', '').replace('S.Pd, ', '').replace('S.Pd', '').trim()
+                : (rawUser.name || lecturer.name).replace('S.Pd', 'S.Si'),
+              department: isPrimary
+                ? (rawUser.department && rawUser.department !== 'Sains Informasi Geografi' ? rawUser.department : 'Universitas Negeri Medan')
+                : (rawUser.department || 'Tenaga Teknis Survei dan Pemetaan BPN Kota Binjai • Geografi / Universitas Negeri Medan'),
+              googleScholarUrl: rawUser.googleScholarUrl || lecturer.googleScholarUrl || '',
+              researchGateUrl: isPrimary ? '' : (rawUser.researchGateUrl || lecturer.researchGateUrl || ''),
+              linkedinUrl: rawUser.linkedinUrl || lecturer.linkedinUrl || '',
+              instagramUrl: isPrimary ? '' : (rawUser.instagramUrl || lecturer.instagramUrl || ''),
+              facebookUrl: isPrimary ? '' : (rawUser.facebookUrl || lecturer.facebookUrl || ''),
+              sintaUrl: isPrimary ? (rawUser.sintaUrl || lecturer.sintaUrl || '') : '',
+              scopusUrl: '',
+            };
 
             return (
               <div
                 key={displayUser.id || displayUser.email}
-                className={`p-6 rounded-3xl bg-white dark:bg-slate-900 border transition-all relative ${
+                className={`p-6 rounded-3xl bg-white dark:bg-slate-900 border transition-all relative flex flex-col justify-between h-full ${
                   isActive
                     ? 'border-indigo-500 shadow-md ring-2 ring-indigo-500/20'
                     : 'border-slate-200 dark:border-slate-800 shadow-xs hover:border-slate-300 dark:hover:border-slate-700'
@@ -447,11 +473,16 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
                   </div>
 
                   {isActive ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                       <CheckCircle2 className="w-3 h-3" />
                       Aktif Sekarang
                     </span>
-                  ) : null}
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                      <Users className="w-3 h-3 text-slate-400" />
+                      Rekan Tim
+                    </span>
+                  )}
                 </div>
 
                 {/* Profile Avatar & Details */}
@@ -496,19 +527,19 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
                 </div>
 
                 {/* Profile Bio */}
-                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/80 text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/80 text-xs text-slate-600 dark:text-slate-400 leading-relaxed min-h-[72px] flex items-center mb-4">
                   {displayUser.bio || (isPrimary
                     ? 'Dosen Pengampu Utama Smart Learning Hub & My Journey. Koordinator kurikulum OBE dan penanggung jawab sinkronisasi pengajaran.'
                     : 'Tenaga Teknis Survei & Pemetaan dan Dosen Pengampu Partner Sains Informasi Geografi. Terhubung langsung dengan workspace riset, pemetaan, dan administrasi perkuliahan My Journey.')}
                 </div>
 
                 {/* Academic & Social Links Bar */}
-                <div className="mb-4">
+                <div className="min-h-[58px] flex flex-col justify-center mb-4">
                   {renderAcademicSocialLinks(displayUser)}
                 </div>
 
                 {/* Taught Classes Pill List */}
-                <div className="space-y-1.5 mb-5">
+                <div className="space-y-1.5 mb-5 min-h-[52px] flex flex-col justify-center">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                     Mata Kuliah Diampu Bersama:
                   </span>
@@ -530,22 +561,22 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
                 </div>
 
                 {/* Account Status / Profile Action */}
-                {!isActive ? (
-                  <div className="w-full py-2.5 px-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-medium text-center flex items-center justify-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-indigo-500" />
-                    <span>Rekan Kolaborasi Tim Dosen (Akun Terverifikasi My Journey)</span>
-                  </div>
-                ) : (
-                  <div className="w-full py-2.5 px-4 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 text-xs font-bold text-center flex items-center justify-center gap-2">
-                    <span>✓ Akun Anda Saat Ini</span>
+                <div className="mt-auto pt-2">
+                  {!isActive ? (
+                    <div className="w-full py-2.5 px-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-medium text-center flex items-center justify-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-indigo-500" />
+                      <span>Rekan Kolaborasi Tim Dosen (Akun Terverifikasi My Journey)</span>
+                    </div>
+                  ) : (
                     <button
                       onClick={openEditModal}
-                      className="underline text-[11px] hover:text-indigo-900 dark:hover:text-white"
+                      className="w-full py-2.5 px-4 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 text-xs font-bold text-center flex items-center justify-center gap-2 transition-colors cursor-pointer"
                     >
-                      (Ubah Profil)
+                      <span>✓ Akun Anda Saat Ini (Ubah Profil)</span>
+                      <Edit3 className="w-3.5 h-3.5" />
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             );
           })}

@@ -66,6 +66,10 @@ function doPost(e) {
       return handleFileUpload(payload);
     } else if (action === "syncTeaching" || action === "sync_teaching") {
       return handleSyncTeaching(payload);
+    } else if (action === "deleteItem" || action === "delete_item") {
+      return handleDeleteItem(payload);
+    } else if (action === "saveItem" || action === "save_item") {
+      return handleSaveItem(payload);
     } else if (action === "backup_to_sheets") {
       return handleBackupToSheets(payload);
     } else if (action === "ping") {
@@ -350,17 +354,18 @@ function handleSyncTeaching(data) {
   var ss = getOrCreateSpreadsheet();
   
   // Sheet 1: Courses
-  if (data.courses && data.courses.length > 0) {
+  if (data.courses) {
     var cSheet = getOrCreateSheet(ss, "Courses");
     cSheet.clear();
-    var cHeaders = ["id", "code", "name", "semester", "academicYear", "section", "enrolledCount", "schedule", "room", "status", "description", "credits", "syllabusOverview", "primaryLecturer", "partnerLecturer"];
+    var cHeaders = ["id", "code", "name", "semester", "academicYear", "section", "enrolledCount", "schedule", "room", "status", "description", "credits", "syllabusOverview", "primaryLecturer", "partnerLecturer", "pendingLecturerEmail", "pendingLecturerName"];
     var cRows = [cHeaders];
     for (var i = 0; i < data.courses.length; i++) {
       var c = data.courses[i];
       cRows.push([
         c.id, c.code, c.name, c.semester, c.academicYear, c.section,
         c.enrolledCount, c.schedule, c.room, c.status, c.description,
-        c.credits, c.syllabusOverview, c.primaryLecturer || "-", c.partnerLecturer || "-"
+        c.credits, c.syllabusOverview, c.primaryLecturer || "-", c.partnerLecturer || "-",
+        c.pendingLecturerEmail || "", c.pendingLecturerName || ""
       ]);
     }
     cSheet.getRange(1, 1, cRows.length, cHeaders.length).setValues(cRows);
@@ -448,12 +453,33 @@ function handleSyncTeaching(data) {
   if (data.profiles && data.profiles.length > 0) {
     var pSheet = getOrCreateSheet(ss, "Profiles");
     pSheet.clear();
-    var pHeaders = ["email", "name", "title", "role", "department", "avatarUrl", "lastSynced"];
+    var pHeaders = [
+      "email", "name", "title", "role", "department", "avatarUrl", "nidn",
+      "googleScholarUrl", "sintaUrl", "scopusUrl", "orcidUrl", "researchGateUrl",
+      "campusEmail", "linkedinUrl", "instagramUrl", "facebookUrl", "websiteUrl", "lastSynced"
+    ];
     var pRows = [pHeaders];
     for (var p = 0; p < data.profiles.length; p++) {
       var prof = data.profiles[p];
       pRows.push([
-        prof.email, prof.name, prof.title, prof.role, prof.department, prof.avatarUrl, new Date().toISOString()
+        prof.email || "",
+        prof.name || "",
+        prof.title || "",
+        prof.role || "",
+        prof.department || "",
+        prof.avatarUrl || "",
+        prof.nidn || "",
+        prof.googleScholarUrl || "",
+        prof.sintaUrl || "",
+        prof.scopusUrl || "",
+        prof.orcidUrl || "",
+        prof.researchGateUrl || "",
+        prof.campusEmail || "",
+        prof.linkedinUrl || "",
+        prof.instagramUrl || "",
+        prof.facebookUrl || "",
+        prof.websiteUrl || "",
+        new Date().toISOString()
       ]);
     }
     pSheet.getRange(1, 1, pRows.length, pHeaders.length).setValues(pRows);
@@ -468,6 +494,103 @@ function handleSyncTeaching(data) {
     spreadsheetUrl: ss.getUrl(),
     timestamp: new Date().toISOString()
   });
+}
+
+/**
+ * Handle Delete Item from Table (e.g. Courses, Students, Materials, etc.)
+ */
+function handleDeleteItem(data) {
+  var table = data.table;
+  var id = data.id;
+  if (!table || !id) {
+    return createJsonResponse({ success: false, status: "error", message: "Table dan id wajib disertakan." });
+  }
+
+  var ss = getOrCreateSpreadsheet();
+  var sheet = ss.getSheetByName(table);
+  if (!sheet) {
+    return createJsonResponse({ success: true, status: "success", message: "Sheet tidak ditemukan, tidak ada yang dihapus." });
+  }
+
+  var values = sheet.getDataRange().getValues();
+  if (values.length <= 1) {
+    return createJsonResponse({ success: true, status: "success", message: "Sheet kosong." });
+  }
+
+  var headers = values[0];
+  var idColIdx = headers.indexOf("id");
+  if (idColIdx === -1) {
+    idColIdx = 0;
+  }
+
+  var deleted = false;
+  for (var r = 1; r < values.length; r++) {
+    if (String(values[r][idColIdx]) === String(id)) {
+      sheet.deleteRow(r + 1);
+      deleted = true;
+      break;
+    }
+  }
+
+  return createJsonResponse({
+    success: true,
+    status: "success",
+    message: deleted ? "Item berhasil dihapus dari " + table : "Item tidak ditemukan di " + table,
+    id: id
+  });
+}
+
+/**
+ * Handle Save / Upsert Single Item
+ */
+function handleSaveItem(data) {
+  var table = data.table;
+  var item = data.item;
+  if (!table || !item) {
+    return createJsonResponse({ success: false, status: "error", message: "Table dan item wajib disertakan." });
+  }
+
+  var ss = getOrCreateSpreadsheet();
+  var sheet = getOrCreateSheet(ss, table);
+  var values = sheet.getDataRange().getValues();
+  if (values.length <= 1) {
+    var headers = Object.keys(item);
+    if (headers.indexOf("id") === -1) headers.unshift("id");
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.setFrozenRows(1);
+    values = [headers];
+  }
+
+  var headers = values[0];
+  var idColIdx = headers.indexOf("id");
+  var existingRowIdx = -1;
+  for (var r = 1; r < values.length; r++) {
+    if (String(values[r][idColIdx]) === String(item.id)) {
+      existingRowIdx = r + 1;
+      break;
+    }
+  }
+
+  var rowData = headers.map(function(h) {
+    var val = item[h];
+    if (val === undefined || val === null) return "";
+    if (typeof val === "object") return JSON.stringify(val);
+    return val;
+  });
+
+  if (existingRowIdx !== -1) {
+    sheet.getRange(existingRowIdx, 1, 1, headers.length).setValues([rowData]);
+  } else {
+    sheet.appendRow(rowData);
+  }
+
+  return createJsonResponse({
+    success: true,
+    status: "success",
+    message: "Item berhasil disimpan ke " + table,
+    id: item.id
+  });
+}
 }
 
 /**
