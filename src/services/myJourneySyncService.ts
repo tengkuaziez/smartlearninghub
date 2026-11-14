@@ -172,7 +172,9 @@ export const myJourneySyncService = {
       syllabusOverview: c.rps?.shortDescription || `${c.totalMeetings} pertemuan kurikulum OBE`,
       primaryLecturer: c.teacher?.name || c.primaryLecturer || '',
       primaryLecturerEmail: c.teacher?.email || '',
-      partnerLecturer: c.secondaryTeacher?.name || c.partnerLecturer || '',
+      partnerLecturer: c.pendingLecturerEmail
+        ? `PENDING:${c.pendingLecturerEmail}`
+        : (c.secondaryTeacher?.name || c.partnerLecturer || '-'),
       partnerLecturerEmail: c.secondaryTeacher?.email || '',
       pendingLecturerEmail: c.pendingLecturerEmail || '',
       pendingLecturerName: c.pendingLecturerName || '',
@@ -271,11 +273,23 @@ export const myJourneySyncService = {
       const isAltaf = lec.email.toLowerCase().includes('altaf');
       const targetAvatar = isMiftah ? '/miftah_avatar.png' : isAltaf ? '/tengku_avatar.png' : (lec.avatarUrl || '');
 
+      const linksObj = {
+        googleScholarUrl: lec.googleScholarUrl || '',
+        sintaUrl: isAltaf ? '' : (lec.sintaUrl || ''),
+        scopusUrl: isAltaf ? '' : (lec.scopusUrl || ''),
+        orcidUrl: lec.orcidUrl || '',
+        researchGateUrl: isMiftah ? '' : (lec.researchGateUrl || ''),
+        campusEmail: lec.campusEmail || (isMiftah ? 'miftahurridlo.688@gmail.com' : 'altaf.aziz16@gmail.com'),
+        linkedinUrl: lec.linkedinUrl || '',
+        instagramUrl: isMiftah ? '' : (lec.instagramUrl || ''),
+        facebookUrl: isMiftah ? '' : (lec.facebookUrl || ''),
+      };
+
       return {
         email: lec.email,
         name: isAltaf ? (lec.name?.replace('S.Pd', 'S.Si') || 'Tengku Abdillah Azis, S.Si') : (lec.name?.replace('S.Pd., ', '') || 'Muhammad Miftahurrodlo, M.Sc.'),
         title: lec.title || (isMiftah ? 'Dosen Pengampu Utama' : 'Tenaga Teknis Survei & Pemetaan / Dosen Pengampu Partner'),
-        role: 'Dosen & Peneliti',
+        role: `Dosen & Peneliti|LINKS:${JSON.stringify(linksObj)}`,
         department: lec.department || (isMiftah ? 'Universitas Negeri Medan' : 'Tenaga Teknis Survei dan Pemetaan BPN Kota Binjai • Geografi / Universitas Negeri Medan'),
         avatarUrl: targetAvatar,
         nidn: lec.nidn || (isMiftah ? '0412088501' : '0419058902'),
@@ -283,11 +297,11 @@ export const myJourneySyncService = {
         sintaUrl: isAltaf ? '' : (lec.sintaUrl || ''),
         scopusUrl: isAltaf ? '' : (lec.scopusUrl || ''),
         orcidUrl: lec.orcidUrl || '',
-        researchGateUrl: lec.researchGateUrl || '',
+        researchGateUrl: isMiftah ? '' : (lec.researchGateUrl || ''),
         campusEmail: lec.campusEmail || (isMiftah ? 'miftahurridlo.688@gmail.com' : 'altaf.aziz16@gmail.com'),
         linkedinUrl: lec.linkedinUrl || '',
-        instagramUrl: lec.instagramUrl || '',
-        facebookUrl: lec.facebookUrl || '',
+        instagramUrl: isMiftah ? '' : (lec.instagramUrl || ''),
+        facebookUrl: isMiftah ? '' : (lec.facebookUrl || ''),
       };
     });
 

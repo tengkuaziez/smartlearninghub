@@ -347,10 +347,10 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
       <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            Teaching
+            Manajemen Kelas
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            Administrasi perkuliahan, RPS & materi.
+            Kelola kelas perkuliahan, mahasiswa, RPS & jadwal sesi perkuliahan.
           </p>
         </div>
       </div>
@@ -408,7 +408,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
-            <span>4. RPS ({courses.length})</span>
+            <span>4. RPS ({activeLecturerCourses.length})</span>
           </button>
 
           <button
@@ -420,7 +420,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
             }`}
           >
             <Calendar className="w-3.5 h-3.5" />
-            <span>5. Jadwal Sesi ({courses.length})</span>
+            <span>5. Jadwal Sesi ({activeLecturerCourses.length})</span>
           </button>
         </div>
 
@@ -961,7 +961,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
       {activeSubTab === 'rps' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {courses.map((c) => (
+            {activeLecturerCourses.map((c) => (
               <div
                 key={c.id}
                 className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3"
@@ -1016,7 +1016,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
       {activeSubTab === 'jadwal' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {courses.map((c) => (
+            {activeLecturerCourses.map((c) => (
               <div
                 key={c.id}
                 className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3"

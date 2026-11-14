@@ -1325,6 +1325,13 @@ export const studentService = {
                   ? prof.avatarUrl
                   : '/miftah_avatar.png');
 
+              let unpackedLinks: any = {};
+              if (prof.role && prof.role.includes('|LINKS:')) {
+                try {
+                  unpackedLinks = JSON.parse(prof.role.split('|LINKS:')[1]);
+                } catch {}
+              }
+
               const userObj: RegisteredUser = {
                 ...defaultData,
                 ...existingUser,
@@ -1339,15 +1346,15 @@ export const studentService = {
                 bio: (existingUser?.bio && !existingUser.bio.includes('Dosen Pengampu Smart Learning Hub.'))
                   ? existingUser.bio
                   : ((prof.bio && !prof.bio.includes('Dosen Pengampu Smart Learning Hub.')) ? prof.bio : defaultBio),
-                campusEmail: existingUser?.campusEmail || defaultData.campusEmail || (isAltaf ? 'altaf.aziz16@gmail.com' : 'mmridlogeo@unimed.ac.id'),
-                googleScholarUrl: existingUser?.googleScholarUrl || defaultData.googleScholarUrl || 'https://scholar.google.com/',
-                sintaUrl: existingUser?.sintaUrl || defaultData.sintaUrl || 'https://sinta.kemdikbud.go.id/',
-                scopusUrl: existingUser?.scopusUrl || defaultData.scopusUrl || 'https://www.scopus.com/',
-                orcidUrl: existingUser?.orcidUrl || defaultData.orcidUrl || '',
-                researchGateUrl: existingUser?.researchGateUrl || defaultData.researchGateUrl || 'https://www.researchgate.net/',
-                linkedinUrl: existingUser?.linkedinUrl || defaultData.linkedinUrl || 'https://linkedin.com/',
-                instagramUrl: existingUser?.instagramUrl || defaultData.instagramUrl || 'https://instagram.com/',
-                facebookUrl: existingUser?.facebookUrl || defaultData.facebookUrl || 'https://facebook.com/',
+                campusEmail: unpackedLinks.campusEmail || prof.campusEmail || existingUser?.campusEmail || defaultData.campusEmail || (isAltaf ? 'altaf.aziz16@gmail.com' : 'miftahurridlo.688@gmail.com'),
+                googleScholarUrl: unpackedLinks.googleScholarUrl || prof.googleScholarUrl || existingUser?.googleScholarUrl || defaultData.googleScholarUrl || '',
+                sintaUrl: isAltaf ? '' : (unpackedLinks.sintaUrl || prof.sintaUrl || existingUser?.sintaUrl || defaultData.sintaUrl || ''),
+                scopusUrl: isAltaf ? '' : (unpackedLinks.scopusUrl || prof.scopusUrl || existingUser?.scopusUrl || defaultData.scopusUrl || ''),
+                orcidUrl: unpackedLinks.orcidUrl || prof.orcidUrl || existingUser?.orcidUrl || defaultData.orcidUrl || '',
+                researchGateUrl: isMiftah ? '' : (unpackedLinks.researchGateUrl || prof.researchGateUrl || existingUser?.researchGateUrl || defaultData.researchGateUrl || ''),
+                linkedinUrl: unpackedLinks.linkedinUrl || prof.linkedinUrl || existingUser?.linkedinUrl || defaultData.linkedinUrl || '',
+                instagramUrl: isMiftah ? '' : (unpackedLinks.instagramUrl || prof.instagramUrl || existingUser?.instagramUrl || defaultData.instagramUrl || ''),
+                facebookUrl: isMiftah ? '' : (unpackedLinks.facebookUrl || prof.facebookUrl || existingUser?.facebookUrl || defaultData.facebookUrl || ''),
                 registeredAt: existingUser?.registeredAt || defaultData.registeredAt || '2026-08-01',
               };
 
@@ -1400,9 +1407,12 @@ export const studentService = {
               const scheduleTime = scheduleRaw.includes(',') ? scheduleRaw.split(',')[1].trim() : '08:00 - 10:30 WIB';
 
               const partnerLecturerStr = (sheetCourse.partnerLecturer || '').trim();
-              const pendingLecturerEmailStr = (sheetCourse.pendingLecturerEmail || '').trim().toLowerCase();
+              const isPendingFromPartnerCol = partnerLecturerStr.startsWith('PENDING:');
+              const pendingLecturerEmailStr = isPendingFromPartnerCol
+                ? partnerLecturerStr.replace('PENDING:', '').trim().toLowerCase()
+                : (sheetCourse.pendingLecturerEmail || '').trim().toLowerCase();
               const hasPendingInvitation = !!pendingLecturerEmailStr;
-              const isPartnerAccepted = partnerLecturerStr && partnerLecturerStr !== '-' && partnerLecturerStr !== '' && !hasPendingInvitation;
+              const isPartnerAccepted = !hasPendingInvitation && partnerLecturerStr && partnerLecturerStr !== '-' && partnerLecturerStr !== '';
 
               const reconstructedCourse: CourseClass = {
                 id: courseId,
@@ -2442,7 +2452,7 @@ export const studentService = {
     const email = (lecturerEmail || currentLecturer.email).toLowerCase().trim();
     const isMiftah = email.includes('miftah');
     const partnerUser = DEFAULT_LECTURERS[email] || (isMiftah ? DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'] : DEFAULT_LECTURERS['altaf.aziz16@gmail.com']);
-    const partnerName = partnerUser?.name || (isMiftah ? 'Muhammad Miftahurrodlo, S.Pd., M.Sc' : 'Tengku Abdillah Azis, S.Pd');
+    const partnerName = partnerUser?.name || (isMiftah ? 'Muhammad Miftahurrodlo, M.Sc.' : 'Tengku Abdillah Azis, S.Si');
     const partnerAvatar = isMiftah ? '/miftah_avatar.png' : '/tengku_avatar.png';
 
     const courses = this.getAllCourses();
@@ -2514,6 +2524,8 @@ export const studentService = {
       const course = courses[courseIndex];
       const updatedCourse: CourseClass = {
         ...course,
+        partnerLecturer: '-',
+        secondaryTeacher: undefined,
         pendingLecturerEmail: undefined,
         pendingLecturerName: undefined,
       };
