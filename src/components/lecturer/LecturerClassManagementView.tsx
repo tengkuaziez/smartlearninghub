@@ -79,6 +79,10 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
   const [newCourseTime, setNewCourseTime] = useState('08:00 - 10:30 WIB');
   const [newCourseSemester, setNewCourseSemester] = useState('Semester 5');
   const [newCourseDesc, setNewCourseDesc] = useState('');
+  const [newCourseCoLecturerEmail, setNewCourseCoLecturerEmail] = useState('');
+  const [quickInviteCourseId, setQuickInviteCourseId] = useState<string | null>(null);
+  const [quickInviteEmail, setQuickInviteEmail] = useState('');
+  const currentUser = studentService.getCurrentUser();
 
   // New Student Form State
   const [newStudentName, setNewStudentName] = useState('');
@@ -145,6 +149,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
       scheduleDay: newCourseDay,
       scheduleTime: newCourseTime,
       semester: newCourseSemester,
+      invitedLecturerEmail: newCourseCoLecturerEmail.trim() || undefined,
     });
 
     onDataUpdated();
@@ -152,8 +157,20 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
     setNewCourseCode('');
     setNewCourseTitle('');
     setNewCourseDesc('');
+    setNewCourseCoLecturerEmail('');
     // Auto-sync pembaruan ke Google Sheets & My Journey
     myJourneySyncService.triggerDebouncedAutoSync();
+  };
+
+  const handleQuickInviteSubmit = (courseId: string, email: string) => {
+    if (!email.trim()) return;
+    const res = studentService.inviteLecturerToCourse(courseId, email.trim());
+    alert(res.message);
+    if (res.success) {
+      setQuickInviteCourseId(null);
+      setQuickInviteEmail('');
+      onDataUpdated();
+    }
   };
 
   // Handle Add Student to Whitelist
@@ -397,6 +414,81 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
 
                   {/* Bottom Metadata Info Lines (Identical to My Journey) */}
                   <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2 text-xs text-slate-500 dark:text-slate-400">
+                    {/* Team Dosen & Kolaborasi Mengajar */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+                          👨‍🏫 {studentService.formatLecturerGreeting(course.teacher.name)}
+                          {course.secondaryTeacher && ` & ${studentService.formatLecturerGreeting(course.secondaryTeacher.name)}`}
+                        </span>
+
+                        {!course.secondaryTeacher && !course.pendingLecturerEmail && course.teacher.email.toLowerCase() === currentUser?.email.toLowerCase() && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setQuickInviteCourseId(quickInviteCourseId === course.id ? null : course.id);
+                              setQuickInviteEmail('');
+                            }}
+                            className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                          >
+                            + Undang Mitra
+                          </button>
+                        )}
+                      </div>
+
+                      {course.pendingLecturerEmail && (
+                        <div className="text-[10px] px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 flex items-center justify-between">
+                          <span>⏳ Menunggu: {course.pendingLecturerName || course.pendingLecturerEmail}</span>
+                          <span className="text-[9px] font-mono">Pending</span>
+                        </div>
+                      )}
+
+                      {/* Quick Invite Form on Card */}
+                      {quickInviteCourseId === course.id && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-indigo-200 dark:border-indigo-800 space-y-2 mt-2 animate-in fade-in"
+                        >
+                          <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300">
+                            Undang Rekan Dosen Pengampu:
+                          </label>
+                          <div className="flex gap-1.5">
+                            <input
+                              type="email"
+                              placeholder="email.dosen@univ.ac.id"
+                              value={quickInviteEmail}
+                              onChange={(e) => setQuickInviteEmail(e.target.value)}
+                              className="flex-1 px-2.5 py-1 text-xs rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 font-mono text-slate-800 dark:text-slate-200"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleQuickInviteSubmit(course.id, quickInviteEmail)}
+                              className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-colors"
+                            >
+                              Kirim
+                            </button>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setQuickInviteEmail('miftahurridlo.688@gmail.com')}
+                              className="text-[10px] px-2 py-0.5 rounded bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50"
+                            >
+                              + Pak Miftah
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setQuickInviteEmail('altaf.aziz16@gmail.com')}
+                              className="text-[10px] px-2 py-0.5 rounded bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-blue-600 dark:text-blue-400 hover:bg-blue-50"
+                            >
+                              + Pak Tengku
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     {/* Schedule & Action Icons */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
@@ -911,6 +1003,38 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                   onChange={(e) => setNewCourseDesc(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                  Undang Rekan Dosen Pengampu (Tim Teaching / Kolaborasi - Opsional)
+                </label>
+                <input
+                  type="email"
+                  placeholder="Contoh: miftahurridlo.688@gmail.com atau altaf.aziz16@gmail.com"
+                  value={newCourseCoLecturerEmail}
+                  onChange={(e) => setNewCourseCoLecturerEmail(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewCourseCoLecturerEmail('miftahurridlo.688@gmail.com')}
+                    className="text-[11px] px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors"
+                  >
+                    + Pak Muhammad Miftahurrodlo, S.Pd., M.Sc
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewCourseCoLecturerEmail('altaf.aziz16@gmail.com')}
+                    className="text-[11px] px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition-colors"
+                  >
+                    + Pak Tengku Abdillah Azis, S.Pd
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Rekan dosen akan menerima notifikasi konfirmasi keikutsertaan. Kelas akan otomatis muncul di akun beliau setelah disetujui.
+                </p>
               </div>
 
               <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">

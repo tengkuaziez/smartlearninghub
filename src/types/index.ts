@@ -121,6 +121,9 @@ export interface CourseClass {
   description: string;
   teacher: TeacherInfo;
   secondaryTeacher?: TeacherInfo; // Dosen partner (tim berdua)
+  pendingLecturerEmail?: string; // Email rekan dosen yang diundang namun belum konfirmasi
+  pendingLecturerName?: string;
+  teamTeachers?: TeacherInfo[];
   semester: string;
   academicYear: string;
   room: string;
@@ -289,11 +292,21 @@ export interface StudentNotification {
   id: string;
   title: string;
   message: string;
-  type: 'assignment' | 'grade' | 'meeting' | 'announcement' | 'attendance';
+  type: 'assignment' | 'grade' | 'meeting' | 'announcement' | 'attendance' | 'invitation';
   timestamp: string;
   isRead: boolean;
   linkTab?: string;
   linkId?: string;
+  recipientEmail?: string;
+  invitationData?: {
+    courseId: string;
+    courseCode: string;
+    courseTitle: string;
+    inviterName: string;
+    inviterEmail: string;
+    invitedEmail: string;
+    status: 'pending' | 'accepted' | 'declined';
+  };
 }
 
 export interface ActivityLog {

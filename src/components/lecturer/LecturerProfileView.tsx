@@ -21,8 +21,9 @@ import {
   Link,
   X,
   FileCode2,
+  Trash2,
 } from 'lucide-react';
-import { studentService, getInitialsAvatar } from '../../services/studentService.ts';
+import { studentService, getInitialsAvatar, DEFAULT_LECTURERS } from '../../services/studentService.ts';
 import { LECTURER_WHITELIST_EMAILS } from '../../data/mockData.ts';
 import { myJourneySyncService } from '../../services/myJourneySyncService.ts';
 import type { AuthUser, CourseClass } from '../../types/index.ts';
@@ -178,31 +179,40 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
     }
   };
 
+  const handleResetAllData = () => {
+    if (window.confirm('PERINGATAN: Apakah Anda yakin ingin mengosongkan seluruh data kelas perkuliahan, mahasiswa, tugas, materi, dan berkas di Smart Learning Hub ke titik 0 bersih? Data akan selaras dengan My Journey yang telah dikosongkan.')) {
+      const res = studentService.resetAllPlatformData();
+      onDataRefreshed();
+      setSyncFeedback(res.message);
+      setTimeout(() => setSyncFeedback(null), 5000);
+    }
+  };
+
   // Build the list of the 2 official lecturers
   const registered = studentService.getRegisteredLecturers();
   const lecturerList: AuthUser[] = [
-    registered.find((l) => l.email.toLowerCase() === 'miftahurridlo.688@gmail.com') || {
-      id: 'dos_01',
-      name: currentUser.email.toLowerCase() === 'miftahurridlo.688@gmail.com' ? currentUser.name : 'Muhammad Miftahurridlo, M.Kom.',
-      email: 'miftahurridlo.688@gmail.com',
-      role: 'dosen' as const,
-      nidn: '0412088501',
-      title: 'Dosen Pengampu Utama',
-      department: 'Sains Informasi Geografi',
-      avatarUrl: getInitialsAvatar('Muhammad Miftahurridlo', true),
-      bio: 'Dosen Pengampu Utama Smart Learning Hub & My Journey. Koordinator kurikulum OBE dan penanggung jawab pengajaran.',
-      registeredAt: '2026-08-01',
-    },
     registered.find((l) => l.email.toLowerCase() === 'altaf.aziz16@gmail.com') || {
       id: 'dos_02',
-      name: currentUser.email.toLowerCase() === 'altaf.aziz16@gmail.com' ? currentUser.name : 'Tengku Abdillah Azis, S.Pd., M.Sc.',
+      name: currentUser.email.toLowerCase() === 'altaf.aziz16@gmail.com' ? currentUser.name : 'Tengku Abdillah Azis, S.Pd',
       email: 'altaf.aziz16@gmail.com',
       role: 'dosen' as const,
       nidn: '0419058902',
-      title: 'Dosen Pengampu Partner',
-      department: 'Pendidikan Geografi',
+      title: 'Dosen Pengampu',
+      department: 'Sains Informasi Geografi',
       avatarUrl: getInitialsAvatar('Tengku Abdillah Azis', true),
-      bio: 'Dosen Pengampu Partner Smart Learning Hub & My Journey. Pengampu kelas SIG dan komputasi spasial.',
+      bio: 'Dosen Pengampu Smart Learning Hub & My Journey.',
+      registeredAt: '2026-08-01',
+    },
+    registered.find((l) => l.email.toLowerCase() === 'miftahurridlo.688@gmail.com') || {
+      id: 'dos_01',
+      name: currentUser.email.toLowerCase() === 'miftahurridlo.688@gmail.com' ? currentUser.name : 'Muhammad Miftahurrodlo, S.Pd., M.Sc',
+      email: 'miftahurridlo.688@gmail.com',
+      role: 'dosen' as const,
+      nidn: '0412088501',
+      title: 'Dosen Pengampu',
+      department: 'Pendidikan Geografi',
+      avatarUrl: getInitialsAvatar('Muhammad Miftahurrodlo', true),
+      bio: 'Dosen Pengampu Smart Learning Hub & My Journey.',
       registeredAt: '2026-08-01',
     },
   ];
@@ -256,6 +266,15 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
           >
             <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
             {isSyncing ? 'Menyelaraskan...' : 'Tarik dari My Journey'}
+          </button>
+
+          <button
+            onClick={handleResetAllData}
+            className="inline-flex items-center gap-2 px-3 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 font-semibold text-xs border border-rose-200 dark:border-rose-800 shadow-xs transition-all cursor-pointer"
+            title="Kosongkan seluruh data teaching & mahasiswa agar bersih seimbang dengan My Journey"
+          >
+            <Trash2 className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+            <span>Reset Seluruh Data</span>
           </button>
         </div>
       </div>

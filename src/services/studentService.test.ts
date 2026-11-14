@@ -212,3 +212,68 @@ test('Whitelist: student must be in master database to register successfully', (
   assert.equal(found?.name, 'Aziz');
   assert.equal(found?.nim, '1234567');
 });
+
+test('Greeting: formatLecturerGreeting prefixes with Pak correctly', () => {
+  assert.equal(studentService.formatLecturerGreeting('Tengku Abdillah Azis, S.Pd'), 'Pak Tengku Abdillah Azis, S.Pd');
+  assert.equal(studentService.formatLecturerGreeting('Muhammad Miftahurrodlo, S.Pd., M.Sc'), 'Pak Muhammad Miftahurrodlo, S.Pd., M.Sc');
+  assert.equal(studentService.formatLecturerGreeting('Pak Tengku'), 'Pak Tengku');
+});
+
+test('Team Teaching: Create course with co-lecturer invitation, accept, and decline flow', () => {
+  // Login as Altaf
+  const altafLogin = studentService.login('altaf.aziz16@gmail.com', 'securePassword456');
+  assert.equal(altafLogin.success, true);
+
+  // Create course and invite Miftah
+  const newCourse = studentService.createCourse({
+    code: 'GEO-501',
+    title: 'Sistem Informasi Geografi Lanjut',
+    description: 'Kelas kolaboratif tim dosen',
+    room: 'Lab SIG',
+    scheduleDay: 'Senin',
+    scheduleTime: '08:00 - 10:30 WIB',
+    invitedLecturerEmail: 'miftahurridlo.688@gmail.com',
+  });
+
+  assert.equal(newCourse.code, 'GEO-501');
+  assert.equal(newCourse.pendingLecturerEmail, 'miftahurridlo.688@gmail.com');
+
+  // Check invitation notification for Miftah
+  const miftahInvites = studentService.getPendingInvitationsForUser('miftahurridlo.688@gmail.com');
+  assert.ok(miftahInvites.length > 0);
+  const invite = miftahInvites.find((n) => n.invitationData?.courseId === newCourse.id);
+  assert.ok(invite);
+  assert.equal(invite?.invitationData?.status, 'pending');
+
+  // Login as Miftah and accept
+  const miftahLogin = studentService.login('miftahurridlo.688@gmail.com', 'password123');
+  assert.equal(miftahLogin.success, true);
+  const acceptRes = studentService.respondToCourseInvitation(invite!.id, 'accepted');
+  assert.equal(acceptRes.success, true);
+
+  // Verify course now has secondaryTeacher set to Miftah
+  const updatedCourse = studentService.getCourseById(newCourse.id);
+  assert.ok(updatedCourse?.secondaryTeacher);
+  assert.equal(updatedCourse?.secondaryTeacher?.email, 'miftahurridlo.688@gmail.com');
+  assert.equal(updatedCourse?.pendingLecturerEmail, undefined);
+
+  // Verify Miftah now has this enrolled/taught course
+  const miftahCourses = studentService.getEnrolledCourses();
+  assert.ok(miftahCourses.some((c) => c.id === newCourse.id));
+});
+
+test('Reset Platform Data: clears courses and students to 0', () => {
+  const res = studentService.resetAllPlatformData();
+  assert.equal(res.success, true);
+  assert.equal(studentService.getAllCourses().length, 0);
+  assert.equal(studentService.getMasterStudents().length, 0);
+  assert.equal(studentService.getMeetings().length, 0);
+  assert.equal(studentService.getAssignments().length, 0);
+  assert.equal(studentService.getSubmissions().length, 0);
+
+  // Both base lecturer accounts remain preserved
+  const lecturers = studentService.getRegisteredLecturers();
+  assert.equal(lecturers.length, 2);
+  assert.ok(lecturers.some((l) => l.email === 'altaf.aziz16@gmail.com'));
+  assert.ok(lecturers.some((l) => l.email === 'miftahurridlo.688@gmail.com'));
+});

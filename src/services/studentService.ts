@@ -56,14 +56,14 @@ const STORAGE_KEYS = {
   CUSTOM_ROSTER: 'slh_custom_roster',
 };
 
-const CURRENT_DATA_VERSION = 'v_kosongan_clean_slate_2026_10_27_r7_clean_slate';
+const CURRENT_DATA_VERSION = 'v_reset_fresh_slate_2026_11_15_r1';
 
 // Automatic migration & purge of outdated dummy data (memulai kosongan & bersih)
 if (typeof window !== 'undefined') {
   try {
     const savedVer = localStorage.getItem(STORAGE_KEYS.DATA_VERSION);
     if (savedVer !== CURRENT_DATA_VERSION) {
-      console.log('[Smart Learning Hub] Mengosongkan semua data dummy lama untuk memulai kosongan...');
+      console.log('[Smart Learning Hub] Mengosongkan seluruh data lama untuk memulai kosongan sesuai My Journey...');
       // Clear old dummy keys to start completely empty
       [
         STORAGE_KEYS.COURSES,
@@ -117,6 +117,34 @@ export const getInitialsAvatar = (name: string, isDosen = false): string => {
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=${bg}&color=fff&size=256&bold=true`;
 };
 
+// 2 Akun Dasar Dosen Pengampu Smart Learning Hub & My Journey
+export const DEFAULT_LECTURERS: Record<string, AuthUser> = {
+  'altaf.aziz16@gmail.com': {
+    id: 'dos_altaf',
+    name: 'Tengku Abdillah Azis, S.Pd',
+    email: 'altaf.aziz16@gmail.com',
+    role: 'dosen',
+    nidn: '0419058902',
+    title: 'Dosen Pengampu',
+    department: 'Sains Informasi Geografi',
+    avatarUrl: getInitialsAvatar('Tengku Abdillah Azis', true),
+    bio: 'Dosen Pengampu Smart Learning Hub.',
+    registeredAt: '2026-08-01',
+  },
+  'miftahurridlo.688@gmail.com': {
+    id: 'dos_miftah',
+    name: 'Muhammad Miftahurrodlo, S.Pd., M.Sc',
+    email: 'miftahurridlo.688@gmail.com',
+    role: 'dosen',
+    nidn: '0412088501',
+    title: 'Dosen Pengampu',
+    department: 'Pendidikan Geografi',
+    avatarUrl: getInitialsAvatar('Muhammad Miftahurrodlo', true),
+    bio: 'Dosen Pengampu Smart Learning Hub.',
+    registeredAt: '2026-08-01',
+  },
+};
+
 export const defaultStudentUser: AuthUser = {
   id: 'std_demo',
   name: 'Mahasiswa',
@@ -127,18 +155,7 @@ export const defaultStudentUser: AuthUser = {
   registeredAt: '2026-09-01',
 };
 
-export const defaultLecturerUser: AuthUser = {
-  id: 'dos_01',
-  name: 'Muhammad Miftahurridlo, M.Kom.',
-  email: 'miftahurridlo.688@gmail.com',
-  role: 'dosen',
-  nidn: '0412088501',
-  title: 'Dosen Pengampu Utama',
-  department: 'Sains Informasi Geografi',
-  avatarUrl: getInitialsAvatar('Muhammad Miftahurridlo', true),
-  bio: 'Dosen Pengampu Utama Smart Learning Hub & My Journey.',
-  registeredAt: '2026-08-01',
-};
+export const defaultLecturerUser: AuthUser = DEFAULT_LECTURERS['altaf.aziz16@gmail.com'];
 
 export interface MeetingAttendanceRosterItem {
   studentName: string;
@@ -192,6 +209,19 @@ export const studentService = {
   getRegisteredUsers(): RegisteredUser[] {
     const users = getStorage<RegisteredUser[]>(STORAGE_KEYS.REGISTERED_USERS, []);
     let modified = false;
+
+    // Pastikan 2 akun dasar dosen selalu terdaftar
+    const altafEmail = 'altaf.aziz16@gmail.com';
+    const miftahEmail = 'miftahurridlo.688@gmail.com';
+    if (!users.some((u) => u.email.toLowerCase() === altafEmail)) {
+      users.push(DEFAULT_LECTURERS[altafEmail]);
+      modified = true;
+    }
+    if (!users.some((u) => u.email.toLowerCase() === miftahEmail)) {
+      users.push(DEFAULT_LECTURERS[miftahEmail]);
+      modified = true;
+    }
+
     users.forEach((u) => {
       if (u.avatarUrl && (u.avatarUrl.includes('photo-1534528741775') || u.avatarUrl.includes('photo-1507003211169'))) {
         u.avatarUrl = getInitialsAvatar(u.name, u.role === 'dosen');
@@ -218,7 +248,18 @@ export const studentService = {
 
   getRegisteredLecturers(): AuthUser[] {
     const users = this.getRegisteredUsers();
-    return users.filter((u) => u.role === 'dosen');
+    const list = users.filter((u) => u.role === 'dosen');
+    const altaf = list.find((u) => u.email.toLowerCase() === 'altaf.aziz16@gmail.com') || DEFAULT_LECTURERS['altaf.aziz16@gmail.com'];
+    const miftah = list.find((u) => u.email.toLowerCase() === 'miftahurridlo.688@gmail.com') || DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'];
+    return [altaf, miftah];
+  },
+
+  // Format sambutan dosen dengan kata "Pak"
+  formatLecturerGreeting(name: string): string {
+    const clean = (name || '').trim();
+    if (!clean) return 'Pak Dosen';
+    if (/^(pak|ibu|dr\.|prof\.)/i.test(clean)) return clean;
+    return `Pak ${clean}`;
   },
 
   // Update lecturer profile directly (Foto, Gelar, NIDN, Prodi, Bio, dsb)
@@ -874,16 +915,18 @@ export const studentService = {
               if (!cleanEmail) return;
 
               const idx = regUsers.findIndex((u) => u.email.toLowerCase() === cleanEmail);
-              const cleanName = prof.name || (cleanEmail.includes('miftah') ? 'Muhammad Miftahurridlo' : 'Tengku Abdillah Azis');
+              const isAltaf = cleanEmail.includes('altaf');
+              const cleanName = isAltaf ? 'Tengku Abdillah Azis, S.Pd' : 'Muhammad Miftahurrodlo, S.Pd., M.Sc';
+              const cleanDept = isAltaf ? 'Sains Informasi Geografi' : 'Pendidikan Geografi';
               const userObj: RegisteredUser = {
-                id: idx >= 0 ? regUsers[idx].id : `dos_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`,
+                id: idx >= 0 ? regUsers[idx].id : (DEFAULT_LECTURERS[cleanEmail]?.id || `dos_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`),
                 name: cleanName,
                 email: cleanEmail,
                 role: 'dosen',
                 title: prof.title || prof.role || 'Dosen Pengampu',
-                department: prof.department || (cleanEmail.includes('miftah') ? 'Sistem Informasi Geografis & Geomatika' : 'Rekayasa Perangkat Lunak & Geoinformatika'),
+                department: cleanDept,
                 avatarUrl: prof.avatarUrl || getInitialsAvatar(cleanName, true),
-                bio: prof.bio || `${cleanName} — Dosen Pengampu Smart Learning Hub & My Journey.`,
+                bio: prof.bio || `${cleanName} — Dosen Pengampu Smart Learning Hub.`,
                 registeredAt: regUsers[idx]?.registeredAt || new Date().toISOString(),
               };
 
@@ -902,57 +945,14 @@ export const studentService = {
             setStorage(STORAGE_KEYS.REGISTERED_USERS, regUsers);
           }
 
-          // B. Kelas dari Google Sheets (hanya non-dummy)
-          if (json.data.Courses && Array.isArray(json.data.Courses) && json.data.Courses.length > 0) {
-            const currentCourses = this.getAllCourses().filter(
-              (c) => !['crs-1', 'crs-2', 'crs-3'].includes(c.id) && !['IF-405', 'IF-208', 'GEO-301'].includes(c.code.toUpperCase())
-            );
-
-            json.data.Courses.forEach((c: any) => {
-              const codeStr = String(c.code || '').trim();
-              const nameStr = c.name || 'Mata Kuliah';
-              if (!codeStr || ['IF-405', 'IF-208', 'GEO-301'].includes(codeStr.toUpperCase())) return;
-
-              const existsIdx = currentCourses.findIndex((crs) => crs.id === c.id || crs.code.toLowerCase() === codeStr.toLowerCase());
-              const mappedCourse: CourseClass = {
-                id: c.id || `gas_crs_${codeStr}`,
-                code: codeStr,
-                title: nameStr,
-                section: c.section || 'Kelas A',
-                schedule: c.schedule || 'Jadwal Kuliah',
-                room: c.room || 'Lab Komputasi',
-                credits: Number(c.credits) || 3,
-                semester: c.semester || 'Ganjil 2026/2027',
-                academicYear: c.academicYear || '2026/2027',
-                description: c.description || `Mata kuliah ${nameStr} diampu oleh tim dosen.`,
-                category: 'Geografi & Geospasial',
-                color: 'from-blue-600 to-indigo-700',
-                status: 'active',
-                syllabusOverview: c.syllabusOverview || 'Kurikulum OBE',
-                enrolledCount: Number(c.enrolledCount) || 0,
-                enrolledStudentEmails: [],
-                completedMeetingsCount: 0,
-                totalMeetingsCount: 16,
-                progress: 0,
-                primaryLecturer: c.primaryLecturer || 'Tengku Abdillah Azis',
-                partnerLecturer: c.partnerLecturer || 'Muhammad Miftahurridlo',
-                teacher: {
-                  name: c.primaryLecturer || 'Tengku Abdillah Azis',
-                  title: 'Dosen Pengampu',
-                  avatarUrl: '',
-                },
-              };
-
-              if (existsIdx >= 0) {
-                currentCourses[existsIdx] = { ...currentCourses[existsIdx], ...mappedCourse };
-              } else {
-                currentCourses.push(mappedCourse);
-              }
-              coursesCount++;
-            });
-
-            setStorage(STORAGE_KEYS.COURSES, currentCourses);
-          }
+          // B. Kelas disinkronkan langsung dari Supabase Database (sumber tunggal My Journey)
+          // Tidak menginjeksi kelas lama dari Google Sheets agar data teaching tetap bersih/sinkron
+          try {
+            const syncedCoursesRes = await this.syncCoursesFromSupabase();
+            if (syncedCoursesRes.success) {
+              coursesCount = syncedCoursesRes.count;
+            }
+          } catch {}
 
           // C. Mahasiswa Resmi dari Google Sheets (hanya mahasiswa nyata)
           if (json.data.Students && Array.isArray(json.data.Students) && json.data.Students.length > 0) {
@@ -1073,11 +1073,10 @@ export const studentService = {
         }
 
         // Supabase Auth Berhasil Terverifikasi!
-        const isMiftah = normalized.includes('miftah');
-        const defaultName = isMiftah ? 'Muhammad Miftahurridlo, M.Kom.' : 'Tengku Abdillah Azis';
-        const fullName = data.user.user_metadata?.full_name || 
-                         data.user.user_metadata?.name || 
-                         defaultName;
+        const isAltaf = normalized.includes('altaf');
+        const defaultName = isAltaf ? 'Tengku Abdillah Azis, S.Pd' : 'Muhammad Miftahurrodlo, S.Pd., M.Sc';
+        const defaultDept = isAltaf ? 'Sains Informasi Geografi' : 'Pendidikan Geografi';
+        const fullName = defaultName;
 
         const registeredUsers = this.getRegisteredUsers();
         let user = registeredUsers.find((u) => u.email.toLowerCase() === normalized);
@@ -1089,10 +1088,10 @@ export const studentService = {
             email: normalized,
             role: 'dosen',
             password: password,
-            nidn: isMiftah ? '0412088501' : '0419058902',
-            title: isMiftah ? 'Dosen Pengampu Utama' : 'Dosen Pengampu Partner',
-            department: isMiftah ? 'Sains Informasi Geografi' : 'Pendidikan Geografi',
-            bio: isMiftah ? 'Dosen Pengampu Utama Smart Learning Hub & My Journey.' : 'Dosen Pengampu Partner Smart Learning Hub & My Journey.',
+            nidn: isAltaf ? '0419058902' : '0412088501',
+            title: 'Dosen Pengampu',
+            department: defaultDept,
+            bio: `${fullName} — Dosen Pengampu Smart Learning Hub.`,
             avatarUrl: getInitialsAvatar(fullName, true),
             registeredAt: new Date().toISOString(),
           };
@@ -1101,6 +1100,7 @@ export const studentService = {
           user.id = data.user.id;
           user.password = password;
           user.name = fullName;
+          user.department = defaultDept;
           this.saveRegisteredUser(user);
         }
 
@@ -1108,10 +1108,11 @@ export const studentService = {
         await this.syncAllFromMyJourneyCloud();
 
         const refreshedUser = this.getCurrentUser() || user;
+        const greetingName = this.formatLecturerGreeting(refreshedUser.name);
         return {
           success: true,
           user: refreshedUser,
-          message: `Selamat datang kembali, ${refreshedUser.name}! (Terverifikasi Supabase My Journey)`,
+          message: `Selamat datang kembali, ${greetingName}! (Terverifikasi Supabase My Journey)`,
         };
       } catch (err: any) {
         return {
@@ -1448,16 +1449,21 @@ export const studentService = {
     if (!user && !studentEmail) {
       return [];
     }
-    const emailToFilter = (studentEmail || user?.email || '').toLowerCase();
+    const emailToFilter = (studentEmail || user?.email || '').toLowerCase().trim();
 
-    // If currentUser is dosen, return all courses managed by the 2 lecturers
+    // If currentUser is dosen: return courses where lecturer is primary teacher OR secondary teacher OR in teamTeachers
     if (user?.role === 'dosen') {
-      return courses;
+      return courses.filter((c) => {
+        const primary = (c.teacher?.email || '').toLowerCase().trim();
+        const secondary = (c.secondaryTeacher?.email || '').toLowerCase().trim();
+        const isTeam = (c.teamTeachers || []).some((t) => (t.email || '').toLowerCase().trim() === emailToFilter);
+        return primary === emailToFilter || secondary === emailToFilter || isTeam;
+      });
     }
 
     // For students: ONLY return classes where the lecturer added their email!
     return courses.filter((c) =>
-      c.enrolledStudentEmails?.map((e) => e.toLowerCase()).includes(emailToFilter)
+      c.enrolledStudentEmails?.map((e) => e.toLowerCase().trim()).includes(emailToFilter)
     );
   },
 
@@ -1519,12 +1525,14 @@ export const studentService = {
     scheduleDay: string;
     scheduleTime: string;
     semester?: string;
+    invitedLecturerEmail?: string;
   }): CourseClass {
     const courses = this.getAllCourses();
     const currentLecturer = this.getCurrentUser() || defaultLecturerUser;
     const newCourseId = `course_${Date.now()}`;
     const cleanCode = data.code.toUpperCase().trim();
     const cleanTitle = data.title.trim();
+    const invitedEmail = data.invitedLecturerEmail?.trim().toLowerCase();
 
     const newCourse: CourseClass = {
       id: newCourseId,
@@ -1537,17 +1545,19 @@ export const studentService = {
         title: currentLecturer.title || 'Dosen Pengampu',
         email: currentLecturer.email,
         avatarUrl: currentLecturer.avatarUrl,
-        department: currentLecturer.department || 'Teknik Informatika',
+        department: currentLecturer.department || 'Sains Informasi Geografi',
       },
+      pendingLecturerEmail: invitedEmail || undefined,
+      pendingLecturerName: invitedEmail ? (DEFAULT_LECTURERS[invitedEmail]?.name || invitedEmail) : undefined,
       semester: data.semester || 'Semester 5',
       academicYear: '2026/2027 Ganjil',
-      room: data.room || 'Lab Komputasi A-302',
+      room: data.room || 'Lab Komputasi Spasial',
       scheduleTime: data.scheduleTime || '08:00 - 10:30 WIB',
       scheduleDay: data.scheduleDay || 'Senin',
       totalMeetings: 16,
       completedMeetings: 0,
       colorScheme: 'blue',
-      enrolledStudentEmails: ['altaf.aziz16@student.ac.id'],
+      enrolledStudentEmails: [],
     };
 
     // Auto generate 16 meetings for OBE matrix
@@ -1561,7 +1571,7 @@ export const studentService = {
       date: `2026-09-${String(Math.min(30, 1 + i * 7)).padStart(2, '0')}`,
       startTime: data.scheduleTime?.split('-')[0]?.trim() || '08:00',
       endTime: data.scheduleTime?.split('-')[1]?.trim() || '10:30',
-      room: data.room || 'Lab Komputasi A-302',
+      room: data.room || 'Lab Komputasi Spasial',
       isCompleted: false,
       materials: [],
       assignments: [],
@@ -1570,17 +1580,275 @@ export const studentService = {
     setStorage(STORAGE_KEYS.COURSES, [...courses, newCourse]);
     setStorage(STORAGE_KEYS.MEETINGS, [...allMeetings, ...newMeetings]);
 
+    // Kirim undangan ke rekan dosen jika email diisi
+    if (invitedEmail) {
+      this.sendCourseInvitationNotification({
+        courseId: newCourse.id,
+        courseCode: newCourse.code,
+        courseTitle: newCourse.title,
+        inviterName: currentLecturer.name,
+        inviterEmail: currentLecturer.email,
+        invitedEmail: invitedEmail,
+      });
+    }
+
     // Kirim sinkronisasi ke Supabase Cloud (My Journey Unified DB)
     supabaseDataService.saveCourse(newCourse).catch(() => {});
 
     this.addActivity({
       title: 'Mata Kuliah Baru Dibuat',
-      description: `Dosen menambahkan kelas baru ${newCourse.code} - ${newCourse.title} (16 Pertemuan).`,
+      description: `${this.formatLecturerGreeting(currentLecturer.name)} menambahkan kelas baru ${newCourse.code} - ${newCourse.title}.${invitedEmail ? ` Mengundang rekan dosen (${invitedEmail}) untuk bertim.` : ''}`,
       type: 'course',
       courseTitle: newCourse.title,
     });
 
     return newCourse;
+  },
+
+  // Kirim notifikasi undangan tim mengajar ke email dosen mitra
+  sendCourseInvitationNotification(data: {
+    courseId: string;
+    courseCode: string;
+    courseTitle: string;
+    inviterName: string;
+    inviterEmail: string;
+    invitedEmail: string;
+  }): void {
+    const notifications = getStorage<StudentNotification[]>(STORAGE_KEYS.NOTIFICATIONS, initialNotifications);
+    const inviterTitle = this.formatLecturerGreeting(data.inviterName);
+    const newNotif: StudentNotification = {
+      id: `notif_inv_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      title: 'Undangan Kolaborasi Mengajar',
+      message: `${inviterTitle} (${data.inviterEmail}) mengundang Anda untuk bergabung mengampu mata kuliah ${data.courseCode} - ${data.courseTitle}.`,
+      type: 'invitation',
+      timestamp: 'Baru saja',
+      isRead: false,
+      recipientEmail: data.invitedEmail.toLowerCase(),
+      linkTab: 'kelas',
+      linkId: data.courseId,
+      invitationData: {
+        courseId: data.courseId,
+        courseCode: data.courseCode,
+        courseTitle: data.courseTitle,
+        inviterName: data.inviterName,
+        inviterEmail: data.inviterEmail,
+        invitedEmail: data.invitedEmail.toLowerCase(),
+        status: 'pending',
+      },
+    };
+    setStorage(STORAGE_KEYS.NOTIFICATIONS, [newNotif, ...notifications]);
+  },
+
+  // Undang rekan dosen ke kelas yang sudah ada
+  inviteLecturerToCourse(courseId: string, targetEmail: string): { success: boolean; message: string } {
+    const courses = this.getAllCourses();
+    const courseIndex = courses.findIndex((c) => c.id === courseId);
+    if (courseIndex === -1) {
+      return { success: false, message: 'Kelas tidak ditemukan.' };
+    }
+    const course = courses[courseIndex];
+    const currentLecturer = this.getCurrentUser() || defaultLecturerUser;
+    const cleanEmail = targetEmail.trim().toLowerCase();
+
+    if (cleanEmail === currentLecturer.email.toLowerCase()) {
+      return { success: false, message: 'Anda tidak dapat mengundang akun sendiri.' };
+    }
+
+    const partnerName = DEFAULT_LECTURERS[cleanEmail]?.name || cleanEmail;
+    const updatedCourse: CourseClass = {
+      ...course,
+      pendingLecturerEmail: cleanEmail,
+      pendingLecturerName: partnerName,
+    };
+    courses[courseIndex] = updatedCourse;
+    setStorage(STORAGE_KEYS.COURSES, courses);
+
+    this.sendCourseInvitationNotification({
+      courseId: course.id,
+      courseCode: course.code,
+      courseTitle: course.title,
+      inviterName: currentLecturer.name,
+      inviterEmail: currentLecturer.email,
+      invitedEmail: cleanEmail,
+    });
+
+    supabaseDataService.saveCourse(updatedCourse).catch(() => {});
+
+    this.addActivity({
+      title: 'Undangan Tim Dosen Dikirim',
+      description: `${this.formatLecturerGreeting(currentLecturer.name)} mengundang ${partnerName} (${cleanEmail}) untuk bergabung di kelas ${course.code} - ${course.title}.`,
+      type: 'course',
+      courseTitle: course.title,
+    });
+
+    return {
+      success: true,
+      message: `Undangan berhasil dikirim ke ${partnerName} (${cleanEmail}). Notifikasi konfirmasi telah diteruskan.`,
+    };
+  },
+
+  // Tanggapi undangan kolaborasi mengajar (Terima / Tolak)
+  respondToCourseInvitation(notificationId: string, response: 'accepted' | 'declined'): { success: boolean; message: string } {
+    const notifications = getStorage<StudentNotification[]>(STORAGE_KEYS.NOTIFICATIONS, initialNotifications);
+    const notifIndex = notifications.findIndex((n) => n.id === notificationId);
+    if (notifIndex === -1) {
+      return { success: false, message: 'Notifikasi undangan tidak ditemukan.' };
+    }
+    const notif = notifications[notifIndex];
+    const invData = notif.invitationData;
+    if (!invData) {
+      return { success: false, message: 'Data undangan tidak valid.' };
+    }
+
+    const currentLecturer = this.getCurrentUser() || defaultLecturerUser;
+    const courses = this.getAllCourses();
+    const courseIndex = courses.findIndex((c) => c.id === invData.courseId);
+
+    if (response === 'accepted') {
+      if (courseIndex !== -1) {
+        const course = courses[courseIndex];
+        const invitedEmail = invData.invitedEmail.toLowerCase();
+        const invitedLecturer = DEFAULT_LECTURERS[invitedEmail] || currentLecturer;
+        const updatedCourse: CourseClass = {
+          ...course,
+          secondaryTeacher: {
+            id: invitedLecturer.id,
+            name: invitedLecturer.name,
+            title: invitedLecturer.title || 'Dosen Pengampu Partner',
+            email: invitedLecturer.email,
+            avatarUrl: invitedLecturer.avatarUrl,
+            department: invitedLecturer.department || 'Pendidikan Geografi',
+          },
+          pendingLecturerEmail: undefined,
+          pendingLecturerName: undefined,
+        };
+        courses[courseIndex] = updatedCourse;
+        setStorage(STORAGE_KEYS.COURSES, courses);
+        supabaseDataService.saveCourse(updatedCourse).catch(() => {});
+      }
+
+      notifications[notifIndex] = {
+        ...notif,
+        isRead: true,
+        invitationData: {
+          ...invData,
+          status: 'accepted',
+        },
+      };
+
+      const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
+      const replyNotif: StudentNotification = {
+        id: `notif_acc_${Date.now()}`,
+        title: 'Undangan Kolaborasi Diterima!',
+        message: `${this.formatLecturerGreeting(currentLecturer.name)} telah menerima undangan Anda untuk bersama-sama mengampu mata kuliah ${invData.courseCode} - ${invData.courseTitle}.`,
+        type: 'announcement',
+        timestamp: nowStr,
+        isRead: false,
+        recipientEmail: invData.inviterEmail.toLowerCase(),
+        linkTab: 'kelas',
+        linkId: invData.courseId,
+      };
+      notifications.unshift(replyNotif);
+      setStorage(STORAGE_KEYS.NOTIFICATIONS, notifications);
+
+      this.addActivity({
+        title: 'Kolaborasi Dosen Diterima',
+        description: `${this.formatLecturerGreeting(currentLecturer.name)} resmi bergabung mengampu kelas ${invData.courseCode} - ${invData.courseTitle} bersama ${this.formatLecturerGreeting(invData.inviterName)}.`,
+        type: 'course',
+        courseTitle: invData.courseTitle,
+      });
+
+      return {
+        success: true,
+        message: `Selamat! Anda telah resmi bergabung sebagai tim dosen pengampu kelas ${invData.courseCode} - ${invData.courseTitle}.`,
+      };
+    } else {
+      // Declined
+      if (courseIndex !== -1) {
+        const course = courses[courseIndex];
+        const updatedCourse: CourseClass = {
+          ...course,
+          pendingLecturerEmail: undefined,
+          pendingLecturerName: undefined,
+        };
+        courses[courseIndex] = updatedCourse;
+        setStorage(STORAGE_KEYS.COURSES, courses);
+        supabaseDataService.saveCourse(updatedCourse).catch(() => {});
+      }
+
+      notifications[notifIndex] = {
+        ...notif,
+        isRead: true,
+        invitationData: {
+          ...invData,
+          status: 'declined',
+        },
+      };
+
+      const replyNotif: StudentNotification = {
+        id: `notif_dec_${Date.now()}`,
+        title: 'Undangan Kolaborasi Belum Diterima',
+        message: `${this.formatLecturerGreeting(currentLecturer.name)} belum dapat menerima undangan kolaborasi untuk mata kuliah ${invData.courseCode} - ${invData.courseTitle}.`,
+        type: 'announcement',
+        timestamp: 'Baru saja',
+        isRead: false,
+        recipientEmail: invData.inviterEmail.toLowerCase(),
+        linkTab: 'kelas',
+        linkId: invData.courseId,
+      };
+      notifications.unshift(replyNotif);
+      setStorage(STORAGE_KEYS.NOTIFICATIONS, notifications);
+
+      return {
+        success: true,
+        message: 'Undangan kolaborasi telah ditolak.',
+      };
+    }
+  },
+
+  // Ambil undangan pending untuk pengguna aktif
+  getPendingInvitationsForUser(email?: string): StudentNotification[] {
+    const user = this.getCurrentUser();
+    const clean = (email || user?.email || '').toLowerCase().trim();
+    if (!clean) return [];
+    const notifs = getStorage<StudentNotification[]>(STORAGE_KEYS.NOTIFICATIONS, initialNotifications);
+    return notifs.filter(
+      (n) =>
+        n.type === 'invitation' &&
+        n.invitationData?.status === 'pending' &&
+        n.recipientEmail?.toLowerCase() === clean
+    );
+  },
+
+  // Reset total data pengajaran & mahasiswa ke titik 0 bersih
+  resetAllPlatformData(): { success: boolean; message: string } {
+    setStorage(STORAGE_KEYS.COURSES, []);
+    setStorage(STORAGE_KEYS.MASTER_STUDENTS, []);
+    setStorage(STORAGE_KEYS.MEETINGS, []);
+    setStorage(STORAGE_KEYS.ASSIGNMENTS, []);
+    setStorage(STORAGE_KEYS.SUBMISSIONS, []);
+    setStorage(STORAGE_KEYS.ATTENDANCE_SESSIONS, []);
+    setStorage(STORAGE_KEYS.ATTENDANCE_RECORDS, []);
+    setStorage(STORAGE_KEYS.GRADES, []);
+    setStorage(STORAGE_KEYS.ANNOUNCEMENTS, []);
+    setStorage(STORAGE_KEYS.NOTIFICATIONS, []);
+    setStorage(STORAGE_KEYS.ACTIVITIES, []);
+    setStorage(STORAGE_KEYS.CUSTOM_ROSTER, {});
+
+    const defaultUsers = [
+      DEFAULT_LECTURERS['altaf.aziz16@gmail.com'],
+      DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'],
+    ];
+    setStorage(STORAGE_KEYS.REGISTERED_USERS, defaultUsers);
+
+    try {
+      myJourneySyncService.triggerDebouncedAutoSync();
+    } catch {}
+
+    return {
+      success: true,
+      message: 'Seluruh kelas, mahasiswa, tugas, materi, dan data dummy berhasil dikosongkan ke titik awal bersih.',
+    };
   },
 
   // Lecturer Action: Delete Course
@@ -2193,8 +2461,12 @@ export const studentService = {
   },
 
   // Notifications
-  getNotifications(): StudentNotification[] {
-    return getStorage<StudentNotification[]>(STORAGE_KEYS.NOTIFICATIONS, initialNotifications);
+  getNotifications(filterEmail?: string): StudentNotification[] {
+    const all = getStorage<StudentNotification[]>(STORAGE_KEYS.NOTIFICATIONS, initialNotifications);
+    const user = this.getCurrentUser();
+    const targetEmail = (filterEmail || user?.email || '').toLowerCase().trim();
+    if (!targetEmail) return all;
+    return all.filter((n) => !n.recipientEmail || n.recipientEmail.toLowerCase() === targetEmail);
   },
 
   markNotificationAsRead(id: string): void {

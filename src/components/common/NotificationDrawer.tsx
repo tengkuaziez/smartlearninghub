@@ -1,6 +1,7 @@
 import React from 'react';
-import { Bell, Check, X, FileText, Award, Calendar, Megaphone, CheckCheck } from 'lucide-react';
+import { Bell, Check, X, FileText, Award, Calendar, Megaphone, CheckCheck, Users } from 'lucide-react';
 import type { StudentNotification } from '../../types/index.ts';
+import { studentService } from '../../services/studentService.ts';
 
 interface NotificationDrawerProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface NotificationDrawerProps {
   onMarkRead: (id: string) => void;
   onMarkAllRead: () => void;
   onNavigate: (tab: string, contextId?: string) => void;
+  onRespondInvitation?: (id: string, response: 'accepted' | 'declined') => void;
 }
 
 export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
@@ -25,6 +27,8 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
 
   const getIcon = (type: StudentNotification['type']) => {
     switch (type) {
+      case 'invitation':
+        return <Users className="w-4 h-4 text-purple-600 dark:text-purple-400" />;
       case 'assignment':
         return <FileText className="w-4 h-4 text-indigo-500" />;
       case 'grade':
@@ -123,6 +127,56 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                   <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 mt-0.5 leading-relaxed">
                     {item.message}
                   </p>
+
+                  {/* Interaksi Konfirmasi Undangan Dosen */}
+                  {item.type === 'invitation' && item.invitationData && (
+                    <div className="mt-2.5">
+                      {item.invitationData.status === 'pending' ? (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onRespondInvitation) {
+                                onRespondInvitation(item.id, 'accepted');
+                              } else {
+                                studentService.respondToCourseInvitation(item.id, 'accepted');
+                              }
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer transition-colors"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Terima Keikutsertaan</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onRespondInvitation) {
+                                onRespondInvitation(item.id, 'declined');
+                              } else {
+                                studentService.respondToCourseInvitation(item.id, 'declined');
+                              }
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-semibold text-[11px] cursor-pointer transition-colors"
+                          >
+                            Tolak
+                          </button>
+                        </div>
+                      ) : item.invitationData.status === 'accepted' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                          <Check className="w-3 h-3" />
+                          Keikutsertaan Diterima
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                          <X className="w-3 h-3" />
+                          Undangan Ditolak
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   <span className="text-[11px] text-slate-400 block mt-1">
                     {item.timestamp}
                   </span>

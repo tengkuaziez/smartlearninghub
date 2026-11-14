@@ -13,6 +13,7 @@ import {
   Users
 } from 'lucide-react';
 import { Logo } from '../common/Logo.tsx';
+import { studentService } from '../../services/studentService.ts';
 import type { AuthUser } from '../../types/index.ts';
 
 export type LecturerNavTab = 
@@ -94,7 +95,7 @@ export const LecturerSidebar: React.FC<LecturerSidebarProps> = ({
           />
           <div className="flex-1 min-w-0">
             <h4 className="text-sm font-bold text-white truncate">
-              {user.name}
+              {studentService.formatLecturerGreeting(user.name)}
             </h4>
             <p className="text-xs text-indigo-300 truncate font-mono">
               {user.email}

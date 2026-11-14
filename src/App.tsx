@@ -537,7 +537,7 @@ export default function App() {
               {lecturerTab === 'beranda' && (
                 <LecturerDashboardView
                   user={currentUser}
-                  courses={allLecturerCourses}
+                  courses={courses}
                   assignments={assignments}
                   submissions={submissions}
                   sessions={attendanceSessions}
@@ -545,6 +545,7 @@ export default function App() {
                   onOpenQrBroadcast={(sess) => setBroadcastSession(sess)}
                   onNavigate={handleSelectLecturerTab}
                   onOpenGoogleModal={() => setIsGoogleModalOpen(true)}
+                  onDataUpdated={reloadData}
                 />
               )}
 
@@ -846,6 +847,10 @@ export default function App() {
           reloadData();
         }}
         onNavigate={handleGlobalNavigate}
+        onRespondInvitation={(id, resp) => {
+          studentService.respondToCourseInvitation(id, resp);
+          reloadData();
+        }}
       />
 
       {/* Student QR Scanner Modal */}

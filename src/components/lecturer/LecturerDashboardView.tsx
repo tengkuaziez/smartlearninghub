@@ -12,8 +12,10 @@ import {
   Award,
   CheckCircle2,
   Cloud,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Check
 } from 'lucide-react';
+import { studentService } from '../../services/studentService.ts';
 import type { 
   AuthUser, 
   CourseClass, 
@@ -33,6 +35,7 @@ interface LecturerDashboardViewProps {
   onOpenQrBroadcast: (session: AttendanceSession) => void;
   onNavigate: (tab: string) => void;
   onOpenGoogleModal?: () => void;
+  onDataUpdated?: () => void;
 }
 
 export const LecturerDashboardView: React.FC<LecturerDashboardViewProps> = ({
@@ -45,6 +48,7 @@ export const LecturerDashboardView: React.FC<LecturerDashboardViewProps> = ({
   onOpenQrBroadcast,
   onNavigate,
   onOpenGoogleModal,
+  onDataUpdated,
 }) => {
   // Stats
   const totalCourses = courses.length;
@@ -55,6 +59,9 @@ export const LecturerDashboardView: React.FC<LecturerDashboardViewProps> = ({
 
   const pendingGrading = submissions.filter((s) => s.grade === undefined);
   const activeSession = sessions.find((s) => s.isOpen);
+
+  // Undangan kolaborasi mengajar yang menunggu konfirmasi pengguna aktif
+  const pendingInvitations = studentService.getPendingInvitationsForUser(user.email);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
@@ -67,7 +74,7 @@ export const LecturerDashboardView: React.FC<LecturerDashboardViewProps> = ({
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            Selamat Datang, {user.name}!
+            Selamat Datang, {studentService.formatLecturerGreeting(user.name)}!
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
             Platform ini digunakan bersama oleh tim dua dosen pengampu untuk mengelola materi, daftar email mahasiswa, dan penilaian tugas terpadu.
@@ -76,6 +83,65 @@ export const LecturerDashboardView: React.FC<LecturerDashboardViewProps> = ({
 
         <div className="absolute -right-8 -bottom-12 w-64 h-64 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
       </div>
+
+      {/* Undangan Kolaborasi Mengajar Dosen (Jika Ada) */}
+      {pendingInvitations.length > 0 && (
+        <div className="space-y-3">
+          {pendingInvitations.map((inv) => (
+            <div
+              key={inv.id}
+              className="p-4 sm:p-5 rounded-2xl bg-linear-to-r from-indigo-500/10 via-purple-500/10 to-blue-500/10 border-2 border-indigo-400 dark:border-indigo-600 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2"
+            >
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
+                      Undangan Tim Mengajar
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      {inv.invitationData?.courseCode}
+                    </span>
+                  </div>
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white mt-1">
+                    {studentService.formatLecturerGreeting(inv.invitationData?.inviterName || 'Dosen Pengampu')} mengundang Anda
+                  </h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                    Bergabung mengampu mata kuliah <strong>{inv.invitationData?.courseCode} - {inv.invitationData?.courseTitle}</strong> secara kolaboratif.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const res = studentService.respondToCourseInvitation(inv.id, 'accepted');
+                    alert(res.message);
+                    if (onDataUpdated) onDataUpdated();
+                  }}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm hover:shadow transition-all cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Terima & Masuk Kelas</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const res = studentService.respondToCourseInvitation(inv.id, 'declined');
+                    if (onDataUpdated) onDataUpdated();
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer transition-colors"
+                >
+                  Tolak
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
@@ -261,7 +327,24 @@ export const LecturerDashboardView: React.FC<LecturerDashboardViewProps> = ({
                     <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
                       <span className="flex items-center gap-1.5">
                         <Users className="w-3.5 h-3.5 text-blue-500" />
-                        <span>Mahasiswa Terdaftar:</span>
+                        <span>Tim Dosen:</span>
+                      </span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[150px]">
+                        {studentService.formatLecturerGreeting(course.teacher?.name || 'Dosen')}
+                        {course.secondaryTeacher && ` & ${studentService.formatLecturerGreeting(course.secondaryTeacher.name)}`}
+                      </span>
+                    </div>
+
+                    {course.pendingLecturerEmail && (
+                      <div className="text-[10px] px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60">
+                        ⏳ Menunggu konfirmasi: {course.pendingLecturerName || course.pendingLecturerEmail}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                      <span className="flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Mahasiswa:</span>
                       </span>
                       <strong className="text-slate-900 dark:text-white font-mono">
                         {course.enrolledStudentEmails?.length || 0} orang
