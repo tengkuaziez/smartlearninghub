@@ -21,7 +21,6 @@ import {
   Link,
   X,
   FileCode2,
-  Trash2,
 } from 'lucide-react';
 import { studentService, getInitialsAvatar, DEFAULT_LECTURERS } from '../../services/studentService.ts';
 import { LECTURER_WHITELIST_EMAILS } from '../../data/mockData.ts';
@@ -171,15 +170,6 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
     }
   };
 
-  const handleResetAllData = () => {
-    if (window.confirm('PERINGATAN: Apakah Anda yakin ingin mengosongkan seluruh data kelas perkuliahan, mahasiswa, tugas, materi, dan berkas di Smart Learning Hub ke titik 0 bersih? Data akan selaras dengan My Journey yang telah dikosongkan.')) {
-      const res = studentService.resetAllPlatformData();
-      onDataRefreshed();
-      setSyncFeedback(res.message);
-      setTimeout(() => setSyncFeedback(null), 5000);
-    }
-  };
-
   // Build the list of the 2 official lecturers
   const registered = studentService.getRegisteredLecturers();
   const lecturerList: AuthUser[] = [
@@ -258,15 +248,6 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
           >
             <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
             {isSyncing ? 'Menyelaraskan...' : 'Tarik dari My Journey'}
-          </button>
-
-          <button
-            onClick={handleResetAllData}
-            className="inline-flex items-center gap-2 px-3 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 font-semibold text-xs border border-rose-200 dark:border-rose-800 shadow-xs transition-all cursor-pointer"
-            title="Kosongkan seluruh data teaching & mahasiswa agar bersih seimbang dengan My Journey"
-          >
-            <Trash2 className="w-4 h-4 text-rose-600 dark:text-rose-400" />
-            <span>Reset Seluruh Data</span>
           </button>
         </div>
       </div>
@@ -368,9 +349,9 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
                         Dosen Pengampu Partner
                       </span>
                     )}
-                    {displayUser.nidn ? (
+                    {(displayUser.nidn || DEFAULT_LECTURERS[displayUser.email]?.nidn) ? (
                       <span className="text-[10px] text-slate-400 font-mono">
-                        NIDN: {displayUser.nidn}
+                        NIDN: {displayUser.nidn || DEFAULT_LECTURERS[displayUser.email]?.nidn}
                       </span>
                     ) : null}
                   </div>
@@ -386,7 +367,7 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
                 {/* Profile Avatar & Details */}
                 <div className="flex items-start gap-4 mb-4">
                   <img
-                    src={displayUser.avatarUrl || getInitialsAvatar(displayUser.name, true)}
+                    src={displayUser.avatarUrl || DEFAULT_LECTURERS[displayUser.email]?.avatarUrl || getInitialsAvatar(displayUser.name, true)}
                     alt={displayUser.name}
                     className="w-16 h-16 rounded-2xl object-cover ring-2 ring-slate-200 dark:ring-slate-700 shrink-0 bg-indigo-50 dark:bg-slate-800"
                     onError={(e) => {
@@ -409,7 +390,7 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
                       )}
                     </div>
                     <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">
-                      {displayUser.title || (isPrimary ? 'Dosen Pengampu Utama' : 'Dosen Pengampu Partner')}
+                      {isPrimary ? 'Dosen Pengampu Utama' : 'Dosen Pengampu Partner'}
                     </p>
                     <div className="flex items-center gap-1.5 text-xs text-slate-500 font-mono mt-1">
                       <Mail className="w-3 h-3 text-slate-400 shrink-0" />

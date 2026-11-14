@@ -56,7 +56,7 @@ const STORAGE_KEYS = {
   CUSTOM_ROSTER: 'slh_custom_roster',
 };
 
-const CURRENT_DATA_VERSION = 'v_reset_fresh_slate_2026_11_15_r2';
+const CURRENT_DATA_VERSION = 'v_reset_fresh_slate_2026_11_15_r3';
 
 // Automatic migration & purge of outdated dummy data (memulai kosongan & bersih)
 if (typeof window !== 'undefined') {
@@ -127,7 +127,7 @@ export const DEFAULT_LECTURERS: Record<string, AuthUser> = {
     nidn: '0419058902',
     title: 'Dosen Pengampu Partner',
     department: 'Sains Informasi Geografi',
-    avatarUrl: getInitialsAvatar('Tengku Abdillah Azis', true),
+    avatarUrl: '/academic_avatar_1792141179472.jpg',
     bio: 'Dosen & Peneliti Sains Informasi Geografi. Terhubung langsung dengan workspace riset, pengajaran, dan administrasi My Journey.',
     registeredAt: '2026-08-01',
   },
@@ -298,18 +298,51 @@ export const studentService = {
 
     let foundProfileData: any = null;
 
-    // 1. Coba ambil dari LocalStorage My Journey (jika diakses pada peramban/origin yang sama)
+    // 1. Coba ambil dari Supabase Database (Tabel profiles resmi My Journey)
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        const authUser = authData?.user;
+        if (authUser) {
+          const { data: supaProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', authUser.id)
+            .maybeSingle();
+
+          if (supaProfile) {
+            foundProfileData = {
+              name: supaProfile.name || foundProfileData?.name,
+              titlePrefix: supaProfile.title_prefix,
+              titleSuffix: supaProfile.title_suffix,
+              role: supaProfile.role || foundProfileData?.role,
+              department: supaProfile.university_or_org || foundProfileData?.department,
+              avatarUrl: supaProfile.avatar_url || foundProfileData?.avatarUrl,
+              bio: supaProfile.bio || foundProfileData?.bio,
+              googleScholarUrl: supaProfile.google_scholar_url,
+              sintaUrl: supaProfile.sinta_url,
+              linkedinUrl: supaProfile.linkedin_url,
+              campusEmail: supaProfile.campus_email,
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('Supabase profile query note:', e);
+      }
+    }
+
+    // 2. Coba ambil dari LocalStorage My Journey (jika diakses pada peramban/origin yang sama)
     try {
       const rawMyJourney = localStorage.getItem('my_journey_user_profile');
       if (rawMyJourney) {
         const parsed = JSON.parse(rawMyJourney);
         if (parsed && (parsed.name || parsed.title)) {
-          foundProfileData = parsed;
+          foundProfileData = { ...parsed, ...foundProfileData };
         }
       }
     } catch {}
 
-    // 2. Jika belum ada atau mau verifikasi, coba tarik dari Google Sheets Teaching Bridge
+    // 3. Tarik data pelengkap dari Google Sheets Teaching Bridge
     try {
       const gasResult = await fetch(`${(import.meta as any).env?.VITE_GAS_API_URL || 'https://script.google.com/macros/s/AKfycbwDzcpOCO9Npm0sH8DM9maCOEtDo_LWaHMX4K7JY6RPle_5En0fG5s59sEHRJ9UZ45W/exec'}?action=getTeaching`);
       if (gasResult.ok) {
@@ -323,6 +356,7 @@ export const studentService = {
               role: matched.role || foundProfileData?.role,
               department: matched.department || foundProfileData?.department,
               avatarUrl: matched.avatarUrl || foundProfileData?.avatarUrl,
+              ...foundProfileData,
             };
           }
         }
@@ -346,13 +380,19 @@ export const studentService = {
       const defaultTitle = isAltaf ? 'Dosen Pengampu Partner' : 'Dosen Pengampu Utama';
       const defaultDept = isAltaf ? 'Sains Informasi Geografi' : 'Pendidikan Geografi';
 
+      let targetAvatar = foundProfileData.avatarUrl;
+      if (!targetAvatar || targetAvatar.includes('photo-1534528741775') || (isAltaf && targetAvatar.includes('ui-avatars.com'))) {
+        targetAvatar = isAltaf ? '/academic_avatar_1792141179472.jpg' : getInitialsAvatar(fullName || foundProfileData.name, true);
+      } else if (targetAvatar.includes('academic_avatar')) {
+        targetAvatar = '/academic_avatar_1792141179472.jpg';
+      }
+
       const updated = this.updateLecturerProfile({
         name: fullName || foundProfileData.name,
-        title: foundProfileData.role || foundProfileData.title || defaultTitle,
+        nidn: isAltaf ? '0419058902' : '0412088501',
+        title: defaultTitle,
         department: foundProfileData.universityOrOrg || foundProfileData.department || defaultDept,
-        avatarUrl: foundProfileData.avatarUrl && !foundProfileData.avatarUrl.includes('photo-1534528741775')
-          ? foundProfileData.avatarUrl
-          : getInitialsAvatar(fullName || foundProfileData.name, true),
+        avatarUrl: targetAvatar,
         bio: (foundProfileData.bio && !foundProfileData.bio.includes('Dosen Pengampu Smart Learning Hub.')) ? foundProfileData.bio : defaultBio,
         googleScholarUrl: foundProfileData.googleScholarUrl || '',
         sintaUrl: foundProfileData.sintaUrl || '',
@@ -930,14 +970,17 @@ export const studentService = {
                 ? 'Dosen & Peneliti Sains Informasi Geografi. Terhubung langsung dengan workspace riset, pengajaran, dan administrasi My Journey.'
                 : 'Dosen & Peneliti Pendidikan Geografi. Terhubung langsung dengan kurikulum OBE dan manajemen pengajaran My Journey.';
 
+              const targetAvatar = isAltaf ? '/academic_avatar_1792141179472.jpg' : (prof.avatarUrl || getInitialsAvatar(cleanName, true));
+
               const userObj: RegisteredUser = {
                 id: idx >= 0 ? regUsers[idx].id : (DEFAULT_LECTURERS[cleanEmail]?.id || `dos_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`),
                 name: cleanName,
                 email: cleanEmail,
                 role: 'dosen',
-                title: prof.title || prof.role || defaultTitle,
-                department: prof.department || cleanDept,
-                avatarUrl: prof.avatarUrl || getInitialsAvatar(cleanName, true),
+                nidn: isAltaf ? '0419058902' : '0412088501',
+                title: defaultTitle,
+                department: cleanDept,
+                avatarUrl: targetAvatar,
                 bio: (prof.bio && !prof.bio.includes('Dosen Pengampu Smart Learning Hub.')) ? prof.bio : defaultBio,
                 registeredAt: regUsers[idx]?.registeredAt || '2026-08-01',
               };
@@ -1088,7 +1131,31 @@ export const studentService = {
         const isAltaf = normalized.includes('altaf');
         const defaultName = isAltaf ? 'Tengku Abdillah Azis, S.Pd' : 'Muhammad Miftahurrodlo, S.Pd., M.Sc';
         const defaultDept = isAltaf ? 'Sains Informasi Geografi' : 'Pendidikan Geografi';
+        const defaultTitle = isAltaf ? 'Dosen Pengampu Partner' : 'Dosen Pengampu Utama';
+        const defaultBio = isAltaf
+          ? 'Dosen & Peneliti Sains Informasi Geografi. Terhubung langsung dengan workspace riset, pengajaran, dan administrasi My Journey.'
+          : 'Dosen & Peneliti Pendidikan Geografi. Terhubung langsung dengan kurikulum OBE dan manajemen pengajaran My Journey.';
+        const defaultAvatar = isAltaf ? '/academic_avatar_1792141179472.jpg' : getInitialsAvatar(defaultName, true);
         const fullName = defaultName;
+
+        // Cek profil dari tabel profiles Supabase My Journey
+        let supaAvatar = defaultAvatar;
+        let supaBio = defaultBio;
+        let supaDept = defaultDept;
+        try {
+          const { data: supaProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', data.user.id)
+            .maybeSingle();
+          if (supaProfile) {
+            if (supaProfile.bio) supaBio = supaProfile.bio;
+            if (supaProfile.university_or_org) supaDept = supaProfile.university_or_org;
+            if (supaProfile.avatar_url && !supaProfile.avatar_url.includes('ui-avatars')) {
+              supaAvatar = supaProfile.avatar_url.includes('academic_avatar') ? '/academic_avatar_1792141179472.jpg' : supaProfile.avatar_url;
+            }
+          }
+        } catch {}
 
         const registeredUsers = this.getRegisteredUsers();
         let user = registeredUsers.find((u) => u.email.toLowerCase() === normalized);
@@ -1101,10 +1168,10 @@ export const studentService = {
             role: 'dosen',
             password: password,
             nidn: isAltaf ? '0419058902' : '0412088501',
-            title: 'Dosen Pengampu',
-            department: defaultDept,
-            bio: `${fullName} — Dosen Pengampu Smart Learning Hub.`,
-            avatarUrl: getInitialsAvatar(fullName, true),
+            title: defaultTitle,
+            department: supaDept,
+            bio: supaBio,
+            avatarUrl: supaAvatar,
             registeredAt: new Date().toISOString(),
           };
           this.saveRegisteredUser(user);
@@ -1112,7 +1179,11 @@ export const studentService = {
           user.id = data.user.id;
           user.password = password;
           user.name = fullName;
-          user.department = defaultDept;
+          user.nidn = isAltaf ? '0419058902' : '0412088501';
+          user.title = defaultTitle;
+          user.department = supaDept;
+          user.bio = supaBio;
+          user.avatarUrl = supaAvatar;
           this.saveRegisteredUser(user);
         }
 
