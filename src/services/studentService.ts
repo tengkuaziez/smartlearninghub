@@ -157,14 +157,15 @@ export const DEFAULT_LECTURERS: Record<string, AuthUser> = {
     title: 'Tenaga Teknis Survei & Pemetaan / Dosen Pengampu Partner',
     department: 'Tenaga Teknis Survei dan Pemetaan BPN Kota Binjai • Geografi / Universitas Negeri Medan',
     avatarUrl: '/tengku_avatar.png',
-    bio: 'Tenaga Teknis Survei dan Pemetaan BPN Kota Binjai dan Dosen Pengampu Partner. Terhubung langsung dengan workspace riset, pemetaan, dan administrasi perkuliahan My Journey.',
-    googleScholarUrl: 'https://scholar.google.com/citations?user=TengkuAbdillahAzis',
+    bio: 'All about my journey; research, work, and study',
+    googleScholarUrl: 'https://scholar.google.com/citations?user=us8cI4UAAAAJ&hl=id&oi=ao',
+    orcidUrl: 'https://orcid.org/0009-0002-3123-0362',
+    researchGateUrl: 'https://www.researchgate.net/profile/Tengku-Abdillah-Azis',
+    linkedinUrl: 'https://www.linkedin.com/in/tengku-abdillah-azis-67347a291/',
+    instagramUrl: 'https://instagram.com/tengku_aziez',
+    facebookUrl: 'https://www.facebook.com/tengku.a.aziz.90',
     sintaUrl: '',
     scopusUrl: '',
-    researchGateUrl: 'https://www.researchgate.net/profile/Tengku-Abdillah-Azis',
-    linkedinUrl: 'https://www.linkedin.com/in/tengku-abdillah-azis',
-    instagramUrl: 'https://www.instagram.com/tengku_azis',
-    facebookUrl: 'https://www.facebook.com/tengku.azis',
     registeredAt: '2026-08-01',
   },
   'miftahurridlo.688@gmail.com': {
@@ -179,12 +180,13 @@ export const DEFAULT_LECTURERS: Record<string, AuthUser> = {
     avatarUrl: '/miftah_avatar.png',
     bio: 'Dosen & Peneliti Pendidikan Geografi. Terhubung langsung dengan kurikulum OBE dan manajemen pengajaran My Journey.',
     googleScholarUrl: 'https://scholar.google.com/citations?user=dZ60Jp0AAAAJ',
+    scopusUrl: 'https://www.scopus.com/authid/detail.uri?authorId=57218579450',
     sintaUrl: 'https://sinta.kemdikbud.go.id/authors/profile/6684784',
-    scopusUrl: '',
-    researchGateUrl: '',
+    orcidUrl: 'https://orcid.org/0000-0002-3909-0268',
+    researchGateUrl: 'https://www.researchgate.net/profile/Muhammad-Miftahurrodlo',
     linkedinUrl: 'https://www.linkedin.com/in/muhammad-miftahurridlo',
-    instagramUrl: '',
-    facebookUrl: '',
+    instagramUrl: 'https://instagram.com/miftahurridlo',
+    facebookUrl: 'https://facebook.com/miftahurridlo',
     registeredAt: '2026-08-01',
   },
 };
@@ -254,6 +256,10 @@ export const studentService = {
           user.googleScholarUrl = DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].googleScholarUrl;
           modified = true;
         }
+        if (!user.orcidUrl || !isValidProfileUrl(user.orcidUrl)) {
+          user.orcidUrl = DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].orcidUrl;
+          modified = true;
+        }
         if (!user.researchGateUrl || !isValidProfileUrl(user.researchGateUrl)) {
           user.researchGateUrl = DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].researchGateUrl;
           modified = true;
@@ -309,14 +315,30 @@ export const studentService = {
           user.sintaUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].sintaUrl;
           modified = true;
         }
+        if (!user.scopusUrl || !isValidProfileUrl(user.scopusUrl)) {
+          user.scopusUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].scopusUrl;
+          modified = true;
+        }
+        if (!user.orcidUrl || !isValidProfileUrl(user.orcidUrl)) {
+          user.orcidUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].orcidUrl;
+          modified = true;
+        }
+        if (!user.researchGateUrl || !isValidProfileUrl(user.researchGateUrl)) {
+          user.researchGateUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].researchGateUrl;
+          modified = true;
+        }
         if (!user.linkedinUrl || !isValidProfileUrl(user.linkedinUrl)) {
           user.linkedinUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].linkedinUrl;
           modified = true;
         }
-        if (user.scopusUrl) { user.scopusUrl = ''; modified = true; }
-        if (user.researchGateUrl) { user.researchGateUrl = ''; modified = true; }
-        if (user.instagramUrl) { user.instagramUrl = ''; modified = true; }
-        if (user.facebookUrl) { user.facebookUrl = ''; modified = true; }
+        if (!user.instagramUrl || !isValidProfileUrl(user.instagramUrl)) {
+          user.instagramUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].instagramUrl;
+          modified = true;
+        }
+        if (!user.facebookUrl || !isValidProfileUrl(user.facebookUrl)) {
+          user.facebookUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].facebookUrl;
+          modified = true;
+        }
       } else if (user.avatarUrl && (user.avatarUrl.includes('photo-1534528741775') || user.avatarUrl.includes('photo-1507003211169') || user.avatarUrl.includes('academic_avatar'))) {
         user.avatarUrl = getInitialsAvatar(user.name, user.role === 'dosen');
         modified = true;
@@ -419,6 +441,10 @@ export const studentService = {
           u.googleScholarUrl = DEFAULT_LECTURERS[altafEmail].googleScholarUrl;
           modified = true;
         }
+        if (!u.orcidUrl || !isValidProfileUrl(u.orcidUrl)) {
+          u.orcidUrl = DEFAULT_LECTURERS[altafEmail].orcidUrl;
+          modified = true;
+        }
         if (!u.researchGateUrl || !isValidProfileUrl(u.researchGateUrl)) {
           u.researchGateUrl = DEFAULT_LECTURERS[altafEmail].researchGateUrl;
           modified = true;
@@ -475,14 +501,30 @@ export const studentService = {
           u.sintaUrl = DEFAULT_LECTURERS[miftahEmail].sintaUrl;
           modified = true;
         }
+        if (!u.scopusUrl || !isValidProfileUrl(u.scopusUrl)) {
+          u.scopusUrl = DEFAULT_LECTURERS[miftahEmail].scopusUrl;
+          modified = true;
+        }
+        if (!u.orcidUrl || !isValidProfileUrl(u.orcidUrl)) {
+          u.orcidUrl = DEFAULT_LECTURERS[miftahEmail].orcidUrl;
+          modified = true;
+        }
+        if (!u.researchGateUrl || !isValidProfileUrl(u.researchGateUrl)) {
+          u.researchGateUrl = DEFAULT_LECTURERS[miftahEmail].researchGateUrl;
+          modified = true;
+        }
         if (!u.linkedinUrl || !isValidProfileUrl(u.linkedinUrl)) {
           u.linkedinUrl = DEFAULT_LECTURERS[miftahEmail].linkedinUrl;
           modified = true;
         }
-        if (u.scopusUrl) { u.scopusUrl = ''; modified = true; }
-        if (u.researchGateUrl) { u.researchGateUrl = ''; modified = true; }
-        if (u.instagramUrl) { u.instagramUrl = ''; modified = true; }
-        if (u.facebookUrl) { u.facebookUrl = ''; modified = true; }
+        if (!u.instagramUrl || !isValidProfileUrl(u.instagramUrl)) {
+          u.instagramUrl = DEFAULT_LECTURERS[miftahEmail].instagramUrl;
+          modified = true;
+        }
+        if (!u.facebookUrl || !isValidProfileUrl(u.facebookUrl)) {
+          u.facebookUrl = DEFAULT_LECTURERS[miftahEmail].facebookUrl;
+          modified = true;
+        }
       } else if (u.avatarUrl && (u.avatarUrl.includes('photo-1534528741775') || u.avatarUrl.includes('photo-1507003211169') || u.avatarUrl.includes('academic_avatar'))) {
         u.avatarUrl = getInitialsAvatar(u.name, u.role === 'dosen');
         modified = true;
@@ -1312,11 +1354,11 @@ export const studentService = {
               const defaultData = DEFAULT_LECTURERS[cleanEmail] || (isAltaf ? DEFAULT_LECTURERS['altaf.aziz16@gmail.com'] : DEFAULT_LECTURERS['miftahurridlo.688@gmail.com']);
               const existingUser = idx >= 0 ? regUsers[idx] : (curUser && curUser.email.toLowerCase() === cleanEmail ? curUser : undefined);
 
-              const cleanName = isAltaf ? 'Tengku Abdillah Azis, S.Pd' : 'Muhammad Miftahurrodlo, S.Pd., M.Sc';
-              const cleanDept = isAltaf ? 'Sains Informasi Geografi' : 'Pendidikan Geografi';
+              const cleanName = isAltaf ? 'Tengku Abdillah Azis, S.Si' : 'Muhammad Miftahurrodlo, M.Sc.';
+              const cleanDept = isAltaf ? 'Tenaga Teknis Survei dan Pemetaan BPN Kota Binjai • Geografi / Universitas Negeri Medan' : 'Pendidikan Geografi';
               const defaultTitle = isAltaf ? 'Tenaga Teknis Survei & Pemetaan / Dosen Pengampu Partner' : 'Dosen Pengampu Utama';
               const defaultBio = isAltaf
-                ? 'Tenaga Teknis Survei & Pemetaan dan Dosen Pengampu Partner Sains Informasi Geografi. Terhubung langsung dengan workspace riset, pemetaan, dan administrasi perkuliahan My Journey.'
+                ? 'All about my journey; research, work, and study'
                 : 'Dosen & Peneliti Pendidikan Geografi. Terhubung langsung dengan kurikulum OBE dan manajemen pengajaran My Journey.';
 
               const targetAvatar = isAltaf
@@ -1336,12 +1378,12 @@ export const studentService = {
                 ...defaultData,
                 ...existingUser,
                 id: existingUser?.id || defaultData.id || `dos_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`,
-                name: cleanName,
+                name: (prof.name && !prof.name.includes('S.Pd')) ? prof.name : cleanName,
                 email: cleanEmail,
                 role: 'dosen',
                 nidn: isAltaf ? '0419058902' : '0412088501',
-                title: existingUser?.title || defaultTitle,
-                department: cleanDept,
+                title: existingUser?.title || prof.title || defaultTitle,
+                department: prof.department || cleanDept,
                 avatarUrl: targetAvatar,
                 bio: (existingUser?.bio && !existingUser.bio.includes('Dosen Pengampu Smart Learning Hub.'))
                   ? existingUser.bio
@@ -1351,10 +1393,10 @@ export const studentService = {
                 sintaUrl: isAltaf ? '' : (unpackedLinks.sintaUrl || prof.sintaUrl || existingUser?.sintaUrl || defaultData.sintaUrl || ''),
                 scopusUrl: isAltaf ? '' : (unpackedLinks.scopusUrl || prof.scopusUrl || existingUser?.scopusUrl || defaultData.scopusUrl || ''),
                 orcidUrl: unpackedLinks.orcidUrl || prof.orcidUrl || existingUser?.orcidUrl || defaultData.orcidUrl || '',
-                researchGateUrl: isMiftah ? '' : (unpackedLinks.researchGateUrl || prof.researchGateUrl || existingUser?.researchGateUrl || defaultData.researchGateUrl || ''),
+                researchGateUrl: unpackedLinks.researchGateUrl || prof.researchGateUrl || existingUser?.researchGateUrl || defaultData.researchGateUrl || '',
                 linkedinUrl: unpackedLinks.linkedinUrl || prof.linkedinUrl || existingUser?.linkedinUrl || defaultData.linkedinUrl || '',
-                instagramUrl: isMiftah ? '' : (unpackedLinks.instagramUrl || prof.instagramUrl || existingUser?.instagramUrl || defaultData.instagramUrl || ''),
-                facebookUrl: isMiftah ? '' : (unpackedLinks.facebookUrl || prof.facebookUrl || existingUser?.facebookUrl || defaultData.facebookUrl || ''),
+                instagramUrl: unpackedLinks.instagramUrl || prof.instagramUrl || existingUser?.instagramUrl || defaultData.instagramUrl || '',
+                facebookUrl: unpackedLinks.facebookUrl || prof.facebookUrl || existingUser?.facebookUrl || defaultData.facebookUrl || '',
                 registeredAt: existingUser?.registeredAt || defaultData.registeredAt || '2026-08-01',
               };
 

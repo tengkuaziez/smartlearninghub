@@ -274,6 +274,7 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
       title: altafSaved.title || 'Tenaga Teknis Survei & Pemetaan / Dosen Pengampu Partner',
       department: altafSaved.department || 'Tenaga Teknis Survei dan Pemetaan BPN Kota Binjai • Geografi / Universitas Negeri Medan',
       googleScholarUrl: altafSaved.googleScholarUrl || DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].googleScholarUrl || '',
+      orcidUrl: altafSaved.orcidUrl || DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].orcidUrl || '',
       researchGateUrl: altafSaved.researchGateUrl || DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].researchGateUrl || '',
       linkedinUrl: altafSaved.linkedinUrl || DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].linkedinUrl || '',
       instagramUrl: altafSaved.instagramUrl || DEFAULT_LECTURERS['altaf.aziz16@gmail.com'].instagramUrl || '',
@@ -284,18 +285,19 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
     {
       ...DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'],
       ...miftahSaved,
-      name: (miftahSaved.name || DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].name).replace('S.Pd., ', ''),
+      name: (miftahSaved.name || DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].name).replace('S.Pd., ', '').replace('S.Pd', '').trim(),
       avatarUrl: '/miftah_avatar.png',
       title: miftahSaved.title || 'Dosen Pengampu Utama',
-      department: miftahSaved.department || 'Universitas Negeri Medan',
+      department: miftahSaved.department || 'Pendidikan Geografi',
       googleScholarUrl: miftahSaved.googleScholarUrl || DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].googleScholarUrl || '',
       sintaUrl: miftahSaved.sintaUrl || DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].sintaUrl || '',
+      scopusUrl: miftahSaved.scopusUrl || DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].scopusUrl || '',
+      orcidUrl: miftahSaved.orcidUrl || DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].orcidUrl || '',
+      researchGateUrl: miftahSaved.researchGateUrl || DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].researchGateUrl || '',
       linkedinUrl: miftahSaved.linkedinUrl || DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].linkedinUrl || '',
+      instagramUrl: miftahSaved.instagramUrl || DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].instagramUrl || '',
+      facebookUrl: miftahSaved.facebookUrl || DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].facebookUrl || '',
       campusEmail: 'miftahurridlo.688@gmail.com',
-      scopusUrl: '',
-      researchGateUrl: '',
-      instagramUrl: '',
-      facebookUrl: '',
     },
   ];
 
@@ -431,15 +433,16 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
                 ? (rawUser.name || lecturer.name).replace('S.Pd., ', '').replace('S.Pd, ', '').replace('S.Pd', '').trim()
                 : (rawUser.name || lecturer.name).replace('S.Pd', 'S.Si'),
               department: isPrimary
-                ? (rawUser.department && rawUser.department !== 'Sains Informasi Geografi' ? rawUser.department : 'Universitas Negeri Medan')
+                ? (rawUser.department && rawUser.department !== 'Sains Informasi Geografi' ? rawUser.department : 'Pendidikan Geografi')
                 : (rawUser.department || 'Tenaga Teknis Survei dan Pemetaan BPN Kota Binjai • Geografi / Universitas Negeri Medan'),
               googleScholarUrl: rawUser.googleScholarUrl || lecturer.googleScholarUrl || '',
-              researchGateUrl: isPrimary ? '' : (rawUser.researchGateUrl || lecturer.researchGateUrl || ''),
-              linkedinUrl: rawUser.linkedinUrl || lecturer.linkedinUrl || '',
-              instagramUrl: isPrimary ? '' : (rawUser.instagramUrl || lecturer.instagramUrl || ''),
-              facebookUrl: isPrimary ? '' : (rawUser.facebookUrl || lecturer.facebookUrl || ''),
               sintaUrl: isPrimary ? (rawUser.sintaUrl || lecturer.sintaUrl || '') : '',
-              scopusUrl: '',
+              scopusUrl: isPrimary ? (rawUser.scopusUrl || lecturer.scopusUrl || '') : '',
+              orcidUrl: rawUser.orcidUrl || lecturer.orcidUrl || '',
+              researchGateUrl: rawUser.researchGateUrl || lecturer.researchGateUrl || '',
+              linkedinUrl: rawUser.linkedinUrl || lecturer.linkedinUrl || '',
+              instagramUrl: rawUser.instagramUrl || lecturer.instagramUrl || '',
+              facebookUrl: rawUser.facebookUrl || lecturer.facebookUrl || '',
             };
 
             return (
@@ -490,9 +493,9 @@ export const LecturerProfileView: React.FC<LecturerProfileViewProps> = ({
                   <img
                     src={displayUser.avatarUrl || (displayUser.email.toLowerCase().includes('altaf') ? '/tengku_avatar.png' : '/miftah_avatar.png')}
                     alt={displayUser.name}
-                    className="w-16 h-16 rounded-2xl object-cover ring-2 ring-slate-200 dark:ring-slate-700 shrink-0 bg-indigo-50 dark:bg-slate-800"
+                    className="w-16 h-16 rounded-2xl object-cover object-center ring-2 ring-slate-200 dark:ring-slate-700 shrink-0 bg-slate-100 dark:bg-slate-800 shadow-sm"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = displayUser.email.toLowerCase().includes('altaf') ? '/tengku_avatar.png' : getInitialsAvatar(displayUser.name, true);
+                      (e.target as HTMLImageElement).src = displayUser.email.toLowerCase().includes('altaf') ? '/tengku_avatar.png' : '/miftah_avatar.png';
                     }}
                   />
                   <div className="flex-1 min-w-0">

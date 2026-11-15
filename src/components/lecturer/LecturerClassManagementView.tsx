@@ -85,6 +85,9 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
   const [quickInviteCourseId, setQuickInviteCourseId] = useState<string | null>(null);
   const [quickInviteEmail, setQuickInviteEmail] = useState('');
 
+  // Selected Pending Course Modal State (Undangan Kolaborasi)
+  const [selectedPendingCourse, setSelectedPendingCourse] = useState<CourseClass | null>(null);
+
   // Edit Course Modal State
   const [isEditCourseModalOpen, setIsEditCourseModalOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<CourseClass | null>(null);
@@ -101,10 +104,10 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
   // Colleague Lecturers for "Add Friend" style co-teaching selection
   const registeredLecturers = studentService.getRegisteredLecturers();
   const colleagueLecturers = registeredLecturers.filter(
-    (l) => l.email.toLowerCase() !== currentUser?.email?.toLowerCase()
+    (l) => (l.email || '').toLowerCase() !== (currentUser?.email || '').toLowerCase()
   );
   if (colleagueLecturers.length === 0) {
-    const isAltaf = currentUser?.email?.toLowerCase().includes('altaf');
+    const isAltaf = (currentUser?.email || '').toLowerCase().includes('altaf');
     colleagueLecturers.push(
       isAltaf
         ? DEFAULT_LECTURERS['miftahurridlo.688@gmail.com']
@@ -300,13 +303,24 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
     (c) => c.pendingLecturerEmail?.toLowerCase() === currentUser?.email?.toLowerCase()
   );
 
-  // Filter kelas aktif: hanya kelas di mana user adalah dosen pengampu utama atau partner yang sudah menerima undangan.
-  // Kelas yang masih menunggu persetujuan (pending) hanya muncul di banner undangan atas!
-  const activeLecturerCourses = courses.filter((c) => {
-    const userEmail = (currentUser?.email || '').toLowerCase().trim();
-    if (c.pendingLecturerEmail?.toLowerCase() === userEmail) {
-      return false; // Tampilkan di banner persetujuan di atas
-    }
+  const userEmail = (currentUser?.email || '').toLowerCase().trim();
+
+  // Kelas yang ditampilkan di Tab "1. Kelas":
+  // Meliputi kelas buatan user, kelas tim yang sudah di-acc, serta kelas yang mengundang user (menunggu persetujuan user)
+  const classesTabCourses = courses.filter((c) => {
+    const isPrimary = (c.teacher?.email || '').toLowerCase() === userEmail ||
+      (c.primaryLecturer || '').toLowerCase().includes(userEmail.split('@')[0]);
+    const isPartner = (c.secondaryTeacher?.email || '').toLowerCase() === userEmail ||
+      (c.partnerLecturer && !c.pendingLecturerEmail && c.partnerLecturer.toLowerCase().includes(userEmail.split('@')[0]));
+    const isPendingForMe = (c.pendingLecturerEmail || '').toLowerCase() === userEmail;
+    return isPrimary || isPartner || isPendingForMe;
+  });
+
+  // Kelas yang sudah disetujui resmi (untuk Tab "4. RPS" dan Tab "5. Jadwal Sesi"):
+  // Kelas yang belum di-acc oleh user TIDAK akan muncul di RPS atau Jadwal Sesi sampai disetujui!
+  const approvedCourses = courses.filter((c) => {
+    const isPendingForMe = (c.pendingLecturerEmail || '').toLowerCase() === userEmail;
+    if (isPendingForMe) return false;
     const isPrimary = (c.teacher?.email || '').toLowerCase() === userEmail ||
       (c.primaryLecturer || '').toLowerCase().includes(userEmail.split('@')[0]);
     const isPartner = (c.secondaryTeacher?.email || '').toLowerCase() === userEmail ||
@@ -317,6 +331,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
   const handleAcceptInvitation = async (courseId: string) => {
     const res = studentService.acceptCourseInvitation(courseId, currentUser?.email);
     if (res.success) {
+      setSelectedPendingCourse(null);
       await myJourneySyncService.pushTeachingToGoogleSheets();
       onDataUpdated();
     }
@@ -326,6 +341,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
     if (confirm('Tolak undangan kolaborasi mengajar ini?')) {
       const res = studentService.declineCourseInvitation(courseId, currentUser?.email);
       if (res.success) {
+        setSelectedPendingCourse(null);
         await myJourneySyncService.pushTeachingToGoogleSheets();
         onDataUpdated();
       }
@@ -367,7 +383,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
             }`}
           >
             <BookOpen className="w-3.5 h-3.5" />
-            <span>1. Kelas ({activeLecturerCourses.length})</span>
+            <span>1. Kelas ({classesTabCourses.length})</span>
             {pendingInvitations.length > 0 && (
               <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white animate-pulse">
                 +{pendingInvitations.length} Undangan
@@ -408,7 +424,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
-            <span>4. RPS ({activeLecturerCourses.length})</span>
+            <span>4. RPS ({approvedCourses.length})</span>
           </button>
 
           <button
@@ -420,7 +436,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
             }`}
           >
             <Calendar className="w-3.5 h-3.5" />
-            <span>5. Jadwal Sesi ({activeLecturerCourses.length})</span>
+            <span>5. Jadwal Sesi ({approvedCourses.length})</span>
           </button>
         </div>
 
@@ -494,11 +510,11 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                   </div>
                   <div className="flex items-center gap-2.5 self-end md:self-center shrink-0">
                     <button
-                      onClick={() => handleAcceptInvitation(inv.id)}
+                      onClick={() => setSelectedPendingCourse(inv)}
                       className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs hover:shadow transition-all flex items-center gap-1.5 cursor-pointer"
                     >
                       <CheckCircle2 className="w-4 h-4" />
-                      Terima Undangan
+                      Setujui
                     </button>
                     <button
                       onClick={() => handleDeclineInvitation(inv.id)}
@@ -513,7 +529,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
             </div>
           )}
 
-          {activeLecturerCourses.length === 0 ? (
+          {classesTabCourses.length === 0 ? (
             <div className="p-12 text-center rounded-3xl bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-800 space-y-4">
               <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 mx-auto flex items-center justify-center font-bold">
                 <BookOpen className="w-7 h-7" />
@@ -544,183 +560,217 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-              {activeLecturerCourses.map((course) => (
-                <div
-                  key={course.id}
-                  className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md transition-all flex flex-col justify-between"
-                >
-                  <div>
-                    {/* Top Header Row (Soft Blue Code Pill on Left, Class Tag on Right) */}
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono font-bold text-xs px-2.5 py-1 rounded-md bg-sky-50 dark:bg-sky-950/70 text-sky-700 dark:text-sky-300 border border-sky-100 dark:border-sky-900/50">
-                        {course.code}
-                      </span>
+              {classesTabCourses.map((course) => {
+                const isPendingForMe = (course.pendingLecturerEmail || '').toLowerCase() === userEmail;
 
-                      <span className="text-xs font-medium text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 px-2.5 py-0.5 rounded-full">
-                        {course.section || 'Kelas A'} • {course.credits || 3} SKS
-                      </span>
-                    </div>
-
-                    {/* Course Title */}
-                    <h3 
-                      onClick={() => onOpenCourse(course.id)}
-                      className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mt-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 cursor-pointer transition-colors line-clamp-2"
-                    >
-                      {course.title}
-                    </h3>
-
-                    {/* Course Description */}
-                    <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-1">
-                      {course.description}
-                    </p>
-                  </div>
-
-                  {/* Bottom Metadata Info Lines (Identical to My Journey) */}
-                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2 text-xs text-slate-500 dark:text-slate-400">
-                    {/* Team Dosen & Kolaborasi Mengajar */}
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
-                          👨‍🏫 {studentService.formatLecturerGreeting(course.teacher?.name || course.primaryLecturer || 'Dosen Pengampu')}
-                          {course.secondaryTeacher?.name && ` & ${studentService.formatLecturerGreeting(course.secondaryTeacher.name)}`}
+                return (
+                  <div
+                    key={course.id}
+                    className={`group relative bg-white dark:bg-slate-900 border rounded-2xl p-4 sm:p-5 hover:shadow-md transition-all flex flex-col justify-between ${
+                      isPendingForMe
+                        ? 'border-amber-300 dark:border-amber-700/80 bg-amber-50/20 dark:bg-amber-950/20 hover:border-amber-400'
+                        : 'border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-500'
+                    }`}
+                  >
+                    <div>
+                      {/* Top Header Row (Soft Blue Code Pill on Left, Class Tag on Right) */}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono font-bold text-xs px-2.5 py-1 rounded-md bg-sky-50 dark:bg-sky-950/70 text-sky-700 dark:text-sky-300 border border-sky-100 dark:border-sky-900/50">
+                          {course.code}
                         </span>
 
-                        {!course.secondaryTeacher && !course.pendingLecturerEmail && (course.teacher?.email || '').toLowerCase() === (currentUser?.email || '').toLowerCase() && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setQuickInviteCourseId(quickInviteCourseId === course.id ? null : course.id);
-                              setQuickInviteEmail('');
-                            }}
-                            className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 px-2.5 py-0.5 rounded-full">
+                          {course.section || 'Kelas A'} • {course.credits || 3} SKS
+                        </span>
+                      </div>
+
+                      {/* Course Title */}
+                      <h3 
+                        onClick={() => {
+                          if (isPendingForMe) {
+                            setSelectedPendingCourse(course);
+                          } else {
+                            onOpenCourse(course.id);
+                          }
+                        }}
+                        className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mt-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 cursor-pointer transition-colors line-clamp-2"
+                      >
+                        {course.title}
+                      </h3>
+
+                      {/* Course Description */}
+                      <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-1">
+                        {course.description}
+                      </p>
+                    </div>
+
+                    {/* Bottom Metadata Info Lines (Identical to My Journey) */}
+                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2 text-xs text-slate-500 dark:text-slate-400">
+                      {/* Team Dosen & Kolaborasi Mengajar */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+                            👨‍🏫 {studentService.formatLecturerGreeting(course.teacher?.name || course.primaryLecturer || 'Dosen Pengampu')}
+                            {course.secondaryTeacher?.name && ` & ${studentService.formatLecturerGreeting(course.secondaryTeacher.name)}`}
+                          </span>
+
+                          {!course.secondaryTeacher && !course.pendingLecturerEmail && (course.teacher?.email || '').toLowerCase() === (currentUser?.email || '').toLowerCase() && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setQuickInviteCourseId(quickInviteCourseId === course.id ? null : course.id);
+                                setQuickInviteEmail('');
+                              }}
+                              className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                            >
+                              + Undang Mitra
+                            </button>
+                          )}
+                        </div>
+
+                        {course.pendingLecturerEmail && (
+                          isPendingForMe ? (
+                            <div className="text-[11px] px-2.5 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-800 font-semibold flex items-center justify-between">
+                              <span className="flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-amber-500 animate-spin" />
+                                <span>Menunggu Persetujuan Anda</span>
+                              </span>
+                              <span className="text-[10px] uppercase font-bold text-amber-600 dark:text-amber-400">Undangan</span>
+                            </div>
+                          ) : (
+                            <div className="text-[10px] px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 flex items-center justify-between">
+                              <span>⏳ Menunggu: {course.pendingLecturerName || course.pendingLecturerEmail}</span>
+                              <span className="text-[9px] font-mono">Pending</span>
+                            </div>
+                          )
+                        )}
+
+                        {/* Quick Invite Form on Card ("Add Friend" Style) */}
+                        {quickInviteCourseId === course.id && (
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-blue-200 dark:border-blue-800 space-y-2 mt-2 animate-in fade-in"
                           >
-                            + Undang Mitra
-                          </button>
+                            <div className="flex items-center justify-between">
+                              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                <Users className="w-3.5 h-3.5 text-blue-500" />
+                                <span>Pilih Rekan Dosen Terverifikasi:</span>
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => setQuickInviteCourseId(null)}
+                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              {colleagueLecturers.map((colleague) => (
+                                <div
+                                  key={colleague.email}
+                                  className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2"
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <img
+                                      src={colleague.avatarUrl || (colleague.email.includes('altaf') ? '/tengku_avatar.png' : getInitialsAvatar(colleague.name, true))}
+                                      alt={colleague.name}
+                                      className="w-7 h-7 rounded-lg object-cover shrink-0"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).src = colleague.email.includes('altaf') ? '/tengku_avatar.png' : getInitialsAvatar(colleague.name, true);
+                                      }}
+                                    />
+                                    <div className="min-w-0">
+                                      <div className="font-bold text-[11px] text-slate-900 dark:text-white truncate">
+                                        {colleague.name}
+                                      </div>
+                                      <div className="text-[9px] text-slate-500 font-mono truncate">
+                                        {colleague.email}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleQuickInviteSubmit(course.id, colleague.email)}
+                                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] rounded-lg transition-colors flex items-center gap-1 shrink-0"
+                                  >
+                                    <UserPlus className="w-3 h-3" />
+                                    <span>+ Tambahkan</span>
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         )}
                       </div>
 
-                      {course.pendingLecturerEmail && (
-                        <div className="text-[10px] px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 flex items-center justify-between">
-                          <span>⏳ Menunggu: {course.pendingLecturerName || course.pendingLecturerEmail}</span>
-                          <span className="text-[9px] font-mono">Pending</span>
+                      {/* Schedule & Action Icons */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>{course.scheduleDay}, {course.scheduleTime}</span>
                         </div>
-                      )}
 
-                      {/* Quick Invite Form on Card ("Add Friend" Style) */}
-                      {quickInviteCourseId === course.id && (
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-blue-200 dark:border-blue-800 space-y-2 mt-2 animate-in fade-in"
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenEditCourse(course);
+                            }}
+                            className="p-1 rounded text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
+                            title="Edit Detail Kelas"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteCourse(course.id, course.title);
+                            }}
+                            className="p-1 rounded text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
+                            title="Hapus Kelas"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Room & Student Count */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate max-w-[140px] sm:max-w-[180px]">{course.room}</span>
+                        </div>
+
+                        <div className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
+                          <Users className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{course.enrolledStudentEmails?.length || 0} Mahasiswa</span>
+                        </div>
+                      </div>
+
+                      {/* Action Button: Setujui (for invited lecturer) vs Buka Ruang Kelas */}
+                      {isPendingForMe ? (
+                        <button
+                          onClick={() => setSelectedPendingCourse(course)}
+                          className="w-full mt-2 py-2.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all"
                         >
-                          <div className="flex items-center justify-between">
-                            <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                              <Users className="w-3.5 h-3.5 text-blue-500" />
-                              <span>Pilih Rekan Dosen Terverifikasi:</span>
-                            </label>
-                            <button
-                              type="button"
-                              onClick={() => setQuickInviteCourseId(null)}
-                              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-
-                          <div className="space-y-1.5">
-                            {colleagueLecturers.map((colleague) => (
-                              <div
-                                key={colleague.email}
-                                className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2"
-                              >
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <img
-                                    src={colleague.avatarUrl || (colleague.email.includes('altaf') ? '/tengku_avatar.png' : getInitialsAvatar(colleague.name, true))}
-                                    alt={colleague.name}
-                                    className="w-7 h-7 rounded-lg object-cover shrink-0"
-                                    onError={(e) => {
-                                      (e.target as HTMLImageElement).src = colleague.email.includes('altaf') ? '/tengku_avatar.png' : getInitialsAvatar(colleague.name, true);
-                                    }}
-                                  />
-                                  <div className="min-w-0">
-                                    <div className="font-bold text-[11px] text-slate-900 dark:text-white truncate">
-                                      {colleague.name}
-                                    </div>
-                                    <div className="text-[9px] text-slate-500 font-mono truncate">
-                                      {colleague.email}
-                                    </div>
-                                  </div>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleQuickInviteSubmit(course.id, colleague.email)}
-                                  className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] rounded-lg transition-colors flex items-center gap-1 shrink-0"
-                                >
-                                  <UserPlus className="w-3 h-3" />
-                                  <span>+ Tambahkan</span>
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Setujui</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => onOpenCourse(course.id)}
+                          className="w-full mt-2 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 hover:text-blue-600 dark:text-slate-200 flex items-center justify-center gap-1.5 transition-all"
+                        >
+                          <span>Buka Ruang Kelas</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
                       )}
                     </div>
-
-                    {/* Schedule & Action Icons */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span>{course.scheduleDay}, {course.scheduleTime}</span>
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenEditCourse(course);
-                          }}
-                          className="p-1 rounded text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
-                          title="Edit Detail Kelas"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteCourse(course.id, course.title);
-                          }}
-                          className="p-1 rounded text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
-                          title="Hapus Kelas"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Room & Student Count */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="truncate max-w-[140px] sm:max-w-[180px]">{course.room}</span>
-                      </div>
-
-                      <div className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
-                        <Users className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{course.enrolledStudentEmails?.length || 0} Mahasiswa</span>
-                      </div>
-                    </div>
-
-                    {/* Open Class Direct Button */}
-                    <button
-                      onClick={() => onOpenCourse(course.id)}
-                      className="w-full mt-2 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 hover:text-blue-600 dark:text-slate-200 flex items-center justify-center gap-1.5 transition-all"
-                    >
-                      <span>Buka Ruang Kelas</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -961,7 +1011,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
       {activeSubTab === 'rps' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {activeLecturerCourses.map((c) => (
+            {approvedCourses.map((c) => (
               <div
                 key={c.id}
                 className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3"
@@ -1016,7 +1066,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
       {activeSubTab === 'jadwal' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {activeLecturerCourses.map((c) => (
+            {approvedCourses.map((c) => (
               <div
                 key={c.id}
                 className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3"
@@ -1732,6 +1782,141 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
 
             <div className="text-[11px] text-slate-400 text-center font-mono pt-1">
               Terakhir Disinkronkan: {lastSyncTimestamp || 'Baru Saja'}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL: DETAIL KELAS & PERSETUJUAN UNDANGAN DOSEN PENGAMPU */}
+      {/* ========================================================= */}
+      {selectedPendingCourse && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-5 my-8">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    Detail Undangan Tim Mengajar
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Konfirmasi persetujuan bergabung menjadi rekan dosen pengampu.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedPendingCourse(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Course Detail Card */}
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-mono font-bold text-xs px-2.5 py-1 rounded-md bg-sky-100 dark:bg-sky-950 text-sky-800 dark:text-sky-300">
+                  {selectedPendingCourse.code}
+                </span>
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                  {selectedPendingCourse.section || 'Kelas A'} • {selectedPendingCourse.credits || 3} SKS
+                </span>
+              </div>
+
+              <div>
+                <h4 className="text-lg font-bold text-slate-900 dark:text-white">
+                  {selectedPendingCourse.title}
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                  {selectedPendingCourse.description || 'Mata kuliah tim teaching terhubung dengan kurikulum OBE 16 pertemuan otomatis.'}
+                </p>
+              </div>
+
+              {/* Inviting Lecturer Info */}
+              <div className="pt-3 border-t border-slate-200 dark:border-slate-700 flex items-center gap-3">
+                <img
+                  src={selectedPendingCourse.teacher?.avatarUrl || (selectedPendingCourse.teacher?.email?.includes('altaf') ? '/tengku_avatar.png' : '/miftah_avatar.png')}
+                  alt={selectedPendingCourse.teacher?.name || 'Dosen Pengampu'}
+                  className="w-10 h-10 rounded-xl object-cover ring-1 ring-slate-200 shrink-0"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/tengku_avatar.png';
+                  }}
+                />
+                <div className="min-w-0 flex-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                    Dosen Pengampu Utama (Pengundang):
+                  </span>
+                  <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                    {studentService.formatLecturerGreeting(selectedPendingCourse.teacher?.name || selectedPendingCourse.primaryLecturer || 'Dosen Pengampu')}
+                  </div>
+                  <div className="text-[11px] text-slate-500 font-mono truncate">
+                    {selectedPendingCourse.teacher?.email || ''}
+                  </div>
+                </div>
+              </div>
+
+              {/* Schedule & Room Grid */}
+              <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                  <span className="text-[10px] text-slate-400 block mb-0.5">Jadwal Perkuliahan:</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {selectedPendingCourse.scheduleDay}, {selectedPendingCourse.scheduleTime}
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                  <span className="text-[10px] text-slate-400 block mb-0.5">Ruang / Laboratorium:</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
+                    {selectedPendingCourse.room}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Information Notice */}
+            <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 text-xs text-indigo-900 dark:text-indigo-200 flex items-start gap-2.5">
+              <ShieldCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+              <p className="leading-relaxed">
+                Jika disetujui, mata kuliah ini akan otomatis ditambahkan ke ruang kelas Anda serta membuka akses penuh ke modul <strong>RPS</strong> dan <strong>16 jadwal sesi perkuliahan</strong>.
+              </p>
+            </div>
+
+            {/* Action Buttons: Setujui vs Tolak */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setSelectedPendingCourse(null)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const courseId = selectedPendingCourse.id;
+                  setSelectedPendingCourse(null);
+                  await handleDeclineInvitation(courseId);
+                }}
+                className="px-4 py-2.5 rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+                <span>Tolak</span>
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const courseId = selectedPendingCourse.id;
+                  setSelectedPendingCourse(null);
+                  await handleAcceptInvitation(courseId);
+                }}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Setujui</span>
+              </button>
             </div>
           </div>
         </div>
