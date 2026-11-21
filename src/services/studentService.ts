@@ -229,7 +229,47 @@ export interface MeetingAttendanceRosterSummary {
 export const studentService = {
   // Current Authenticated User (Lecturer or Student or null if not logged in)
   getCurrentUser(): AuthUser | null {
-    const user = getStorage<AuthUser | null>(STORAGE_KEYS.CURRENT_USER, null);
+    let user: AuthUser | null = null;
+
+    if (typeof window === 'undefined') {
+      // In Node.js / unit tests / server environment
+      user = getStorage<AuthUser | null>(STORAGE_KEYS.CURRENT_USER, null);
+    } else {
+      // 1. Check sessionStorage first (active session in current tab)
+      try {
+        if (window.sessionStorage) {
+          const sessRaw = sessionStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+          if (sessRaw) {
+            user = JSON.parse(sessRaw);
+          }
+        }
+      } catch {}
+
+      // 2. If not in sessionStorage, check localStorage if rememberMe is enabled
+      if (!user) {
+        try {
+          const isRemembered = localStorage.getItem('slh_remember_me') === 'true';
+          const localRaw = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+          if (localRaw) {
+            const parsed = JSON.parse(localRaw);
+            if (isRemembered) {
+              const loginTime = parsed._loginTimestamp || 0;
+              const maxAge = 7 * 24 * 60 * 60 * 1000;
+              if (loginTime && (Date.now() - loginTime > maxAge)) {
+                localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+                user = null;
+              } else {
+                user = parsed;
+              }
+            } else {
+              // Not remembered: remove stale session to prevent unwanted auto-login
+              localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+            }
+          }
+        } catch {}
+      }
+    }
+
     if (user) {
       let modified = false;
       const isAltaf = user.email.toLowerCase() === 'altaf.aziz16@gmail.com';
@@ -344,7 +384,7 @@ export const studentService = {
         modified = true;
       }
       if (modified) {
-        setStorage(STORAGE_KEYS.CURRENT_USER, user);
+        this.setCurrentUser(user);
       }
     }
     return user;
@@ -352,7 +392,11 @@ export const studentService = {
 
   setCurrentUser(user: AuthUser | null): void {
     if (!user) {
-      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+      setStorage(STORAGE_KEYS.CURRENT_USER, null);
+      if (typeof window !== 'undefined') {
+        try { sessionStorage.removeItem(STORAGE_KEYS.CURRENT_USER); } catch {}
+        try { localStorage.removeItem(STORAGE_KEYS.CURRENT_USER); } catch {}
+      }
     } else {
       if (user.email.toLowerCase() === 'altaf.aziz16@gmail.com') {
         if (!user.avatarUrl || user.avatarUrl.includes('ui-avatars') || user.avatarUrl.includes('photo-') || user.avatarUrl.includes('academic_avatar')) {
@@ -365,11 +409,32 @@ export const studentService = {
       } else if (user.avatarUrl && (user.avatarUrl.includes('photo-1534528741775') || user.avatarUrl.includes('photo-1507003211169') || user.avatarUrl.includes('academic_avatar'))) {
         user.avatarUrl = getInitialsAvatar(user.name, user.role === 'dosen');
       }
-      setStorage(STORAGE_KEYS.CURRENT_USER, user);
+
+      const stampedUser = {
+        ...user,
+        _loginTimestamp: (user as any)._loginTimestamp || Date.now(),
+      };
+
+      setStorage(STORAGE_KEYS.CURRENT_USER, stampedUser);
+
+      if (typeof window !== 'undefined') {
+        try { sessionStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(stampedUser)); } catch {}
+        const isRemembered = localStorage.getItem('slh_remember_me') === 'true';
+        if (isRemembered) {
+          try { localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(stampedUser)); } catch {}
+        } else {
+          try { localStorage.removeItem(STORAGE_KEYS.CURRENT_USER); } catch {}
+        }
+      }
     }
   },
 
   logout(): void {
+    if (typeof window !== 'undefined') {
+      try { localStorage.removeItem('slh_remember_me'); } catch {}
+      try { sessionStorage.removeItem(STORAGE_KEYS.CURRENT_USER); } catch {}
+      try { localStorage.removeItem(STORAGE_KEYS.CURRENT_USER); } catch {}
+    }
     this.setCurrentUser(null);
   },
 
@@ -1128,13 +1193,28 @@ export const studentService = {
       const syncedCourses: CourseClass[] = data.map((row) => {
         const d = row.data || {};
         const existing = currentCourses.find((c) => c.id === row.id || c.code.toLowerCase() === (d.code || '').toLowerCase());
-        const isLecturerAziz = row.user_id === 'd342423d-fce0-4b54-896f-4c4b27e70dc0';
-        const lecturerEmail = isLecturerAziz ? 'altaf.aziz16@gmail.com' : 'miftahurridlo.688@gmail.com';
-        const partnerEmail = isLecturerAziz ? 'miftahurridlo.688@gmail.com' : 'altaf.aziz16@gmail.com';
-        const lecturerUser = DEFAULT_LECTURERS[lecturerEmail];
+        
+        // Determine primary lecturer from data or row
+        const primaryStr = String(d.primaryLecturer || existing?.primaryLecturer || existing?.teacher?.name || '').toLowerCase();
+        const isMiftahPrimary = primaryStr.includes('miftah') || (!primaryStr && row.user_id !== 'd342423d-fce0-4b54-896f-4c4b27e70dc0');
+        
+        const primaryEmail = isMiftahPrimary ? 'miftahurridlo.688@gmail.com' : 'altaf.aziz16@gmail.com';
+        const partnerEmail = isMiftahPrimary ? 'altaf.aziz16@gmail.com' : 'miftahurridlo.688@gmail.com';
+        const primaryUser = DEFAULT_LECTURERS[primaryEmail];
         const partnerUser = DEFAULT_LECTURERS[partnerEmail];
-        const lecturerName = lecturerUser.name;
-        const partnerName = partnerUser.name;
+
+        // Check pending invitation status
+        const rawPartnerStr = String(d.partnerLecturer || existing?.partnerLecturer || '').trim();
+        const isPendingFromStr = rawPartnerStr.startsWith('PENDING:');
+        const pendingEmail = (d.pendingLecturerEmail || (isPendingFromStr ? rawPartnerStr.replace('PENDING:', '').trim() : '') || existing?.pendingLecturerEmail || '').trim().toLowerCase();
+        const pendingName = d.pendingLecturerName || existing?.pendingLecturerName || (pendingEmail ? partnerUser.name : undefined);
+
+        const hasPendingInvitation = !!pendingEmail;
+        const hasAcceptedPartner = !hasPendingInvitation && (
+          (rawPartnerStr && rawPartnerStr !== '-' && !isPendingFromStr) ||
+          !!existing?.secondaryTeacher ||
+          !!d.secondaryTeacherEmail
+        );
 
         return {
           id: row.id,
@@ -1151,29 +1231,58 @@ export const studentService = {
           category: 'Geografi & Komputasi',
           color: existing?.color || 'from-blue-600 to-indigo-700',
           syllabusOverview: d.syllabusOverview || existing?.syllabusOverview || 'Silabus perkuliahan dalam proses penyusunan.',
-          enrolledCount: existing?.enrolledCount || 0,
-          enrolledStudentEmails: existing?.enrolledStudentEmails || [],
+          enrolledCount: (d.enrolledStudentEmails || existing?.enrolledStudentEmails || []).length,
+          enrolledStudentEmails: d.enrolledStudentEmails || existing?.enrolledStudentEmails || [],
           completedMeetingsCount: existing?.completedMeetingsCount || 0,
           totalMeetingsCount: 16,
           progress: existing?.progress || 0,
-          primaryLecturer: lecturerName,
-          partnerLecturer: partnerName,
-          teacher: existing?.teacher || {
-            id: lecturerUser.id,
-            name: lecturerName,
-            title: lecturerUser.title || 'Dosen Pengampu',
-            email: lecturerEmail,
-            avatarUrl: lecturerUser.avatarUrl,
-            department: lecturerUser.department,
+          primaryLecturer: primaryUser.name,
+          partnerLecturer: hasAcceptedPartner ? partnerUser.name : undefined,
+          pendingLecturerEmail: hasPendingInvitation ? pendingEmail : undefined,
+          pendingLecturerName: hasPendingInvitation ? pendingName : undefined,
+          teacher: {
+            id: primaryUser.id,
+            name: primaryUser.name,
+            title: 'Dosen Pengampu Utama',
+            email: primaryUser.email,
+            avatarUrl: primaryUser.avatarUrl,
+            department: primaryUser.department,
           },
-          secondaryTeacher: existing?.secondaryTeacher || {
+          secondaryTeacher: hasAcceptedPartner ? {
             id: partnerUser.id,
-            name: partnerName,
-            title: partnerUser.title || 'Dosen Pengampu Partner',
-            email: partnerEmail,
+            name: partnerUser.name,
+            title: 'Dosen Pengampu Partner',
+            email: partnerUser.email,
             avatarUrl: partnerUser.avatarUrl,
             department: partnerUser.department,
-          },
+          } : undefined,
+          teamTeachers: hasAcceptedPartner ? [
+            {
+              id: primaryUser.id,
+              name: primaryUser.name,
+              title: 'Dosen Pengampu Utama',
+              email: primaryUser.email,
+              avatarUrl: primaryUser.avatarUrl,
+              department: primaryUser.department,
+            },
+            {
+              id: partnerUser.id,
+              name: partnerUser.name,
+              title: 'Dosen Pengampu Partner',
+              email: partnerUser.email,
+              avatarUrl: partnerUser.avatarUrl,
+              department: partnerUser.department,
+            },
+          ] : [
+            {
+              id: primaryUser.id,
+              name: primaryUser.name,
+              title: 'Dosen Pengampu Utama',
+              email: primaryUser.email,
+              avatarUrl: primaryUser.avatarUrl,
+              department: primaryUser.department,
+            },
+          ],
           scheduleDay: existing?.scheduleDay || (d.schedule && d.schedule.includes(',') ? d.schedule.split(',')[0].trim() : 'Senin'),
           scheduleTime: existing?.scheduleTime || (d.schedule && d.schedule.includes(',') ? d.schedule.split(',')[1].trim() : '08:00 - 10:30 WIB'),
           totalMeetings: 16,
@@ -1572,30 +1681,74 @@ export const studentService = {
           // C. Mahasiswa Resmi dari Google Sheets (hanya mahasiswa nyata)
           if (json.data.Students && Array.isArray(json.data.Students) && json.data.Students.length > 0) {
             const masterStudents = this.getMasterStudents();
+            const currentCourses = this.getAllCourses();
+            const customRoster = getStorage<Record<string, any>>(STORAGE_KEYS.CUSTOM_ROSTER, {});
+            let coursesModified = false;
+
             json.data.Students.forEach((std: any) => {
               const cleanEmail = (std.email || '').toLowerCase().trim();
               if (!cleanEmail) return;
 
               const idx = masterStudents.findIndex((m) => m.email.toLowerCase() === cleanEmail);
+              const courseCodeStr = String(std.courseCode || '').trim();
+              const courseNameStr = String(std.courseName || '').trim().toLowerCase();
+
               const record: MasterStudent = {
                 id: std.id || `std_${Date.now()}`,
                 nim: String(std.nim || '10123000'),
                 name: std.name || 'Mahasiswa',
                 email: cleanEmail,
-                major: std.major || 'Sistem Informasi Geografis',
+                major: std.major || 'Sains Informasi Geografi',
                 classSection: std.classSection || 'Kelas A',
-                enrolledCourseCodes: std.courseCode ? [String(std.courseCode)] : [],
+                enrolledCourseCodes: courseCodeStr ? [courseCodeStr] : [],
                 avatarUrl: getInitialsAvatar(std.name || 'Mahasiswa', false),
               };
 
               if (idx >= 0) {
-                masterStudents[idx] = { ...masterStudents[idx], ...record };
+                const mergedCodes = Array.from(new Set([
+                  ...(masterStudents[idx].enrolledCourseCodes || []),
+                  ...(courseCodeStr ? [courseCodeStr] : []),
+                ]));
+                masterStudents[idx] = { ...masterStudents[idx], ...record, enrolledCourseCodes: mergedCodes };
               } else {
                 masterStudents.push(record);
               }
+
+              // Update custom roster
+              customRoster[cleanEmail] = {
+                name: std.name || 'Mahasiswa',
+                nim: String(std.nim || '10123000'),
+                email: cleanEmail,
+              };
+
+              // Attach student email to matching course(s)
+              currentCourses.forEach((crs) => {
+                const codeMatch = courseCodeStr && (
+                  crs.code.toUpperCase() === courseCodeStr.toUpperCase() ||
+                  crs.id === courseCodeStr
+                );
+                const titleMatch = courseNameStr && (
+                  crs.title.toLowerCase() === courseNameStr ||
+                  crs.title.toLowerCase().includes(courseNameStr)
+                );
+                if (codeMatch || titleMatch) {
+                  if (!crs.enrolledStudentEmails) crs.enrolledStudentEmails = [];
+                  if (!crs.enrolledStudentEmails.map((e) => e.toLowerCase().trim()).includes(cleanEmail)) {
+                    crs.enrolledStudentEmails.push(cleanEmail);
+                    crs.enrolledCount = crs.enrolledStudentEmails.length;
+                    coursesModified = true;
+                  }
+                }
+              });
+
               studentsCount++;
             });
+
             setStorage(STORAGE_KEYS.MASTER_STUDENTS, masterStudents);
+            setStorage(STORAGE_KEYS.CUSTOM_ROSTER, customRoster);
+            if (coursesModified) {
+              setStorage(STORAGE_KEYS.COURSES, currentCourses);
+            }
           }
         }
       }
@@ -2125,8 +2278,9 @@ export const studentService = {
     }
     const emailToFilter = (studentEmail || user?.email || '').toLowerCase().trim();
 
-    // If currentUser is dosen: return courses where lecturer is creator OR accepted partner
-    if (user?.role === 'dosen') {
+    // If querying as lecturer for lecturer's own portal: return courses where lecturer is creator OR accepted partner
+    const isLecturerSelfQuery = user?.role === 'dosen' && (!studentEmail || studentEmail.toLowerCase().trim() === user.email.toLowerCase().trim());
+    if (isLecturerSelfQuery) {
       return courses.filter((c) => {
         const primary = (c.teacher?.email || '').toLowerCase().trim();
         const secondary = (c.secondaryTeacher?.email || '').toLowerCase().trim();
@@ -2155,10 +2309,41 @@ export const studentService = {
       });
     }
 
-    // For students: ONLY return classes where the lecturer added their email!
-    return courses.filter((c) =>
-      c.enrolledStudentEmails?.map((e) => e.toLowerCase().trim()).includes(emailToFilter)
+    // For students: check enrolledStudentEmails OR masterStudents database
+    const masterStudents = this.getMasterStudents();
+    const studentMaster = masterStudents.find(
+      (m) => m.email.toLowerCase().trim() === emailToFilter
     );
+
+    let modified = false;
+    const enrolled = courses.filter((c) => {
+      const inWhitelist = (c.enrolledStudentEmails || [])
+        .map((e) => e.toLowerCase().trim())
+        .includes(emailToFilter);
+      if (inWhitelist) return true;
+
+      if (studentMaster && studentMaster.enrolledCourseCodes && studentMaster.enrolledCourseCodes.length > 0) {
+        const matchesCode = studentMaster.enrolledCourseCodes.some(
+          (code) => code.toUpperCase() === c.code.toUpperCase() || code === c.id
+        );
+        if (matchesCode) {
+          if (!c.enrolledStudentEmails) c.enrolledStudentEmails = [];
+          if (!c.enrolledStudentEmails.map((e) => e.toLowerCase().trim()).includes(emailToFilter)) {
+            c.enrolledStudentEmails.push(emailToFilter);
+            c.enrolledCount = c.enrolledStudentEmails.length;
+            modified = true;
+          }
+          return true;
+        }
+      }
+      return false;
+    });
+
+    if (modified) {
+      setStorage(STORAGE_KEYS.COURSES, courses);
+    }
+
+    return enrolled;
   },
 
   getCourseById(courseId: string): CourseClass | undefined {
@@ -2192,9 +2377,48 @@ export const studentService = {
     }
 
     emails.push(cleanEmail);
-    const updatedCourse = { ...course, enrolledStudentEmails: emails };
+    const updatedCourse = { ...course, enrolledStudentEmails: emails, enrolledCount: emails.length };
     courses[courseIndex] = updatedCourse;
     setStorage(STORAGE_KEYS.COURSES, courses);
+
+    // Update masterStudents & customRoster so other lecturers & student view will see it immediately
+    const masterStudents = this.getMasterStudents();
+    const customRoster = getStorage<Record<string, any>>(STORAGE_KEYS.CUSTOM_ROSTER, {});
+    const existingIdx = masterStudents.findIndex((m) => m.email.toLowerCase() === cleanEmail);
+    const info = customRoster[cleanEmail] || getStudentRosterInfo(cleanEmail);
+    const studentRecord: MasterStudent = {
+      id: existingIdx >= 0 ? masterStudents[existingIdx].id : `std_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      nim: (existingIdx >= 0 && masterStudents[existingIdx].nim) ? masterStudents[existingIdx].nim : (info.nim || `22081010${Math.floor(100 + Math.random() * 900)}`),
+      name: (existingIdx >= 0 && masterStudents[existingIdx].name) ? masterStudents[existingIdx].name : (info.name || 'Mahasiswa'),
+      email: cleanEmail,
+      major: 'Sains Informasi Geografi',
+      classSection: course.section || 'Kelas A',
+      enrolledCourseCodes: Array.from(new Set([
+        ...((existingIdx >= 0 && masterStudents[existingIdx].enrolledCourseCodes) || []),
+        course.code,
+        course.id,
+      ])),
+      avatarUrl: getInitialsAvatar((existingIdx >= 0 && masterStudents[existingIdx].name) || info.name || 'Mahasiswa', false),
+    };
+
+    if (existingIdx >= 0) {
+      masterStudents[existingIdx] = studentRecord;
+    } else {
+      masterStudents.push(studentRecord);
+    }
+    setStorage(STORAGE_KEYS.MASTER_STUDENTS, masterStudents);
+
+    customRoster[cleanEmail] = {
+      name: studentRecord.name,
+      nim: studentRecord.nim,
+      email: cleanEmail,
+    };
+    setStorage(STORAGE_KEYS.CUSTOM_ROSTER, customRoster);
+
+    // Save to Supabase Cloud & trigger Google Sheets push
+    supabaseDataService.saveStudent(studentRecord).catch(() => {});
+    supabaseDataService.saveCourse(updatedCourse).catch(() => {});
+    myJourneySyncService.triggerDebouncedAutoSync();
 
     this.addActivity({
       title: 'Mahasiswa Ditambahkan ke Kelas',
@@ -2385,6 +2609,77 @@ export const studentService = {
       success: true,
       message: 'Rincian mata kuliah berhasil diperbarui.',
       course: updated,
+    };
+  },
+
+  // Lecturer Action: Switch or Choose Primary Lecturer
+  setPrimaryLecturer(courseId: string, targetPrimaryEmail: string): {
+    success: boolean;
+    message: string;
+    course?: CourseClass;
+  } {
+    const courses = this.getAllCourses();
+    const idx = courses.findIndex((c) => c.id === courseId);
+    if (idx === -1) {
+      return { success: false, message: 'Kelas tidak ditemukan.' };
+    }
+    const course = courses[idx];
+    const targetEmail = targetPrimaryEmail.toLowerCase().trim();
+    const currentPrimary = (course.teacher?.email || '').toLowerCase().trim();
+
+    if (currentPrimary === targetEmail) {
+      return { success: true, message: 'Dosen yang dipilih sudah merupakan Dosen Utama.', course };
+    }
+
+    const isTargetAltaf = targetEmail.includes('altaf');
+    const newPrimaryUser = DEFAULT_LECTURERS[targetEmail] || (isTargetAltaf ? DEFAULT_LECTURERS['altaf.aziz16@gmail.com'] : DEFAULT_LECTURERS['miftahurridlo.688@gmail.com']);
+    const isOldAltaf = currentPrimary.includes('altaf');
+    const newSecondaryUser = DEFAULT_LECTURERS[currentPrimary] || (isOldAltaf ? DEFAULT_LECTURERS['altaf.aziz16@gmail.com'] : DEFAULT_LECTURERS['miftahurridlo.688@gmail.com']);
+
+    const newPrimaryTeacher: TeacherInfo = {
+      id: newPrimaryUser.id,
+      name: newPrimaryUser.name,
+      title: 'Dosen Pengampu Utama',
+      email: newPrimaryUser.email,
+      avatarUrl: newPrimaryUser.avatarUrl,
+      department: newPrimaryUser.department,
+    };
+
+    const newSecondaryTeacher: TeacherInfo = {
+      id: newSecondaryUser.id,
+      name: newSecondaryUser.name,
+      title: 'Dosen Pengampu Partner',
+      email: newSecondaryUser.email,
+      avatarUrl: newSecondaryUser.avatarUrl,
+      department: newSecondaryUser.department,
+    };
+
+    const updatedCourse: CourseClass = {
+      ...course,
+      teacher: newPrimaryTeacher,
+      secondaryTeacher: course.secondaryTeacher ? newSecondaryTeacher : undefined,
+      primaryLecturer: newPrimaryUser.name,
+      partnerLecturer: course.partnerLecturer ? newSecondaryUser.name : undefined,
+      teamTeachers: course.secondaryTeacher ? [newPrimaryTeacher, newSecondaryTeacher] : [newPrimaryTeacher],
+    };
+
+    courses[idx] = updatedCourse;
+    setStorage(STORAGE_KEYS.COURSES, courses);
+
+    supabaseDataService.saveCourse(updatedCourse).catch(() => {});
+    myJourneySyncService.triggerDebouncedAutoSync();
+
+    this.addActivity({
+      title: 'Perubahan Dosen Utama',
+      description: `Dosen Utama untuk kelas ${course.code} - ${course.title} kini dialihkan ke ${newPrimaryUser.name}.`,
+      type: 'course',
+      courseTitle: course.title,
+    });
+
+    return {
+      success: true,
+      message: `Berhasil mengubah Dosen Utama menjadi ${newPrimaryUser.name}.`,
+      course: updatedCourse,
     };
   },
 
@@ -2601,129 +2896,26 @@ export const studentService = {
 
   // Tanggapi undangan kolaborasi mengajar (Terima / Tolak)
   respondToCourseInvitation(notificationId: string, response: 'accepted' | 'declined'): { success: boolean; message: string } {
-    if (notificationId.startsWith('notif_inv_')) {
-      const courseId = notificationId.replace('notif_inv_', '');
-      if (response === 'accepted') {
-        return this.acceptCourseInvitation(courseId, this.getCurrentUser()?.email);
-      } else {
-        return this.declineCourseInvitation(courseId, this.getCurrentUser()?.email);
-      }
+    const notifications = getStorage<StudentNotification[]>(STORAGE_KEYS.NOTIFICATIONS, initialNotifications);
+    const notif = notifications.find((n) => n.id === notificationId);
+    let targetCourseId = notif?.invitationData?.courseId;
+    let targetInvitedEmail = notif?.invitationData?.invitedEmail;
+
+    if (!targetCourseId && notificationId.startsWith('notif_inv_')) {
+      targetCourseId = notificationId.replace('notif_inv_', '');
     }
 
-    const notifications = getStorage<StudentNotification[]>(STORAGE_KEYS.NOTIFICATIONS, initialNotifications);
-    const notifIndex = notifications.findIndex((n) => n.id === notificationId);
-    if (notifIndex === -1) {
+    if (!targetCourseId) {
       return { success: false, message: 'Notifikasi undangan tidak ditemukan.' };
-    }
-    const notif = notifications[notifIndex];
-    const invData = notif.invitationData;
-    if (!invData) {
-      return { success: false, message: 'Data undangan tidak valid.' };
     }
 
     const currentLecturer = this.getCurrentUser() || defaultLecturerUser;
-    const courses = this.getAllCourses();
-    const courseIndex = courses.findIndex((c) => c.id === invData.courseId);
+    const effectiveEmail = targetInvitedEmail || currentLecturer.email;
 
     if (response === 'accepted') {
-      if (courseIndex !== -1) {
-        const course = courses[courseIndex];
-        const invitedEmail = invData.invitedEmail.toLowerCase();
-        const invitedLecturer = DEFAULT_LECTURERS[invitedEmail] || currentLecturer;
-        const updatedCourse: CourseClass = {
-          ...course,
-          secondaryTeacher: {
-            id: invitedLecturer.id,
-            name: invitedLecturer.name,
-            title: invitedLecturer.title || 'Dosen Pengampu Partner',
-            email: invitedLecturer.email,
-            avatarUrl: invitedLecturer.avatarUrl,
-            department: invitedLecturer.department || 'Pendidikan Geografi',
-          },
-          pendingLecturerEmail: undefined,
-          pendingLecturerName: undefined,
-        };
-        courses[courseIndex] = updatedCourse;
-        setStorage(STORAGE_KEYS.COURSES, courses);
-        supabaseDataService.saveCourse(updatedCourse).catch(() => {});
-      }
-
-      notifications[notifIndex] = {
-        ...notif,
-        isRead: true,
-        invitationData: {
-          ...invData,
-          status: 'accepted',
-        },
-      };
-
-      const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
-      const replyNotif: StudentNotification = {
-        id: `notif_acc_${Date.now()}`,
-        title: 'Undangan Kolaborasi Diterima!',
-        message: `${this.formatLecturerGreeting(currentLecturer.name)} telah menerima undangan Anda untuk bersama-sama mengampu mata kuliah ${invData.courseCode} - ${invData.courseTitle}.`,
-        type: 'announcement',
-        timestamp: nowStr,
-        isRead: false,
-        recipientEmail: invData.inviterEmail.toLowerCase(),
-        linkTab: 'kelas',
-        linkId: invData.courseId,
-      };
-      notifications.unshift(replyNotif);
-      setStorage(STORAGE_KEYS.NOTIFICATIONS, notifications);
-
-      this.addActivity({
-        title: 'Kolaborasi Dosen Diterima',
-        description: `${this.formatLecturerGreeting(currentLecturer.name)} resmi bergabung mengampu kelas ${invData.courseCode} - ${invData.courseTitle} bersama ${this.formatLecturerGreeting(invData.inviterName)}.`,
-        type: 'course',
-        courseTitle: invData.courseTitle,
-      });
-
-      return {
-        success: true,
-        message: `Selamat! Anda telah resmi bergabung sebagai tim dosen pengampu kelas ${invData.courseCode} - ${invData.courseTitle}.`,
-      };
+      return this.acceptCourseInvitation(targetCourseId, effectiveEmail);
     } else {
-      // Declined
-      if (courseIndex !== -1) {
-        const course = courses[courseIndex];
-        const updatedCourse: CourseClass = {
-          ...course,
-          pendingLecturerEmail: undefined,
-          pendingLecturerName: undefined,
-        };
-        courses[courseIndex] = updatedCourse;
-        setStorage(STORAGE_KEYS.COURSES, courses);
-        supabaseDataService.saveCourse(updatedCourse).catch(() => {});
-      }
-
-      notifications[notifIndex] = {
-        ...notif,
-        isRead: true,
-        invitationData: {
-          ...invData,
-          status: 'declined',
-        },
-      };
-
-      const replyNotif: StudentNotification = {
-        id: `notif_dec_${Date.now()}`,
-        title: 'Undangan Kolaborasi Belum Diterima',
-        message: `${this.formatLecturerGreeting(currentLecturer.name)} belum dapat menerima undangan kolaborasi untuk mata kuliah ${invData.courseCode} - ${invData.courseTitle}.`,
-        type: 'announcement',
-        timestamp: 'Baru saja',
-        isRead: false,
-        recipientEmail: invData.inviterEmail.toLowerCase(),
-        linkTab: 'kelas',
-        linkId: invData.courseId,
-      };
-      notifications.unshift(replyNotif);
-      setStorage(STORAGE_KEYS.NOTIFICATIONS, notifications);
-
-      return {
-        success: true,
-        message: 'Undangan kolaborasi telah ditolak.',
-      };
+      return this.declineCourseInvitation(targetCourseId, effectiveEmail);
     }
   },
 
@@ -2859,9 +3051,27 @@ export const studentService = {
       (e) => e.toLowerCase() !== cleanEmail
     );
 
-    const updatedCourse = { ...course, enrolledStudentEmails: emails };
+    const updatedCourse = { ...course, enrolledStudentEmails: emails, enrolledCount: emails.length };
     courses[courseIndex] = updatedCourse;
     setStorage(STORAGE_KEYS.COURSES, courses);
+
+    // Update master student database
+    const masterStudents = this.getMasterStudents();
+    const studentIdx = masterStudents.findIndex((s) => s.email.toLowerCase() === cleanEmail);
+    if (studentIdx >= 0) {
+      const remainingCodes = (masterStudents[studentIdx].enrolledCourseCodes || []).filter(
+        (code) => code.toUpperCase() !== course.code.toUpperCase() && code !== course.id
+      );
+      masterStudents[studentIdx] = {
+        ...masterStudents[studentIdx],
+        enrolledCourseCodes: remainingCodes,
+      };
+      setStorage(STORAGE_KEYS.MASTER_STUDENTS, masterStudents);
+      supabaseDataService.saveStudent(masterStudents[studentIdx]).catch(() => {});
+    }
+
+    supabaseDataService.saveCourse(updatedCourse).catch(() => {});
+    myJourneySyncService.triggerDebouncedAutoSync();
 
     return {
       success: true,
@@ -2878,12 +3088,27 @@ export const studentService = {
     registeredAt?: string;
   }> {
     const courses = this.getAllCourses();
+    const masterStudents = this.getMasterStudents();
+    const customRoster = getStorage<Record<string, any>>(STORAGE_KEYS.CUSTOM_ROSTER, {});
     const studentsMap = new Map<string, { email: string; name: string; nim: string; enrolledCourseCodes: string[]; registeredAt?: string }>();
 
+    // 1. Seed from Master Students database
+    masterStudents.forEach((ms) => {
+      const clean = ms.email.toLowerCase().trim();
+      if (!clean) return;
+      studentsMap.set(clean, {
+        email: clean,
+        name: ms.name,
+        nim: ms.nim,
+        enrolledCourseCodes: [...(ms.enrolledCourseCodes || [])],
+      });
+    });
+
+    // 2. Augment from courses enrolledStudentEmails
+    let coursesModified = false;
     courses.forEach((course) => {
       (course.enrolledStudentEmails || []).forEach((email) => {
         const clean = email.toLowerCase().trim();
-        const customRoster = getStorage<Record<string, { name: string; nim: string; email: string }>>('slh_custom_roster', {});
         const info = customRoster[clean] || getStudentRosterInfo(clean);
 
         if (!studentsMap.has(clean)) {
@@ -2901,6 +3126,24 @@ export const studentService = {
         }
       });
     });
+
+    // 3. Self-heal courses enrolledStudentEmails from studentsMap
+    studentsMap.forEach((std) => {
+      courses.forEach((course) => {
+        if (std.enrolledCourseCodes.some((code) => code.toUpperCase() === course.code.toUpperCase() || code === course.id)) {
+          if (!course.enrolledStudentEmails) course.enrolledStudentEmails = [];
+          if (!course.enrolledStudentEmails.map((e) => e.toLowerCase().trim()).includes(std.email)) {
+            course.enrolledStudentEmails.push(std.email);
+            course.enrolledCount = course.enrolledStudentEmails.length;
+            coursesModified = true;
+          }
+        }
+      });
+    });
+
+    if (coursesModified) {
+      setStorage(STORAGE_KEYS.COURSES, courses);
+    }
 
     return Array.from(studentsMap.values());
   },
@@ -3417,7 +3660,36 @@ export const studentService = {
     const user = this.getCurrentUser();
     const targetEmail = (filterEmail || user?.email || '').toLowerCase().trim();
     if (!targetEmail) return all;
-    return all.filter((n) => !n.recipientEmail || n.recipientEmail.toLowerCase() === targetEmail);
+
+    const userNotifs = all.filter((n) => !n.recipientEmail || n.recipientEmail.toLowerCase() === targetEmail);
+
+    // Auto-generate active notifications for pending course invitations!
+    const courses = this.getAllCourses();
+    const pendingInvitations = courses.filter(
+      (c) => (c.pendingLecturerEmail || '').toLowerCase().trim() === targetEmail
+    );
+
+    const generatedInvNotifs: StudentNotification[] = pendingInvitations.map((c) => ({
+      id: `notif_inv_${c.id}`,
+      title: 'Undangan Kolaborasi Mengajar',
+      message: `${c.teacher?.name || 'Rekan Dosen'} mengundang Anda menjadi Dosen Pengampu untuk mata kuliah ${c.code} - ${c.title}.`,
+      timestamp: 'Menunggu Persetujuan',
+      type: 'grade',
+      isRead: false,
+      recipientEmail: targetEmail,
+      invitationData: {
+        courseId: c.id,
+        courseCode: c.code,
+        courseTitle: c.title,
+        inviterName: c.teacher?.name || 'Rekan Dosen',
+        inviterEmail: c.teacher?.email || '',
+        invitedEmail: targetEmail,
+        status: 'pending',
+      },
+    }));
+
+    const existingIds = new Set(userNotifs.map((n) => n.id));
+    return [...generatedInvNotifs.filter((n) => !existingIds.has(n.id)), ...userNotifs];
   },
 
   markNotificationAsRead(id: string): void {

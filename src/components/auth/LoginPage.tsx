@@ -52,7 +52,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     try {
       return localStorage.getItem('slh_remember_me') === 'true';
     } catch {
-      return true;
+      return false;
     }
   });
 
@@ -67,6 +67,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     setIsLoading(true);
 
     try {
+      if (rememberMe) {
+        localStorage.setItem('slh_remember_me', 'true');
+      } else {
+        localStorage.removeItem('slh_remember_me');
+      }
+
       const res = await studentService.loginAsync(email, password);
       setIsLoading(false);
 
@@ -74,11 +80,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         setSuccessMsg(res.message);
         try {
           localStorage.setItem('slh_last_email', email.trim());
-          if (rememberMe) {
-            localStorage.setItem('slh_remember_me', 'true');
-          } else {
-            localStorage.removeItem('slh_remember_me');
-          }
         } catch {}
 
         setTimeout(() => {
@@ -118,6 +119,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     setIsLoading(true);
 
     try {
+      if (rememberMe) {
+        localStorage.setItem('slh_remember_me', 'true');
+      } else {
+        localStorage.removeItem('slh_remember_me');
+      }
+
       const res = await studentService.registerAsync({
         name: fullName,
         email: email,
@@ -132,9 +139,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         setSuccessMsg(res.message);
         try {
           localStorage.setItem('slh_last_email', email.trim());
-          if (rememberMe) {
-            localStorage.setItem('slh_remember_me', 'true');
-          }
         } catch {}
 
         setTimeout(() => {

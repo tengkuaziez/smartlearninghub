@@ -124,8 +124,14 @@ export const supabaseDataService = {
           syllabusOverview: course.syllabusOverview || `${course.totalMeetings || 16} pertemuan kurikulum OBE`,
           enrolledCount: (course.enrolledStudentEmails || []).length,
           enrolledStudentEmails: course.enrolledStudentEmails || [],
-          primaryLecturer: course.teacher?.name || course.primaryLecturer || 'Tengku Abdillah Azis, S.Pd',
-          partnerLecturer: course.secondaryTeacher?.name || course.partnerLecturer || '',
+          primaryLecturer: course.teacher?.name || course.primaryLecturer || 'Tengku Abdillah Azis, S.Si',
+          primaryLecturerEmail: course.teacher?.email || '',
+          partnerLecturer: course.pendingLecturerEmail
+            ? `PENDING:${course.pendingLecturerEmail}`
+            : (course.secondaryTeacher?.name || course.partnerLecturer || ''),
+          partnerLecturerEmail: course.secondaryTeacher?.email || '',
+          pendingLecturerEmail: course.pendingLecturerEmail || null,
+          pendingLecturerName: course.pendingLecturerName || null,
           color: course.color || 'blue',
           category: course.category || 'Geografi & Komputasi',
         },

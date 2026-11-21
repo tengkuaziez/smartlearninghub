@@ -78,7 +78,9 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
   const [newCourseCredits, setNewCourseCredits] = useState<number>(3);
   const [newCourseRoom, setNewCourseRoom] = useState('Lab Komputasi Spasial Lt. 3');
   const [newCourseDay, setNewCourseDay] = useState('Senin');
-  const [newCourseTime, setNewCourseTime] = useState('08:00 - 10:30 WIB');
+  const [newCourseStartTime, setNewCourseStartTime] = useState('08:00');
+  const [newCourseEndTime, setNewCourseEndTime] = useState('10:30');
+  const [newCourseTimezone, setNewCourseTimezone] = useState('WIB');
   const [newCourseSemester, setNewCourseSemester] = useState('Semester 5');
   const [newCourseDesc, setNewCourseDesc] = useState('');
   const [newCourseCoLecturerEmail, setNewCourseCoLecturerEmail] = useState('');
@@ -97,9 +99,12 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
   const [editCourseCredits, setEditCourseCredits] = useState<number>(3);
   const [editCourseSemester, setEditCourseSemester] = useState('Semester 5');
   const [editCourseDay, setEditCourseDay] = useState('Senin');
-  const [editCourseTime, setEditCourseTime] = useState('08:00 - 10:30 WIB');
+  const [editCourseStartTime, setEditCourseStartTime] = useState('08:00');
+  const [editCourseEndTime, setEditCourseEndTime] = useState('10:30');
+  const [editCourseTimezone, setEditCourseTimezone] = useState('WIB');
   const [editCourseRoom, setEditCourseRoom] = useState('Lab Komputasi Spasial Lt. 3');
   const [editCourseDesc, setEditCourseDesc] = useState('');
+  const [editPrimaryLecturerEmail, setEditPrimaryLecturerEmail] = useState('');
   const currentUser = studentService.getCurrentUser();
   // Colleague Lecturers for "Add Friend" style co-teaching selection
   const registeredLecturers = studentService.getRegisteredLecturers();
@@ -164,6 +169,31 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
     return matchesSearch && targetCourse && s.enrolledCourseCodes.includes(targetCourse.code);
   });
 
+  // Time helpers for interactive class schedule
+  const calculateEndTime = (startTime: string, credits: number) => {
+    try {
+      const [hStr, mStr] = startTime.split(':');
+      const h = parseInt(hStr || '8', 10);
+      const m = parseInt(mStr || '0', 10);
+      const durationMinutes = (credits || 3) * 50;
+      const totalMinutes = h * 60 + m + durationMinutes;
+      const endH = Math.floor(totalMinutes / 60) % 24;
+      const endM = totalMinutes % 60;
+      return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+    } catch {
+      return '10:30';
+    }
+  };
+
+  const parseScheduleString = (scheduleTimeStr: string) => {
+    const clean = (scheduleTimeStr || '08:00 - 10:30 WIB').trim();
+    const parts = clean.split(' ');
+    const start = parts[0] || '08:00';
+    const end = parts[2] || '10:30';
+    const tz = parts[3] || 'WIB';
+    return { start, end, tz };
+  };
+
   // Handle Add New Course
   const handleCreateCourseSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,6 +201,8 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
       alert('Kode mata kuliah dan nama mata kuliah wajib diisi.');
       return;
     }
+
+    const formattedScheduleTime = `${newCourseStartTime} - ${newCourseEndTime} ${newCourseTimezone}`;
 
     studentService.createCourse({
       code: newCourseCode,
@@ -180,7 +212,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
       description: newCourseDesc,
       room: newCourseRoom,
       scheduleDay: newCourseDay,
-      scheduleTime: newCourseTime,
+      scheduleTime: formattedScheduleTime,
       semester: newCourseSemester,
       invitedLecturerEmail: newCourseCoLecturerEmail.trim() || undefined,
     });
@@ -192,6 +224,9 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
     setNewCourseDesc('');
     setNewCourseSection('Kelas A');
     setNewCourseCredits(3);
+    setNewCourseStartTime('08:00');
+    setNewCourseEndTime('10:30');
+    setNewCourseTimezone('WIB');
     setNewCourseCoLecturerEmail('');
     // Auto-sync pembaruan ke Google Sheets & My Journey
     myJourneySyncService.triggerDebouncedAutoSync();
@@ -206,15 +241,24 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
     setEditCourseCredits(course.credits || 3);
     setEditCourseSemester(course.semester || 'Semester 5');
     setEditCourseDay(course.scheduleDay || 'Senin');
-    setEditCourseTime(course.scheduleTime || '08:00 - 10:30 WIB');
+    
+    const parsed = parseScheduleString(course.scheduleTime || '08:00 - 10:30 WIB');
+    setEditCourseStartTime(parsed.start);
+    setEditCourseEndTime(parsed.end);
+    setEditCourseTimezone(parsed.tz);
+
     setEditCourseRoom(course.room || 'Lab Komputasi Spasial Lt. 3');
     setEditCourseDesc(course.description || '');
+    setEditPrimaryLecturerEmail(course.teacher?.email || '');
     setIsEditCourseModalOpen(true);
   };
 
   const handleSaveEditCourse = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCourse) return;
+
+    const formattedScheduleTime = `${editCourseStartTime} - ${editCourseEndTime} ${editCourseTimezone}`;
+
     studentService.updateCourse(editingCourse.id, {
       code: editCourseCode,
       title: editCourseTitle,
@@ -222,10 +266,16 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
       credits: Number(editCourseCredits) || 3,
       semester: editCourseSemester,
       scheduleDay: editCourseDay,
-      scheduleTime: editCourseTime,
+      scheduleTime: formattedScheduleTime,
       room: editCourseRoom,
       description: editCourseDesc,
     });
+
+    // Update Primary Lecturer if changed
+    if (editPrimaryLecturerEmail && editPrimaryLecturerEmail.toLowerCase() !== (editingCourse.teacher?.email || '').toLowerCase()) {
+      studentService.setPrimaryLecturer(editingCourse.id, editPrimaryLecturerEmail);
+    }
+
     setIsEditCourseModalOpen(false);
     setEditingCourse(null);
     onDataUpdated();
@@ -1202,7 +1252,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
                     Hari Kuliah
@@ -1221,17 +1271,91 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                   </select>
                 </div>
 
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                    Jam Sesi Perkuliahan
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Contoh: 08:00 - 10:30 WIB"
-                    value={newCourseTime}
-                    onChange={(e) => setNewCourseTime(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  />
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-slate-700 dark:text-slate-300 block text-xs">
+                      Jam Sesi Perkuliahan
+                    </label>
+                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {(newCourseCredits || 3) * 50} Menit ({newCourseCredits || 3} SKS)
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-12 gap-1.5 items-center">
+                    <div className="col-span-5">
+                      <input
+                        type="time"
+                        required
+                        value={newCourseStartTime}
+                        onChange={(e) => {
+                          const st = e.target.value;
+                          setNewCourseStartTime(st);
+                          setNewCourseEndTime(calculateEndTime(st, newCourseCredits));
+                        }}
+                        className="w-full px-2 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+                    <span className="col-span-1 text-center text-slate-400 font-bold">-</span>
+                    <div className="col-span-4">
+                      <input
+                        type="time"
+                        required
+                        value={newCourseEndTime}
+                        onChange={(e) => setNewCourseEndTime(e.target.value)}
+                        className="w-full px-2 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <select
+                        value={newCourseTimezone}
+                        onChange={(e) => setNewCourseTimezone(e.target.value)}
+                        className="w-full px-1 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[10px] font-bold text-center focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      >
+                        <option value="WIB">WIB</option>
+                        <option value="WITA">WITA</option>
+                        <option value="WIT">WIT</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Preset Quick Chips */}
+                  <div className="flex flex-wrap gap-1 pt-0.5">
+                    {[
+                      { label: '08:00 - 09:40', s: '08:00', e: '09:40', sks: 2 },
+                      { label: '08:00 - 10:30', s: '08:00', e: '10:30', sks: 3 },
+                      { label: '10:40 - 12:20', s: '10:40', e: '12:20', sks: 2 },
+                      { label: '13:30 - 16:00', s: '13:30', e: '16:00', sks: 3 },
+                    ].map((chip) => (
+                      <button
+                        key={chip.label}
+                        type="button"
+                        onClick={() => {
+                          setNewCourseStartTime(chip.s);
+                          setNewCourseEndTime(chip.e);
+                          setNewCourseCredits(chip.sks);
+                        }}
+                        className={`text-[9px] px-2 py-0.5 rounded-md border transition-all ${
+                          newCourseStartTime === chip.s && newCourseEndTime === chip.e
+                            ? 'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 border-blue-300 font-bold'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-200'
+                        }`}
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Schedule preview badge */}
+                  <div className="p-2 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-900/40 flex items-center justify-between text-[11px] text-blue-800 dark:text-blue-300 font-medium">
+                    <span className="flex items-center gap-1.5 font-bold">
+                      <Clock className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      {newCourseDay}, {newCourseStartTime} - {newCourseEndTime} {newCourseTimezone}
+                    </span>
+                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
+                      Terintegrasi Jadwal
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -1482,7 +1606,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
                     Hari Kuliah
@@ -1501,19 +1625,155 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                   </select>
                 </div>
 
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                    Jam Sesi Perkuliahan
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Contoh: 08:00 - 10:30 WIB"
-                    value={editCourseTime}
-                    onChange={(e) => setEditCourseTime(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  />
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-slate-700 dark:text-slate-300 block text-xs">
+                      Jam Sesi Perkuliahan
+                    </label>
+                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {(editCourseCredits || 3) * 50} Menit ({editCourseCredits || 3} SKS)
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-12 gap-1.5 items-center">
+                    <div className="col-span-5">
+                      <input
+                        type="time"
+                        required
+                        value={editCourseStartTime}
+                        onChange={(e) => {
+                          const st = e.target.value;
+                          setEditCourseStartTime(st);
+                          setEditCourseEndTime(calculateEndTime(st, editCourseCredits));
+                        }}
+                        className="w-full px-2 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+                    <span className="col-span-1 text-center text-slate-400 font-bold">-</span>
+                    <div className="col-span-4">
+                      <input
+                        type="time"
+                        required
+                        value={editCourseEndTime}
+                        onChange={(e) => setEditCourseEndTime(e.target.value)}
+                        className="w-full px-2 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <select
+                        value={editCourseTimezone}
+                        onChange={(e) => setEditCourseTimezone(e.target.value)}
+                        className="w-full px-1 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[10px] font-bold text-center focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      >
+                        <option value="WIB">WIB</option>
+                        <option value="WITA">WITA</option>
+                        <option value="WIT">WIT</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Preset Quick Chips */}
+                  <div className="flex flex-wrap gap-1 pt-0.5">
+                    {[
+                      { label: '08:00 - 09:40', s: '08:00', e: '09:40', sks: 2 },
+                      { label: '08:00 - 10:30', s: '08:00', e: '10:30', sks: 3 },
+                      { label: '10:40 - 12:20', s: '10:40', e: '12:20', sks: 2 },
+                      { label: '13:30 - 16:00', s: '13:30', e: '16:00', sks: 3 },
+                    ].map((chip) => (
+                      <button
+                        key={chip.label}
+                        type="button"
+                        onClick={() => {
+                          setEditCourseStartTime(chip.s);
+                          setEditCourseEndTime(chip.e);
+                          setEditCourseCredits(chip.sks);
+                        }}
+                        className={`text-[9px] px-2 py-0.5 rounded-md border transition-all ${
+                          editCourseStartTime === chip.s && editCourseEndTime === chip.e
+                            ? 'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 border-blue-300 font-bold'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-200'
+                        }`}
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Schedule preview badge */}
+                  <div className="p-2 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-900/40 flex items-center justify-between text-[11px] text-blue-800 dark:text-blue-300 font-medium">
+                    <span className="flex items-center gap-1.5 font-bold">
+                      <Clock className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      {editCourseDay}, {editCourseStartTime} - {editCourseEndTime} {editCourseTimezone}
+                    </span>
+                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
+                      Terintegrasi Jadwal
+                    </span>
+                  </div>
                 </div>
               </div>
+
+              {/* Primary Lecturer Selection */}
+              {(editingCourse.secondaryTeacher || editingCourse.partnerLecturer) && (
+                <div className="p-3.5 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/60 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-slate-800 dark:text-slate-200 block text-xs flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-indigo-600" />
+                      <span>Atur Dosen Utama (Primary Lecturer)</span>
+                    </label>
+                    <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold bg-indigo-100 dark:bg-indigo-900/50 px-2 py-0.5 rounded-md">
+                      Tim Pengajar Aktif
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Pilih siapa yang memegang peran sebagai Dosen Pengampu Utama untuk mata kuliah ini.
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    {[
+                      {
+                        name: editingCourse.teacher?.name || editingCourse.primaryLecturer || 'Dosen Utama',
+                        email: editingCourse.teacher?.email || 'altaf.aziz16@gmail.com',
+                        avatar: editingCourse.teacher?.avatarUrl,
+                      },
+                      {
+                        name: editingCourse.secondaryTeacher?.name || editingCourse.partnerLecturer || 'Dosen Partner',
+                        email: editingCourse.secondaryTeacher?.email || 'miftahurridlo.688@gmail.com',
+                        avatar: editingCourse.secondaryTeacher?.avatarUrl,
+                      },
+                    ].map((lecturer) => {
+                      const isSelected = (editPrimaryLecturerEmail || editingCourse.teacher?.email || '').toLowerCase() === lecturer.email.toLowerCase();
+                      return (
+                        <div
+                          key={lecturer.email}
+                          onClick={() => setEditPrimaryLecturerEmail(lecturer.email)}
+                          className={`p-2.5 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-white dark:bg-slate-900 border-indigo-500 ring-2 ring-indigo-500/20 shadow-xs'
+                              : 'bg-white/60 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 hover:border-slate-300'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="primaryLecturerRadio"
+                            checked={isSelected}
+                            onChange={() => setEditPrimaryLecturerEmail(lecturer.email)}
+                            className="w-3.5 h-3.5 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                              {lecturer.name}
+                            </div>
+                            <div className="text-[10px] text-slate-500 truncate">
+                              {isSelected ? '✓ Dosen Pengampu Utama' : 'Dosen Pengampu Partner'}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">

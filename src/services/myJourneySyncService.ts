@@ -182,16 +182,25 @@ export const myJourneySyncService = {
 
     // 2. Format Students
     const studentsPayload = students.map((std, idx) => {
-      const matchedCourse = courses.find((c) => c.enrolledStudentEmails.includes(std.email));
+      const cleanEmail = (std.email || '').toLowerCase().trim();
+      const matchedCourse = courses.find((c) =>
+        (c.enrolledStudentEmails || []).some((e) => e.toLowerCase().trim() === cleanEmail) ||
+        (std.enrolledCourseCodes || []).some((code) => code.toUpperCase() === c.code.toUpperCase() || code === c.id)
+      );
+      // Gunakan ID unik stabil (std_...) yang tidak terfilter oleh isMockDummyId My Journey
+      const safeId = (std as any).id && !/^(tsk|idea|draft|pub|haki|crs|std|mat|rps|ses|job|note|act|log)-\d{1,2}$/.test((std as any).id)
+        ? (std as any).id
+        : `std_${std.nim || cleanEmail.replace(/[^a-z0-9]/g, '_')}`;
+
       return {
-        id: `std-${String(idx + 1).padStart(2, '0')}`,
+        id: safeId,
         nim: std.nim,
         name: std.name,
-        courseCode: matchedCourse?.code || 'UMUM',
+        courseCode: matchedCourse?.code || std.enrolledCourseCodes?.[0] || 'UMUM',
         courseName: matchedCourse?.title || 'Perkuliahan',
         classSection: matchedCourse?.section || 'Kelas A',
         academicYear: '2026/2027',
-        email: std.email,
+        email: cleanEmail,
         attendancePercent: 95,
       };
     });

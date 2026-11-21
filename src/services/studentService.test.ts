@@ -277,3 +277,67 @@ test('Reset Platform Data: clears courses and students to 0', () => {
   assert.ok(lecturers.some((l) => l.email === 'altaf.aziz16@gmail.com'));
   assert.ok(lecturers.some((l) => l.email === 'miftahurridlo.688@gmail.com'));
 });
+
+test('Student Enrollment: Lecturer adds student, appears in roster and student portal', () => {
+  // 1. Login as Azis
+  studentService.login('altaf.aziz16@gmail.com', 'password123');
+  const course = studentService.createCourse({
+    code: 'SIG-LANJUT',
+    title: 'Sistem Informasi Geografi Lanjutan',
+    description: 'Kelas praktek SIG',
+    room: 'Lab Spasial',
+    scheduleDay: 'Selasa',
+    scheduleTime: '08:00 - 10:30 WIB',
+  });
+
+  // 2. Register student
+  const regRes = studentService.registerStudentWithDetails({
+    name: 'Budi Santoso',
+    nim: '2208101001',
+    email: 'budi.santoso@student.ac.id',
+    courseId: course.id,
+  });
+  assert.equal(regRes.success, true);
+
+  // 3. Check course in Azis view
+  const updatedCourse = studentService.getCourseById(course.id);
+  assert.ok(updatedCourse?.enrolledStudentEmails?.includes('budi.santoso@student.ac.id'));
+  assert.equal(updatedCourse?.enrolledCount, 1);
+
+  // 4. Check getAllPreRegisteredStudents
+  const allStds = studentService.getAllPreRegisteredStudents();
+  assert.ok(allStds.some((s) => s.email === 'budi.santoso@student.ac.id'));
+
+  // 5. Check student view (when budi logs in or queries enrolled courses)
+  const studentCourses = studentService.getEnrolledCourses('budi.santoso@student.ac.id');
+  assert.equal(studentCourses.length, 1);
+  assert.equal(studentCourses[0].code, 'SIG-LANJUT');
+});
+
+test('Set Primary Lecturer: Swaps primary and secondary lecturer roles correctly', () => {
+  studentService.login('altaf.aziz16@gmail.com', 'password123');
+  const course = studentService.createCourse({
+    code: 'GEO-OBE',
+    title: 'Geografi Berbasis OBE',
+    description: 'Kelas kolaborasi',
+    room: 'Lab Komputasi',
+    scheduleDay: 'Senin',
+    scheduleTime: '08:00 - 10:30 WIB',
+    invitedLecturerEmail: 'miftahurridlo.688@gmail.com',
+  });
+
+  // Accept co-lecturer invitation
+  studentService.acceptCourseInvitation(course.id, 'miftahurridlo.688@gmail.com');
+  const acceptedCourse = studentService.getCourseById(course.id);
+  assert.equal(acceptedCourse?.teacher?.email, 'altaf.aziz16@gmail.com');
+  assert.equal(acceptedCourse?.secondaryTeacher?.email, 'miftahurridlo.688@gmail.com');
+
+  // Switch Primary Lecturer to Miftah
+  const switchRes = studentService.setPrimaryLecturer(course.id, 'miftahurridlo.688@gmail.com');
+  assert.equal(switchRes.success, true);
+
+  const switchedCourse = studentService.getCourseById(course.id);
+  assert.equal(switchedCourse?.teacher?.email, 'miftahurridlo.688@gmail.com');
+  assert.equal(switchedCourse?.secondaryTeacher?.email, 'altaf.aziz16@gmail.com');
+  assert.equal(switchedCourse?.primaryLecturer, 'Muhammad Miftahurrodlo, M.Sc.');
+});
