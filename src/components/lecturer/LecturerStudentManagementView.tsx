@@ -58,6 +58,7 @@ export const LecturerStudentManagementView: React.FC<LecturerStudentManagementVi
 
   // Modal: Impor Data Mahasiswa via CSV (Persis My Journey)
   const [isCsvImportModalOpen, setIsCsvImportModalOpen] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<{ id: string; name: string } | null>(null);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvParsedStudents, setCsvParsedStudents] = useState<Array<{ name: string; nim: string; email: string }>>([]);
   const [csvParseError, setCsvParseError] = useState<string | null>(null);
@@ -177,15 +178,19 @@ export const LecturerStudentManagementView: React.FC<LecturerStudentManagementVi
   };
 
   const handleDeleteStudent = (id: string, name: string) => {
-    if (window.confirm(`Yakin ingin menghapus data mahasiswa "${name}" dari basis data?`)) {
-      studentService.deleteMasterStudent(id);
-      try {
-        myJourneySyncService.triggerDebouncedAutoSync();
-      } catch {}
-      onDataUpdated();
-      setNotification(`Mahasiswa "${name}" telah dihapus.`);
-      setTimeout(() => setNotification(null), 3000);
-    }
+    setStudentToDelete({ id, name });
+  };
+
+  const handleConfirmDeleteStudent = () => {
+    if (!studentToDelete) return;
+    studentService.deleteMasterStudent(studentToDelete.id);
+    try {
+      myJourneySyncService.triggerDebouncedAutoSync();
+    } catch {}
+    onDataUpdated();
+    setNotification(`Mahasiswa "${studentToDelete.name}" telah dihapus.`);
+    setTimeout(() => setNotification(null), 3000);
+    setStudentToDelete(null);
   };
 
   const handleSyncMyJourney = async () => {
@@ -1121,6 +1126,40 @@ export const LecturerStudentManagementView: React.FC<LecturerStudentManagementVi
                   </span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* In-App Delete Confirmation Modal */}
+      {studentToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-2">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                Hapus Data Mahasiswa?
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                Yakin ingin menghapus data mahasiswa <strong>{studentToDelete.name}</strong> dari basis data? Akses mahasiswa ini pada seluruh kelas akan dicabut.
+              </p>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setStudentToDelete(null)}
+                className="flex-1 px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteStudent}
+                className="flex-1 px-4 py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs cursor-pointer"
+              >
+                Hapus
+              </button>
             </div>
           </div>
         </div>

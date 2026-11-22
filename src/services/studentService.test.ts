@@ -312,6 +312,26 @@ test('Student Enrollment: Lecturer adds student, appears in roster and student p
   const studentCourses = studentService.getEnrolledCourses('budi.santoso@student.ac.id');
   assert.equal(studentCourses.length, 1);
   assert.equal(studentCourses[0].code, 'SIG-LANJUT');
+
+  // 6. Lecturer removes student from course
+  const removeRes = studentService.removeStudentEmailFromCourse(course.id, 'budi.santoso@student.ac.id');
+  assert.equal(removeRes.success, true);
+
+  // 7. Check course in Lecturer view: roster count is 0, student email is gone
+  const courseAfterRemoval = studentService.getCourseById(course.id);
+  assert.equal(courseAfterRemoval?.enrolledCount, 0);
+  assert.equal(courseAfterRemoval?.enrolledStudentEmails?.length, 0);
+
+  // 8. Check student view: student is kicked out of the course immediately!
+  const studentCoursesAfterRemoval = studentService.getEnrolledCourses('budi.santoso@student.ac.id');
+  assert.equal(studentCoursesAfterRemoval.length, 0);
+
+  // 9. Verify subsequent calls to getEnrolledCourses do NOT resurrect student
+  const studentCoursesAgain = studentService.getEnrolledCourses('budi.santoso@student.ac.id');
+  assert.equal(studentCoursesAgain.length, 0);
+  const courseCheck = studentService.getCourseById(course.id);
+  assert.equal(courseCheck?.enrolledCount, 0);
+  assert.equal(courseCheck?.enrolledStudentEmails?.length, 0);
 });
 
 test('Set Primary Lecturer: Swaps primary and secondary lecturer roles correctly', () => {
@@ -493,4 +513,68 @@ test('Student view: pruned immediately on course delete & new course starts empt
   // Student checks enrolled courses after deletion
   const studentCoursesAfter = studentService.getEnrolledCourses(studentEmail);
   assert.ok(!studentCoursesAfter.some((c) => c.id === course.id || c.code === 'SIG-STUDENT-TEST'));
+});
+
+test('Student Removal & Cloud Sync: Removed student is evicted permanently and never resurrected', () => {
+  studentService.login('altaf.aziz16@gmail.com', 'password123');
+  const course = studentService.createCourse({
+    code: 'BENCANA-TEST',
+    title: 'Geografi Kebencanaan Test',
+    description: 'Mitigasi Bencana',
+    room: 'Lab Spasial',
+    scheduleDay: 'Senin',
+    scheduleTime: '08:00 - 10:30 WIB',
+  });
+
+  const studentA = 'altaf.aziz.student@gmail.com';
+  const studentB = 'citra.permata@student.ac.id';
+
+  studentService.registerStudentWithDetails({
+    name: 'Altaf Mahasiswa',
+    nim: '3222431013',
+    email: studentA,
+    courseId: course.id,
+  });
+  studentService.registerStudentWithDetails({
+    name: 'Citra Permata',
+    nim: '3222431014',
+    email: studentB,
+    courseId: course.id,
+  });
+
+  // Both students see course
+  assert.equal(studentService.getEnrolledCourses(studentA).length, 1);
+  assert.equal(studentService.getEnrolledCourses(studentB).length, 1);
+  assert.equal(studentService.getCourseById(course.id)?.enrolledCount, 2);
+
+  // Lecturer removes studentA
+  const removeRes = studentService.removeStudentEmailFromCourse(course.id, studentA);
+  assert.equal(removeRes.success, true);
+
+  // Verification 1: studentA MUST immediately have 0 enrolled courses
+  const studentACourses = studentService.getEnrolledCourses(studentA);
+  assert.equal(studentACourses.length, 0);
+
+  // Verification 2: studentB STILL has 1 enrolled course
+  const studentBCourses = studentService.getEnrolledCourses(studentB);
+  assert.equal(studentBCourses.length, 1);
+  assert.equal(studentBCourses[0].id, course.id);
+
+  // Verification 3: Course roster in lecturer view shows only studentB
+  const updatedCourse = studentService.getCourseById(course.id);
+  assert.equal(updatedCourse?.enrolledCount, 1);
+  assert.deepEqual(updatedCourse?.enrolledStudentEmails, [studentB]);
+
+  // Verification 4: Simulate cross-browser realtime broadcast with updated roster
+  studentService.applyRealtimeCourseUpdate({
+    type: 'roster_updated',
+    courseId: course.id,
+    removedEmail: studentA,
+    course: updatedCourse,
+  });
+  assert.equal(studentService.getEnrolledCourses(studentA).length, 0);
+
+  // Clean up
+  studentService.deleteCourse(course.id);
+  assert.equal(studentService.getEnrolledCourses(studentB).length, 0);
 });

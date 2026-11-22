@@ -154,9 +154,22 @@ export const supabaseDataService = {
   async deleteCourse(courseId: string, courseCode?: string): Promise<boolean> {
     if (!isSupabaseConfigured() || !supabase || !courseId) return false;
     try {
+      // 1. Hard delete by id
       await supabase.from('courses').delete().eq('id', courseId);
+      // 2. Hard delete by courseCode if provided
       if (courseCode) {
         await supabase.from('courses').delete().filter('data->>code', 'ilike', courseCode);
+      }
+      // 3. Fallback: in case RLS blocks deleting another user's row, soft-delete via update
+      await supabase.from('courses').update({
+        data: { id: courseId, code: courseCode || '', status: 'deleted', isDeleted: true },
+        updated_at: new Date().toISOString(),
+      }).eq('id', courseId);
+      if (courseCode) {
+        await supabase.from('courses').update({
+          data: { id: courseId, code: courseCode, status: 'deleted', isDeleted: true },
+          updated_at: new Date().toISOString(),
+        }).filter('data->>code', 'ilike', courseCode);
       }
       return true;
     } catch {
@@ -601,6 +614,9 @@ export const supabaseDataService = {
         })
         .on('broadcast', { event: 'course_deleted' }, (msg: any) => {
           onDataChange('courses', { type: 'delete', ...msg?.payload });
+        })
+        .on('broadcast', { event: 'student_roster_updated' }, (msg: any) => {
+          onDataChange('courses', { type: 'roster_updated', ...msg?.payload });
         })
         .on('broadcast', { event: 'student_updated' }, (msg: any) => {
           onDataChange('students', msg?.payload);

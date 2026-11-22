@@ -959,10 +959,12 @@ export const studentService = {
 
     return students.map((std) => {
       const isReg = registeredUsers.some((u) => u.email.toLowerCase() === std.email.toLowerCase());
-      const courseCodes = new Set(std.enrolledCourseCodes || []);
+      const cleanStdEmail = std.email.toLowerCase().trim();
+      const courseCodes = new Set<string>();
       courses.forEach((c) => {
-        if ((c.enrolledStudentEmails || []).some((e) => e.toLowerCase() === std.email.toLowerCase())) {
-          courseCodes.add(c.code);
+        if ((c.enrolledStudentEmails || []).some((e) => e.toLowerCase().trim() === cleanStdEmail)) {
+          if (c.code) courseCodes.add(c.code);
+          if (c.id) courseCodes.add(c.id);
         }
       });
 
@@ -1046,14 +1048,21 @@ export const studentService = {
       }
       const courses = this.getAllCourses();
       let modified = false;
+      const modifiedCourses: CourseClass[] = [];
       courses.forEach((crs) => {
         if (crs.enrolledStudentEmails && crs.enrolledStudentEmails.map((e) => e.toLowerCase()).includes(toDelete.email.toLowerCase())) {
           crs.enrolledStudentEmails = crs.enrolledStudentEmails.filter((e) => e.toLowerCase() !== toDelete.email.toLowerCase());
+          crs.enrolledCount = crs.enrolledStudentEmails.length;
           modified = true;
+          modifiedCourses.push(crs);
         }
       });
       if (modified) {
         setStorage(STORAGE_KEYS.COURSES, courses);
+        modifiedCourses.forEach((c) => {
+          supabaseDataService.saveCourse(c).catch(() => {});
+          supabaseDataService.broadcastChange('course_updated', c);
+        });
       }
     }
 
@@ -1196,11 +1205,14 @@ export const studentService = {
       const currentCourses = this.getAllCourses();
       const deletedIds = getStorage<string[]>('slh_deleted_course_ids', []);
 
-      // Filter out courses that were explicitly deleted so they never resurrect from Supabase
+      // Filter out courses that were explicitly deleted or marked deleted so they never resurrect from Supabase
       const activeRows = data.filter((row) => {
         const d = row.data || {};
         const code = String(d.code || '').trim().toUpperCase();
         const id = String(row.id || d.id || '').trim();
+        if (d.status === 'deleted' || d.isDeleted === true || (d.deletionRequest && d.deletionRequest.status === 'approved')) {
+          return false;
+        }
         if (deletedIds.includes(id) || (code && deletedIds.includes(code))) {
           return false;
         }
@@ -1237,18 +1249,12 @@ export const studentService = {
 
         const latest = { ...rows[0], data: { ...rows[0].data } };
 
-        // Union enrolled student emails across all rows
-        const allEmails = new Set<string>();
-        rows.forEach((r) => {
-          const list = r.data?.enrolledStudentEmails || [];
-          if (Array.isArray(list)) {
-            list.forEach((e: string) => {
-              if (e && e.includes('@')) allEmails.add(e.toLowerCase().trim());
-            });
-          }
-        });
-        latest.data.enrolledStudentEmails = Array.from(allEmails);
-        latest.data.enrolledCount = allEmails.size;
+        // Authoritative enrolled student emails from latest row (do not resurrect deleted students)
+        const latestEmails = Array.isArray(rows[0].data?.enrolledStudentEmails)
+          ? rows[0].data.enrolledStudentEmails
+          : [];
+        latest.data.enrolledStudentEmails = latestEmails;
+        latest.data.enrolledCount = latestEmails.length;
 
         // If ANY row has accepted partner status, the course is accepted!
         const acceptedRow = rows.find((r) => {
@@ -1421,12 +1427,9 @@ export const studentService = {
           const chosen = (existingIsPending && !cIsPending) ? c : existing;
           const other = (chosen === c) ? existing : c;
 
-          const mergedEmails = Array.from(new Set([
-            ...(chosen.enrolledStudentEmails || []),
-            ...(other.enrolledStudentEmails || []),
-          ]));
-          chosen.enrolledStudentEmails = mergedEmails;
-          chosen.enrolledCount = mergedEmails.length;
+          // Authoritative enrolled emails from chosen course without unioning removed students
+          chosen.enrolledStudentEmails = chosen.enrolledStudentEmails || [];
+          chosen.enrolledCount = chosen.enrolledStudentEmails.length;
 
           uniqueMap.set(codeKey, chosen);
           uniqueMap.set(idKey, chosen);
@@ -1466,13 +1469,10 @@ export const studentService = {
         );
 
         if (idx >= 0) {
-          const mergedCodes = Array.from(
-            new Set([...(currentStudents[idx].enrolledCourseCodes || []), ...(cs.enrolledCourseCodes || [])])
-          );
           currentStudents[idx] = {
             ...currentStudents[idx],
             ...cs,
-            enrolledCourseCodes: mergedCodes,
+            enrolledCourseCodes: cs.enrolledCourseCodes || currentStudents[idx].enrolledCourseCodes || [],
           };
         } else {
           currentStudents.push(cs);
@@ -2477,39 +2477,11 @@ export const studentService = {
       });
     }
 
-    // For students: check enrolledStudentEmails OR masterStudents database
-    const masterStudents = this.getMasterStudents();
-    const studentMaster = masterStudents.find(
-      (m) => m.email.toLowerCase().trim() === emailToFilter
-    );
-
-    let modified = false;
+    // For students: strictly check enrolledStudentEmails (Lecturer's class roster whitelist authority)
     const enrolled = activeCourses.filter((c) => {
-      const inWhitelist = (c.enrolledStudentEmails || [])
-        .map((e) => e.toLowerCase().trim())
-        .includes(emailToFilter);
-      if (inWhitelist) return true;
-
-      if (studentMaster && studentMaster.enrolledCourseCodes && studentMaster.enrolledCourseCodes.length > 0) {
-        const matchesCode = studentMaster.enrolledCourseCodes.some(
-          (code) => code.toUpperCase() === c.code.toUpperCase() || code === c.id
-        );
-        if (matchesCode) {
-          if (!c.enrolledStudentEmails) c.enrolledStudentEmails = [];
-          if (!c.enrolledStudentEmails.map((e) => e.toLowerCase().trim()).includes(emailToFilter)) {
-            c.enrolledStudentEmails.push(emailToFilter);
-            c.enrolledCount = c.enrolledStudentEmails.length;
-            modified = true;
-          }
-          return true;
-        }
-      }
-      return false;
+      const studentEmails = (c.enrolledStudentEmails || []).map((e) => e.toLowerCase().trim());
+      return studentEmails.includes(emailToFilter);
     });
-
-    if (modified) {
-      setStorage(STORAGE_KEYS.COURSES, courses);
-    }
 
     return enrolled;
   },
@@ -3407,6 +3379,20 @@ export const studentService = {
       return;
     }
 
+    if (payload.type === 'roster_updated' && payload.removedEmail && payload.courseId) {
+      const cleanEmail = payload.removedEmail.toLowerCase().trim();
+      const courses = this.getAllCourses();
+      const idx = courses.findIndex(c => c.id === payload.courseId || (c.code && payload.course && c.code.toUpperCase() === payload.course.code?.toUpperCase()));
+      if (idx >= 0) {
+        courses[idx].enrolledStudentEmails = (courses[idx].enrolledStudentEmails || []).filter(
+          e => e.toLowerCase().trim() !== cleanEmail
+        );
+        courses[idx].enrolledCount = courses[idx].enrolledStudentEmails.length;
+        setStorage(STORAGE_KEYS.COURSES, courses);
+      }
+      return;
+    }
+
     if (payload.id && payload.code) {
       const incoming = payload as CourseClass;
       const courses = this.getAllCourses();
@@ -3426,10 +3412,12 @@ export const studentService = {
           deletionRequest: incoming.deletionRequest || undefined,
           pendingLecturerEmail: isAccepted ? undefined : (incoming.pendingLecturerEmail ?? courses[idx].pendingLecturerEmail),
           pendingLecturerName: isAccepted ? undefined : (incoming.pendingLecturerName ?? courses[idx].pendingLecturerName),
-          enrolledStudentEmails: Array.from(new Set([
-            ...(courses[idx].enrolledStudentEmails || []),
-            ...(incoming.enrolledStudentEmails || []),
-          ])),
+          enrolledStudentEmails: incoming.enrolledStudentEmails !== undefined
+            ? incoming.enrolledStudentEmails
+            : (courses[idx].enrolledStudentEmails || []),
+          enrolledCount: incoming.enrolledStudentEmails !== undefined
+            ? incoming.enrolledStudentEmails.length
+            : (courses[idx].enrolledCount || 0),
         };
         if (isAccepted) {
           delete merged.pendingLecturerEmail;
@@ -3541,8 +3529,8 @@ export const studentService = {
     setStorage(STORAGE_KEYS.COURSES, courses);
 
     // Update master student database
-    const masterStudents = this.getMasterStudents();
-    const studentIdx = masterStudents.findIndex((s) => s.email.toLowerCase() === cleanEmail);
+    const masterStudents = getStorage<MasterStudent[]>(STORAGE_KEYS.MASTER_STUDENTS, []);
+    const studentIdx = masterStudents.findIndex((s) => s.email.toLowerCase().trim() === cleanEmail);
     if (studentIdx >= 0) {
       const remainingCodes = (masterStudents[studentIdx].enrolledCourseCodes || []).filter(
         (code) => code.toUpperCase() !== course.code.toUpperCase() && code !== course.id
@@ -3555,8 +3543,20 @@ export const studentService = {
       supabaseDataService.saveStudent(masterStudents[studentIdx]).catch(() => {});
     }
 
+    // Prune registered users if present
+    const regUsers = getStorage<RegisteredUser[]>(STORAGE_KEYS.REGISTERED_USERS, []);
+    const regIdx = regUsers.findIndex((u) => u.email.toLowerCase().trim() === cleanEmail);
+    if (regIdx >= 0) {
+      setStorage(STORAGE_KEYS.REGISTERED_USERS, regUsers);
+    }
+
     supabaseDataService.saveCourse(updatedCourse).catch(() => {});
     supabaseDataService.broadcastChange('course_updated', updatedCourse);
+    supabaseDataService.broadcastChange('student_roster_updated', {
+      courseId,
+      removedEmail: cleanEmail,
+      course: updatedCourse,
+    });
     myJourneySyncService.triggerDebouncedAutoSync();
 
     return {
