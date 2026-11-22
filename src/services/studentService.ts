@@ -148,7 +148,7 @@ export const isValidProfileUrl = (url?: string): boolean => {
 // 2 Akun Dasar Dosen Pengampu Smart Learning Hub & My Journey
 export const DEFAULT_LECTURERS: Record<string, AuthUser> = {
   'altaf.aziz16@gmail.com': {
-    id: 'dos_altaf',
+    id: 'a9e68483-f4fb-4acf-9138-e70470b28833',
     name: 'Tengku Abdillah Azis, S.Si',
     email: 'altaf.aziz16@gmail.com',
     campusEmail: 'altaf.aziz16@gmail.com',
@@ -169,7 +169,7 @@ export const DEFAULT_LECTURERS: Record<string, AuthUser> = {
     registeredAt: '2026-08-01',
   },
   'miftahurridlo.688@gmail.com': {
-    id: 'dos_miftah',
+    id: 'd342423d-fce0-4b54-896f-4c4b27e70dc0',
     name: 'Muhammad Miftahurrodlo, M.Sc.',
     email: 'miftahurridlo.688@gmail.com',
     campusEmail: 'miftahurridlo.688@gmail.com',
@@ -382,6 +382,23 @@ export const studentService = {
         if (!user.facebookUrl || !isValidProfileUrl(user.facebookUrl)) {
           user.facebookUrl = DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'].facebookUrl;
           modified = true;
+        }
+      } else if (user.role === 'mahasiswa') {
+        const masterStudents = getStorage<MasterStudent[]>(STORAGE_KEYS.MASTER_STUDENTS, []);
+        const matched = masterStudents.find((m) => m.email.toLowerCase() === userEmailLower);
+        if (matched) {
+          if (matched.name && matched.name !== user.name) {
+            user.name = matched.name;
+            modified = true;
+          }
+          if (matched.nim && matched.nim !== user.nim) {
+            user.nim = matched.nim;
+            modified = true;
+          }
+          if (matched.major && matched.major !== user.department) {
+            user.department = matched.major;
+            modified = true;
+          }
         }
       } else if (user.avatarUrl && (user.avatarUrl.includes('photo-1534528741775') || user.avatarUrl.includes('photo-1507003211169') || user.avatarUrl.includes('academic_avatar'))) {
         user.avatarUrl = getInitialsAvatar(user.name, user.role === 'dosen');
@@ -953,6 +970,18 @@ export const studentService = {
       }
     });
 
+    // Bersihkan legacy raw course codes di master students
+    let sanitized = false;
+    students.forEach((s) => {
+      if (s.enrolledCourseCodes && s.enrolledCourseCodes.some((c) => c.startsWith('course_') || c.startsWith('crs_'))) {
+        s.enrolledCourseCodes = s.enrolledCourseCodes.filter((c) => !c.startsWith('course_') && !c.startsWith('crs_'));
+        sanitized = true;
+      }
+    });
+    if (sanitized) {
+      setStorage(STORAGE_KEYS.MASTER_STUDENTS, students);
+    }
+
     if (students.length === 0) {
       return [];
     }
@@ -963,8 +992,10 @@ export const studentService = {
       const courseCodes = new Set<string>();
       courses.forEach((c) => {
         if ((c.enrolledStudentEmails || []).some((e) => e.toLowerCase().trim() === cleanStdEmail)) {
-          if (c.code) courseCodes.add(c.code);
-          if (c.id) courseCodes.add(c.id);
+          const displayCode = (c.code || c.title || '').trim();
+          if (displayCode && !displayCode.startsWith('course_') && !displayCode.startsWith('crs_')) {
+            courseCodes.add(displayCode);
+          }
         }
       });
 
@@ -981,6 +1012,11 @@ export const studentService = {
     const cleanEmail = student.email.trim().toLowerCase();
     const idx = list.findIndex((s) => s.email.trim().toLowerCase() === cleanEmail || (student.id && s.id === student.id));
 
+    // Bersihkan enrolledCourseCodes dari ID raw internal (seperti course_...)
+    const cleanCourseCodes = (student.enrolledCourseCodes || []).filter(
+      (c) => typeof c === 'string' && !c.startsWith('course_') && !c.startsWith('crs_')
+    );
+
     const updated: MasterStudent = {
       ...student,
       id: student.id || `mstd_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -989,7 +1025,7 @@ export const studentService = {
       nim: student.nim.trim(),
       major: student.major || 'Pendidikan Geografi',
       classSection: student.classSection || 'Kelas A',
-      enrolledCourseCodes: student.enrolledCourseCodes || [],
+      enrolledCourseCodes: cleanCourseCodes,
       avatarUrl: student.avatarUrl || getInitialsAvatar(student.name, false),
     };
 
@@ -1000,7 +1036,7 @@ export const studentService = {
     }
     setStorage(STORAGE_KEYS.MASTER_STUDENTS, list);
 
-    // Simpan juga ke custom roster agar dapat diakses oleh query kehadiran & nilai
+    // 1. Simpan ke custom roster agar dapat diakses oleh query kehadiran & nilai
     const custom = getStorage<Record<string, any>>(STORAGE_KEYS.CUSTOM_ROSTER, {});
     custom[cleanEmail] = {
       name: updated.name,
@@ -1009,12 +1045,50 @@ export const studentService = {
     };
     setStorage(STORAGE_KEYS.CUSTOM_ROSTER, custom);
 
+    // 2. SINKRONISASI KE AKUN MAHASISWA (Registered Users, Profile, & Current User)
+    // Jika dosen mengedit nama/NIM/jurusan mahasiswa, akun mahasiswa HARUS ikut berubah secara konsisten!
+    const regUsers = this.getRegisteredUsers();
+    const regIdx = regUsers.findIndex((u) => u.email.toLowerCase() === cleanEmail);
+    if (regIdx >= 0) {
+      regUsers[regIdx] = {
+        ...regUsers[regIdx],
+        name: updated.name,
+        nim: updated.nim,
+        department: updated.major,
+      };
+      setStorage(STORAGE_KEYS.REGISTERED_USERS, regUsers);
+    }
+
+    // Update Profile jika mahasiswa terkait sedang login atau tersimpan di profil
+    const curProfile = getStorage<StudentProfile>(STORAGE_KEYS.PROFILE, initialStudentProfile);
+    if (curProfile && (curProfile.email?.toLowerCase() === cleanEmail || !curProfile.email)) {
+      setStorage(STORAGE_KEYS.PROFILE, {
+        ...curProfile,
+        name: updated.name,
+        nim: updated.nim,
+        major: updated.major,
+        avatarUrl: updated.avatarUrl || curProfile.avatarUrl,
+      });
+    }
+
+    // Update Current User jika mahasiswa terkait sedang aktif
+    const curUser = this.getCurrentUser();
+    if (curUser && curUser.email.toLowerCase() === cleanEmail) {
+      const updatedCurUser: AuthUser = {
+        ...curUser,
+        name: updated.name,
+        nim: updated.nim,
+        department: updated.major,
+      };
+      this.setCurrentUser(updatedCurUser);
+    }
+
     // Sync student to courses
-    if (updated.enrolledCourseCodes && updated.enrolledCourseCodes.length > 0) {
+    if (cleanCourseCodes.length > 0) {
       const courses = this.getAllCourses();
       let modified = false;
       courses.forEach((crs) => {
-        if (updated.enrolledCourseCodes.includes(crs.code) || updated.enrolledCourseCodes.includes(crs.id)) {
+        if (cleanCourseCodes.includes(crs.code) || cleanCourseCodes.includes(crs.id)) {
           if (!crs.enrolledStudentEmails) crs.enrolledStudentEmails = [];
           if (!crs.enrolledStudentEmails.map((e) => e.toLowerCase()).includes(cleanEmail)) {
             crs.enrolledStudentEmails.push(cleanEmail);
@@ -1027,8 +1101,9 @@ export const studentService = {
       }
     }
 
-    // Sinkronisasi otomatis ke Supabase Database My Journey (Background)
+    // Sinkronisasi otomatis ke Supabase Database My Journey & Broadcast realtime
     supabaseDataService.saveStudent(updated).catch(() => {});
+    supabaseDataService.broadcastChange('student_updated', { student: updated });
 
     return updated;
   },
@@ -1285,7 +1360,8 @@ export const studentService = {
         
         // Determine primary lecturer from data or row
         const primaryStr = String(d.primaryLecturer || existing?.primaryLecturer || existing?.teacher?.name || '').toLowerCase();
-        const isMiftahPrimary = primaryStr.includes('miftah') || (!primaryStr && row.user_id !== 'd342423d-fce0-4b54-896f-4c4b27e70dc0');
+        const isMiftahPrimary = primaryStr.includes('miftah') || 
+          (!primaryStr && (row.user_id === 'd342423d-fce0-4b54-896f-4c4b27e70dc0' || (d.primaryLecturerEmail || '').includes('miftah')));
         
         const primaryEmail = isMiftahPrimary ? 'miftahurridlo.688@gmail.com' : 'altaf.aziz16@gmail.com';
         const partnerEmail = isMiftahPrimary ? 'altaf.aziz16@gmail.com' : 'miftahurridlo.688@gmail.com';
@@ -1406,8 +1482,11 @@ export const studentService = {
       const supaCodes = new Set(syncedCourses.map((c) => (c.code || '').toUpperCase()));
 
       const localRemaining = currentCourses.filter((c) => {
-        const isRecentOffline = (c as any)._localCreatedAt && Date.now() - (c as any)._localCreatedAt < 30000;
-        return isRecentOffline && !supaIds.has(c.id) && !supaCodes.has((c.code || '').toUpperCase()) && !isDummyCourse(c);
+        const code = (c.code || '').trim().toUpperCase();
+        if (deletedIds.includes(c.id) || (code && deletedIds.includes(code))) return false;
+        if (isDummyCourse(c)) return false;
+        // Keep all valid locally created/existing courses that are not yet in Supabase
+        return !supaIds.has(c.id) && !supaCodes.has(code);
       });
 
       const combined = [...syncedCourses, ...localRemaining];
@@ -2303,7 +2382,25 @@ export const studentService = {
 
   // Profile (Student)
   getProfile(): StudentProfile {
-    return getStorage<StudentProfile>(STORAGE_KEYS.PROFILE, initialStudentProfile);
+    const profile = getStorage<StudentProfile>(STORAGE_KEYS.PROFILE, initialStudentProfile);
+    const currentUser = this.getCurrentUser();
+    const email = (currentUser?.email || profile.email || '').toLowerCase().trim();
+    if (email) {
+      const master = getStorage<MasterStudent[]>(STORAGE_KEYS.MASTER_STUDENTS, []).find(
+        (m) => m.email.toLowerCase() === email
+      );
+      if (master) {
+        profile.name = master.name;
+        profile.nim = master.nim;
+        if (master.major) profile.major = master.major;
+        if (master.avatarUrl) profile.avatarUrl = master.avatarUrl;
+      } else if (currentUser && currentUser.role === 'mahasiswa') {
+        profile.name = currentUser.name;
+        if (currentUser.nim) profile.nim = currentUser.nim;
+        if (currentUser.department) profile.major = currentUser.department;
+      }
+    }
+    return profile;
   },
 
   updateProfile(updates: Partial<StudentProfile>): StudentProfile {
@@ -2534,9 +2631,10 @@ export const studentService = {
       major: 'Sains Informasi Geografi',
       classSection: course.section || 'Kelas A',
       enrolledCourseCodes: Array.from(new Set([
-        ...((existingIdx >= 0 && masterStudents[existingIdx].enrolledCourseCodes) || []),
+        ...(((existingIdx >= 0 && masterStudents[existingIdx].enrolledCourseCodes) || []).filter(
+          (c) => typeof c === 'string' && !c.startsWith('course_') && !c.startsWith('crs_')
+        )),
         course.code,
-        course.id,
       ])),
       avatarUrl: getInitialsAvatar((existingIdx >= 0 && masterStudents[existingIdx].name) || info.name || 'Mahasiswa', false),
     };
@@ -2560,6 +2658,7 @@ export const studentService = {
     supabaseDataService.saveCourse(updatedCourse).catch(() => {});
     supabaseDataService.broadcastChange('student_updated', { student: studentRecord, course: updatedCourse });
     supabaseDataService.broadcastChange('course_updated', updatedCourse);
+    myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
     myJourneySyncService.triggerDebouncedAutoSync();
 
     this.addActivity({
@@ -2634,7 +2733,8 @@ export const studentService = {
       colorScheme: 'blue',
       // Kelas baru wajib dimulai dengan daftar mahasiswa KOSONG (mencegah bocornya mahasiswa dari kelas lain)
       enrolledStudentEmails: [],
-    };
+      _localCreatedAt: Date.now(),
+    } as any;
 
     if (invitedEmail) {
       const isMiftah = invitedEmail.includes('miftah');
@@ -2695,6 +2795,8 @@ export const studentService = {
     // Kirim sinkronisasi ke Supabase Cloud & Broadcast ke rekan dosen secara instan (< 300ms)
     supabaseDataService.saveCourse(newCourse).catch(() => {});
     supabaseDataService.broadcastChange('course_updated', newCourse);
+    // Sinkronisasi instan ke Google Sheets agar rekan dosen langsung melihat kelas tanpa jeda
+    myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
     myJourneySyncService.triggerDebouncedAutoSync();
 
     this.addActivity({
@@ -3456,22 +3558,72 @@ export const studentService = {
   applyRealtimeStudentUpdate(payload: any): void {
     if (!payload) return;
     if (payload.student) {
-      const masterStudents = this.getMasterStudents();
-      const cleanEmail = (payload.student.email || '').toLowerCase().trim();
+      const student = payload.student;
+      const cleanEmail = (student.email || '').toLowerCase().trim();
+      const masterStudents = getStorage<MasterStudent[]>(STORAGE_KEYS.MASTER_STUDENTS, []);
       const idx = masterStudents.findIndex((m) => m.email.toLowerCase() === cleanEmail);
+
+      const cleanCourseCodes = (student.enrolledCourseCodes || []).filter(
+        (c: any) => typeof c === 'string' && !c.startsWith('course_') && !c.startsWith('crs_')
+      );
+
+      const updatedRecord: MasterStudent = {
+        ...(idx >= 0 ? masterStudents[idx] : {}),
+        ...student,
+        enrolledCourseCodes: cleanCourseCodes,
+      };
+
       if (idx >= 0) {
-        masterStudents[idx] = {
-          ...masterStudents[idx],
-          ...payload.student,
-          enrolledCourseCodes: Array.from(new Set([
-            ...(masterStudents[idx].enrolledCourseCodes || []),
-            ...(payload.student.enrolledCourseCodes || []),
-          ])),
-        };
+        masterStudents[idx] = updatedRecord;
       } else {
-        masterStudents.push(payload.student);
+        masterStudents.push(updatedRecord);
       }
       setStorage(STORAGE_KEYS.MASTER_STUDENTS, masterStudents);
+
+      // Sinkronisasi ke custom roster
+      const custom = getStorage<Record<string, any>>(STORAGE_KEYS.CUSTOM_ROSTER, {});
+      custom[cleanEmail] = {
+        name: updatedRecord.name,
+        nim: updatedRecord.nim,
+        email: cleanEmail,
+      };
+      setStorage(STORAGE_KEYS.CUSTOM_ROSTER, custom);
+
+      // Sinkronisasi ke registered users jika ada
+      const regUsers = this.getRegisteredUsers();
+      const regIdx = regUsers.findIndex((u) => u.email.toLowerCase() === cleanEmail);
+      if (regIdx >= 0) {
+        regUsers[regIdx] = {
+          ...regUsers[regIdx],
+          name: updatedRecord.name,
+          nim: updatedRecord.nim,
+          department: updatedRecord.major,
+        };
+        setStorage(STORAGE_KEYS.REGISTERED_USERS, regUsers);
+      }
+
+      // Sinkronisasi ke profile jika akun ini sedang dibuka di tab ini
+      const curProfile = getStorage<StudentProfile>(STORAGE_KEYS.PROFILE, initialStudentProfile);
+      if (curProfile && (curProfile.email?.toLowerCase() === cleanEmail || !curProfile.email)) {
+        setStorage(STORAGE_KEYS.PROFILE, {
+          ...curProfile,
+          name: updatedRecord.name,
+          nim: updatedRecord.nim,
+          major: updatedRecord.major,
+          avatarUrl: updatedRecord.avatarUrl || curProfile.avatarUrl,
+        });
+      }
+
+      // Sinkronisasi ke currentUser jika aktif di tab ini
+      const curUser = this.getCurrentUser();
+      if (curUser && curUser.email.toLowerCase() === cleanEmail) {
+        this.setCurrentUser({
+          ...curUser,
+          name: updatedRecord.name,
+          nim: updatedRecord.nim,
+          department: updatedRecord.major,
+        });
+      }
     }
     if (payload.course) {
       this.applyRealtimeCourseUpdate(payload.course);

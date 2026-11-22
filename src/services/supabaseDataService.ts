@@ -22,6 +22,7 @@ import type {
 
 // ID Dosen Pengampu Akun My Journey (pemilik database)
 export const LECTURER_USER_ID = 'd342423d-fce0-4b54-896f-4c4b27e70dc0';
+export const ALTAF_USER_ID = 'a9e68483-f4fb-4acf-9138-e70470b28833';
 
 export const supabaseDataService = {
   /**
@@ -40,6 +41,13 @@ export const supabaseDataService = {
           const u = JSON.parse(raw);
           if (u?.id && u.id.length > 20 && !u.id.startsWith('dos_')) {
             return u.id;
+          }
+          const email = (u?.email || '').toLowerCase().trim();
+          if (email.includes('altaf') || email.includes('azis') || email.includes('aziz')) {
+            return ALTAF_USER_ID;
+          }
+          if (email.includes('miftah')) {
+            return LECTURER_USER_ID;
           }
         }
       }
@@ -105,7 +113,13 @@ export const supabaseDataService = {
   async saveCourse(course: CourseClass): Promise<boolean> {
     if (!isSupabaseConfigured() || !supabase || !course.id) return false;
     try {
-      const activeUserId = (await this.getActiveAuthUserId()) || LECTURER_USER_ID;
+      let activeUserId = await this.getActiveAuthUserId();
+      if (!activeUserId) {
+        const primaryStr = (course.teacher?.email || course.primaryLecturer || '').toLowerCase();
+        activeUserId = (primaryStr.includes('altaf') || primaryStr.includes('azis') || primaryStr.includes('aziz'))
+          ? ALTAF_USER_ID
+          : LECTURER_USER_ID;
+      }
       const payload = {
         id: course.id,
         user_id: activeUserId,
@@ -197,6 +211,10 @@ export const supabaseDataService = {
 
       return data.map((row) => {
         const d = row.data || {};
+        const rawCodes = d.enrolledCourseCodes || (d.courseCode ? [d.courseCode] : []);
+        const cleanCodes = (Array.isArray(rawCodes) ? rawCodes : [rawCodes])
+          .filter((c: any) => typeof c === 'string' && !c.startsWith('course_') && !c.startsWith('crs_'));
+
         return {
           id: row.id,
           nim: d.nim || String(d.id || '').replace(/\D/g, '') || '10123000',
@@ -204,7 +222,7 @@ export const supabaseDataService = {
           email: (d.email || '').toLowerCase().trim(),
           major: d.major || 'Pendidikan Geografi',
           classSection: d.classSection || 'Kelas A',
-          enrolledCourseCodes: d.enrolledCourseCodes || (d.courseCode ? [d.courseCode] : []),
+          enrolledCourseCodes: cleanCodes,
           isRegistered: Boolean(d.isRegistered),
           registeredAt: d.registeredAt,
           avatarUrl: d.avatarUrl || '',
@@ -222,6 +240,9 @@ export const supabaseDataService = {
     try {
       const activeUserId = (await this.getActiveAuthUserId()) || LECTURER_USER_ID;
       const cleanEmail = student.email.trim().toLowerCase();
+      const cleanCodes = (student.enrolledCourseCodes || []).filter(
+        (c) => typeof c === 'string' && !c.startsWith('course_') && !c.startsWith('crs_')
+      );
       const payload = {
         id: student.id,
         user_id: activeUserId,
@@ -230,12 +251,12 @@ export const supabaseDataService = {
           nim: student.nim,
           name: student.name,
           email: cleanEmail,
-          courseCode: student.enrolledCourseCodes?.[0] || '',
+          courseCode: cleanCodes[0] || '',
           courseName: '',
           classSection: student.classSection || 'Kelas A',
           academicYear: '2026/2027',
           attendancePercent: 100,
-          enrolledCourseCodes: student.enrolledCourseCodes || [],
+          enrolledCourseCodes: cleanCodes,
           major: student.major || 'Pendidikan Geografi',
           isRegistered: Boolean(student.isRegistered),
           registeredAt: student.registeredAt,

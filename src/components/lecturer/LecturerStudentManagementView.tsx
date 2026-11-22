@@ -141,7 +141,11 @@ export const LecturerStudentManagementView: React.FC<LecturerStudentManagementVi
     setFormEmail(student.email);
     setFormMajor(student.major || 'Sains Informasi Geografi');
     setFormClassSection(student.classSection || 'Kelas A');
-    setFormSelectedCourses(student.enrolledCourseCodes || []);
+    setFormSelectedCourses(
+      (student.enrolledCourseCodes || []).filter(
+        (c) => typeof c === 'string' && !c.startsWith('course_') && !c.startsWith('crs_')
+      )
+    );
     setIsStudentModalOpen(true);
   };
 
@@ -647,19 +651,26 @@ export const LecturerStudentManagementView: React.FC<LecturerStudentManagementVi
 
                     <td className="py-3.5 px-4">
                       <div className="flex flex-wrap gap-1">
-                        {(std.enrolledCourseCodes || []).map((code) => (
-                          <span
-                            key={code}
-                            className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
-                          >
-                            {code}
-                          </span>
-                        ))}
-                        {(std.enrolledCourseCodes || []).length === 0 && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                            Bebas Kelas (Belum Diatur)
-                          </span>
-                        )}
+                        {(() => {
+                          const cleanCodes = (std.enrolledCourseCodes || []).filter(
+                            (c) => typeof c === 'string' && !c.startsWith('course_') && !c.startsWith('crs_')
+                          );
+                          if (cleanCodes.length === 0) {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                                Bebas Kelas (Belum Diatur)
+                              </span>
+                            );
+                          }
+                          return cleanCodes.map((code) => (
+                            <span
+                              key={code}
+                              className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
+                            >
+                              {code}
+                            </span>
+                          ));
+                        })()}
                       </div>
                     </td>
 

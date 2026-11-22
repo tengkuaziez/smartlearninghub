@@ -247,7 +247,8 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
     setNewCourseEndTime('10:30');
     setNewCourseTimezone('WIB');
     setNewCourseCoLecturerEmail('');
-    // Auto-sync pembaruan ke Google Sheets & My Journey
+    // Auto-sync pembaruan ke Google Sheets & My Journey secara instan
+    myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
     myJourneySyncService.triggerDebouncedAutoSync();
 
     setFeedbackModal({
@@ -428,27 +429,55 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
   );
 
   const userEmail = (currentUser?.email || '').toLowerCase().trim();
+  const isCurrentUserMiftah = userEmail.includes('miftah');
+  const isCurrentUserAzis = userEmail.includes('altaf') || userEmail.includes('azis') || userEmail.includes('aziz');
 
   // Kelas yang ditampilkan di Tab "1. Kelas":
   // Meliputi kelas buatan user, kelas tim yang sudah di-acc, serta kelas yang mengundang user (menunggu persetujuan user)
   const classesTabCourses = dedupedCourses.filter((c) => {
-    const isPrimary = (c.teacher?.email || '').toLowerCase() === userEmail ||
-      (c.primaryLecturer || '').toLowerCase().includes(userEmail.split('@')[0]);
-    const isPartner = (c.secondaryTeacher?.email || '').toLowerCase() === userEmail ||
-      (c.partnerLecturer && !c.pendingLecturerEmail && c.partnerLecturer.toLowerCase().includes(userEmail.split('@')[0]));
-    const isPendingForMe = (c.pendingLecturerEmail || '').toLowerCase() === userEmail;
+    const primaryStr = `${c.teacher?.email || ''} ${c.primaryLecturer || ''} ${c.teacher?.name || ''}`.toLowerCase();
+    const partnerStr = `${c.secondaryTeacher?.email || ''} ${c.partnerLecturer || ''} ${c.secondaryTeacher?.name || ''}`.toLowerCase();
+    const pendingEmailStr = (c.pendingLecturerEmail || '').toLowerCase().trim();
+
+    const isPrimary = primaryStr.includes(userEmail) ||
+      (isCurrentUserMiftah && primaryStr.includes('miftah')) ||
+      (isCurrentUserAzis && (primaryStr.includes('altaf') || primaryStr.includes('azis') || primaryStr.includes('aziz')));
+
+    const isPartner = (!c.pendingLecturerEmail && (
+      partnerStr.includes(userEmail) ||
+      (isCurrentUserMiftah && partnerStr.includes('miftah')) ||
+      (isCurrentUserAzis && (partnerStr.includes('altaf') || partnerStr.includes('azis') || partnerStr.includes('aziz')))
+    ));
+
+    const isPendingForMe = pendingEmailStr === userEmail ||
+      (isCurrentUserMiftah && pendingEmailStr.includes('miftah')) ||
+      (isCurrentUserAzis && (pendingEmailStr.includes('altaf') || pendingEmailStr.includes('azis') || pendingEmailStr.includes('aziz')));
+
     return isPrimary || isPartner || isPendingForMe;
   });
 
   // Kelas yang sudah disetujui resmi (untuk Tab "4. RPS" dan Tab "5. Jadwal Sesi"):
   // Kelas yang belum di-acc oleh user TIDAK akan muncul di RPS atau Jadwal Sesi sampai disetujui!
   const approvedCourses = dedupedCourses.filter((c) => {
-    const isPendingForMe = (c.pendingLecturerEmail || '').toLowerCase() === userEmail;
+    const primaryStr = `${c.teacher?.email || ''} ${c.primaryLecturer || ''} ${c.teacher?.name || ''}`.toLowerCase();
+    const partnerStr = `${c.secondaryTeacher?.email || ''} ${c.partnerLecturer || ''} ${c.secondaryTeacher?.name || ''}`.toLowerCase();
+    const pendingEmailStr = (c.pendingLecturerEmail || '').toLowerCase().trim();
+
+    const isPendingForMe = pendingEmailStr === userEmail ||
+      (isCurrentUserMiftah && pendingEmailStr.includes('miftah')) ||
+      (isCurrentUserAzis && (pendingEmailStr.includes('altaf') || pendingEmailStr.includes('azis') || pendingEmailStr.includes('aziz')));
     if (isPendingForMe) return false;
-    const isPrimary = (c.teacher?.email || '').toLowerCase() === userEmail ||
-      (c.primaryLecturer || '').toLowerCase().includes(userEmail.split('@')[0]);
-    const isPartner = (c.secondaryTeacher?.email || '').toLowerCase() === userEmail ||
-      (c.partnerLecturer && !c.pendingLecturerEmail && c.partnerLecturer.toLowerCase().includes(userEmail.split('@')[0]));
+
+    const isPrimary = primaryStr.includes(userEmail) ||
+      (isCurrentUserMiftah && primaryStr.includes('miftah')) ||
+      (isCurrentUserAzis && (primaryStr.includes('altaf') || primaryStr.includes('azis') || primaryStr.includes('aziz')));
+
+    const isPartner = (!c.pendingLecturerEmail && (
+      partnerStr.includes(userEmail) ||
+      (isCurrentUserMiftah && partnerStr.includes('miftah')) ||
+      (isCurrentUserAzis && (partnerStr.includes('altaf') || partnerStr.includes('azis') || partnerStr.includes('aziz')))
+    ));
+
     return isPrimary || isPartner;
   });
 

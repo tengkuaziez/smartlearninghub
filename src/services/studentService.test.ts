@@ -578,3 +578,114 @@ test('Student Removal & Cloud Sync: Removed student is evicted permanently and n
   studentService.deleteCourse(course.id);
   assert.equal(studentService.getEnrolledCourses(studentB).length, 0);
 });
+
+test('Student Name Sync: editing student in master database propagates to account profile and current user', async () => {
+  const studentEmail = 'altaf.aziz16@student.ac.id';
+
+  // 1. Pre-register student in master database
+  studentService.saveMasterStudent({
+    id: 'mstd_test_sync',
+    name: 'Altaf Aziz',
+    nim: '10123000',
+    email: studentEmail,
+    major: 'Sains Informasi Geografi',
+    classSection: 'Kelas A',
+    enrolledCourseCodes: [],
+  });
+
+  // 2. Student registers account and logs in
+  const regRes = await studentService.registerAsync({
+    name: 'Altaf Aziz',
+    email: studentEmail,
+    nim: '10123000',
+    password: 'password123',
+    role: 'mahasiswa',
+  });
+  assert.equal(regRes.success, true);
+
+  // Student logs in
+  studentService.setCurrentUser(regRes.user!);
+  assert.equal(studentService.getCurrentUser()?.name, 'Altaf Aziz');
+  assert.equal(studentService.getProfile().name, 'Altaf Aziz');
+
+  // 3. Lecturer edits student name to "Tengku Aziez" in master student database
+  const updated = studentService.saveMasterStudent({
+    id: 'mstd_test_sync',
+    name: 'Tengku Aziez',
+    nim: '10123000',
+    email: studentEmail,
+    major: 'Sains Informasi Geografi',
+    classSection: 'Kelas A',
+    enrolledCourseCodes: [],
+  });
+  assert.equal(updated.name, 'Tengku Aziez');
+
+  // Verification 1: studentService.getCurrentUser() MUST immediately reflect "Tengku Aziez"
+  const curUser = studentService.getCurrentUser();
+  assert.equal(curUser?.name, 'Tengku Aziez');
+
+  // Verification 2: studentService.getProfile() MUST immediately reflect "Tengku Aziez"
+  const prof = studentService.getProfile();
+  assert.equal(prof.name, 'Tengku Aziez');
+
+  // Verification 3: Registered users list MUST have updated name
+  const regUser = studentService.getRegisteredUsers().find((u) => u.email.toLowerCase() === studentEmail);
+  assert.equal(regUser?.name, 'Tengku Aziez');
+
+  // 4. Test realtime propagation via applyRealtimeStudentUpdate
+  studentService.applyRealtimeStudentUpdate({
+    student: {
+      id: 'mstd_test_sync',
+      name: 'Tengku Aziez Realtime',
+      nim: '10123000',
+      email: studentEmail,
+      major: 'Sains Informasi Geografi',
+      classSection: 'Kelas A',
+      enrolledCourseCodes: [],
+    },
+  });
+  assert.equal(studentService.getCurrentUser()?.name, 'Tengku Aziez Realtime');
+  assert.equal(studentService.getProfile().name, 'Tengku Aziez Realtime');
+
+  // Clean up
+  studentService.deleteMasterStudent(studentEmail);
+  studentService.logout();
+});
+
+test('Clean Course Badges: enrolledCourseCodes excludes raw IDs like course_...', () => {
+  const testStudentEmail = 'clean.badge.test@student.ac.id';
+
+  // Create course with specific code
+  const course = studentService.createCourse({
+    code: 'SIGDASAR',
+    title: 'SIG Dasar',
+    description: 'Testing badges',
+    room: 'Lab 3',
+    scheduleDay: 'Senin',
+    scheduleTime: '08:00 - 10:30 WIB',
+  });
+
+  // Add student to course
+  studentService.addStudentEmailToCourse(course.id, testStudentEmail);
+
+  // Fetch student from getMasterStudents
+  const master = studentService.getMasterStudents().find((s) => s.email === testStudentEmail);
+  assert.ok(master);
+
+  // Verification 1: enrolledCourseCodes MUST ONLY contain clean course code 'SIGDASAR'
+  // and MUST NOT contain raw ID (e.g. course.id starting with 'course_')
+  assert.deepEqual(master.enrolledCourseCodes, ['SIGDASAR']);
+  assert.ok(!master.enrolledCourseCodes.some((c) => c.startsWith('course_')));
+
+  // Remove student from course
+  studentService.removeStudentEmailFromCourse(course.id, testStudentEmail);
+
+  // Verification 2: master students for this student now has 0 enrolled courses (empty array)
+  const masterAfterRemoval = studentService.getMasterStudents().find((s) => s.email === testStudentEmail);
+  assert.deepEqual(masterAfterRemoval?.enrolledCourseCodes, []);
+
+  // Clean up
+  studentService.deleteCourse(course.id);
+  studentService.deleteMasterStudent(testStudentEmail);
+});
+

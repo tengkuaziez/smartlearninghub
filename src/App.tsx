@@ -112,8 +112,10 @@ export default function App() {
 
   // Reload data helper
   const reloadData = () => {
-    if (currentUser) {
-      setCourses(studentService.getEnrolledCourses(currentUser.email));
+    const latestUser = studentService.getCurrentUser();
+    if (latestUser) {
+      setCurrentUser(latestUser);
+      setCourses(studentService.getEnrolledCourses(latestUser.email));
     } else {
       setCourses([]);
     }
