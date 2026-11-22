@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '../common/Badge.tsx';
 import { formatIndonesianDate } from '../../utils/academicCalculations.ts';
+import { studentService } from '../../services/studentService.ts';
 import type { CourseClass, CourseRps, Meeting } from '../../types/index.ts';
 
 interface RpsViewProps {
@@ -42,14 +43,32 @@ export const RpsView: React.FC<RpsViewProps> = ({
 
   if (!rps) {
     return (
-      <div className="p-12 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center text-slate-400 space-y-3">
-        <FileText className="w-10 h-10 mx-auto text-slate-400 opacity-60" />
-        <h4 className="text-base font-bold text-slate-700 dark:text-slate-300">
-          Dokumen RPS Belum Tersedia
-        </h4>
-        <p className="text-xs max-w-md mx-auto">
-          Dosen pengampu sedang menyusun silabus resmi Rencana Pembelajaran Semester untuk mata kuliah ini.
-        </p>
+      <div className="p-12 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center text-slate-400 space-y-4">
+        <div className="w-14 h-14 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+          <FileText className="w-7 h-7" />
+        </div>
+        <div className="space-y-1">
+          <h4 className="text-base font-bold text-slate-900 dark:text-white">
+            Dokumen RPS Belum Tersedia
+          </h4>
+          <p className="text-xs max-w-md mx-auto text-slate-500">
+            Dosen pengampu sedang menyusun silabus resmi Rencana Pembelajaran Semester untuk mata kuliah ini.
+          </p>
+        </div>
+        {isLecturerMode && (
+          <div className="pt-2">
+            <button
+              onClick={() => {
+                const newRps = studentService.generateDefaultRps(course.id);
+                if (onUpdateRps) onUpdateRps(newRps);
+              }}
+              className="px-5 py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-md inline-flex items-center gap-2 transition-all hover:scale-102"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Susun & Generate RPS Kurikulum OBE Sekarang</span>
+            </button>
+          </div>
+        )}
       </div>
     );
   }

@@ -689,3 +689,112 @@ test('Clean Course Badges: enrolledCourseCodes excludes raw IDs like course_...'
   studentService.deleteMasterStudent(testStudentEmail);
 });
 
+test('Class Detail Management: Meetings, Materials, Assignments, and OBE RPS generation', () => {
+  // 1. Create course
+  const course = studentService.createCourse({
+    code: 'KARTOGRAFI',
+    title: 'Kartografi Tematik',
+    description: 'Studi pemetaan dan kartografi',
+    room: 'Lab Spasial',
+    scheduleDay: 'Selasa',
+    scheduleTime: '08:00 - 10:30 WIB',
+  });
+  assert.ok(course.id);
+
+  // 2. Generate 16 OBE Meetings
+  const meetings16 = studentService.generate16MeetingsForCourse(course.id);
+  assert.equal(meetings16.length, 16);
+  assert.equal(meetings16[0].meetingNumber, 1);
+  assert.equal(meetings16[15].meetingNumber, 16);
+  assert.ok(meetings16[7].title.includes('Evaluasi Tengah Semester (UTS)'));
+  assert.ok(meetings16[15].title.includes('Evaluasi Akhir Semester (UAS)'));
+
+  // 3. Create a manual meeting
+  const manualMeeting = studentService.createMeeting({
+    courseId: course.id,
+    meetingNumber: 17,
+    title: 'Sesi Pengayaan: Kartografi Digital 3D',
+    topic: 'Visualisasi 3D Topografi',
+    date: '2026-12-01',
+    startTime: '08:00',
+    endTime: '10:30',
+    room: 'Lab Spasial',
+    isOnline: true,
+    meetingLink: 'https://meet.google.com/test-kartografi',
+    description: 'Sesi tambahan untuk eksplorasi DEM',
+  });
+  assert.ok(manualMeeting.id);
+  assert.equal(manualMeeting.meetingNumber, 17);
+  assert.equal(manualMeeting.isOnline, true);
+
+  // 4. Update the meeting
+  const updatedMeeting = studentService.updateMeeting(manualMeeting.id, {
+    title: 'Sesi Pengayaan: Kartografi Digital 3D (Revisi)',
+  });
+  assert.equal(updatedMeeting?.title, 'Sesi Pengayaan: Kartografi Digital 3D (Revisi)');
+
+  // 5. Add material to meeting
+  const material = studentService.addMaterialToMeeting(manualMeeting.id, {
+    title: 'Slide Modul 3D DEM',
+    type: 'pdf',
+    url: 'https://example.com/slide-dem.pdf',
+    description: 'Bahan ajar pengayaan 3D',
+  });
+  assert.ok(material);
+  assert.equal(material?.title, 'Slide Modul 3D DEM');
+  assert.equal(material?.type, 'pdf');
+
+  // Verify material is in meeting
+  const meetingsAfterMat = studentService.getMeetings(course.id);
+  const foundMeeting = meetingsAfterMat.find((m) => m.id === manualMeeting.id);
+  assert.equal(foundMeeting?.materials.length, 1);
+  assert.equal(foundMeeting?.materials[0].title, 'Slide Modul 3D DEM');
+
+  // Delete material from meeting
+  if (material) {
+    const deletedMat = studentService.deleteMaterialFromMeeting(manualMeeting.id, material.id);
+    assert.equal(deletedMat, true);
+  }
+
+  // 6. Delete manual meeting
+  const deletedMeeting = studentService.deleteMeeting(manualMeeting.id);
+  assert.equal(deletedMeeting, true);
+  const meetingsAfterDelete = studentService.getMeetings(course.id);
+  assert.equal(meetingsAfterDelete.some((m) => m.id === manualMeeting.id), false);
+
+  // 7. Create, update, and delete assignment
+  const assignment = studentService.createAssignment({
+    courseId: course.id,
+    meetingId: meetings16[0].id,
+    title: 'Tugas 1: Peta Kontur dan Skala',
+    instructions: 'Buat peta kontur dengan interval 25m',
+    deadline: '2026-12-10T23:59',
+    allowedFormats: ['.pdf', '.zip'],
+    maxFileSizeMb: 20,
+    allowTextResponse: true,
+  });
+  assert.ok(assignment.id);
+  assert.equal(assignment.title, 'Tugas 1: Peta Kontur dan Skala');
+
+  const updatedAsg = studentService.updateAssignment(assignment.id, {
+    title: 'Tugas 1: Peta Kontur dan Skala (Diperbarui)',
+  });
+  assert.equal(updatedAsg?.title, 'Tugas 1: Peta Kontur dan Skala (Diperbarui)');
+
+  const deletedAsg = studentService.deleteAssignment(assignment.id);
+  assert.equal(deletedAsg, true);
+  const asgsAfterDelete = studentService.getAssignments(course.id);
+  assert.equal(asgsAfterDelete.some((a) => a.id === assignment.id), false);
+
+  // 8. Generate Default OBE RPS
+  const rps = studentService.generateDefaultRps(course.id);
+  assert.ok(rps);
+  assert.equal(rps.courseCode, 'KARTOGRAFI');
+  assert.ok(rps.cpmk.length >= 3);
+  assert.ok(rps.studyMaterials.length >= 10);
+
+  // Clean up
+  studentService.deleteCourse(course.id);
+});
+
+

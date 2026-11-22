@@ -535,6 +535,16 @@ export const supabaseDataService = {
     }
   },
 
+  async deleteAssignment(assignmentId: string): Promise<boolean> {
+    if (!isSupabaseConfigured() || !supabase || !assignmentId) return false;
+    try {
+      const { error } = await supabase.from('assignments').delete().eq('id', assignmentId);
+      return !error;
+    } catch {
+      return false;
+    }
+  },
+
   async fetchSubmissions(courseId?: string): Promise<AssignmentSubmission[] | null> {
     if (!isSupabaseConfigured() || !supabase) return null;
     try {

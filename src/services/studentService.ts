@@ -13,6 +13,8 @@ import type {
   ActivityLog,
   AuthUser,
   MasterStudent,
+  LearningMaterial,
+  MaterialType,
 } from '../types/index.ts';
 
 import {
@@ -2506,7 +2508,7 @@ export const studentService = {
     const idx = courses.findIndex((c) => c.id === courseId);
     if (idx === -1) throw new Error('Course not found');
 
-    const currentRps = courses[idx].rps || initialCourseRps[courseId];
+    const currentRps = courses[idx].rps || initialCourseRps[courseId] || this.generateDefaultRps(courseId);
     const updatedRps: CourseRps = {
       ...currentRps,
       ...updates,
@@ -2519,6 +2521,10 @@ export const studentService = {
     };
     setStorage(STORAGE_KEYS.COURSES, courses);
 
+    supabaseDataService.saveCourse(courses[idx]).catch(() => {});
+    supabaseDataService.broadcastChange('course_updated', courses[idx]);
+    myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
+
     this.addActivity({
       title: 'Pembaruan RPS Mata Kuliah',
       description: `Dokumen RPS ${courses[idx].code} - ${courses[idx].title} telah diperbarui oleh dosen pengampu.`,
@@ -2527,6 +2533,97 @@ export const studentService = {
     });
 
     return updatedRps;
+  },
+
+  generateDefaultRps(courseId: string): CourseRps {
+    const courses = this.getAllCourses();
+    const idx = courses.findIndex((c) => c.id === courseId);
+    if (idx === -1) throw new Error('Mata kuliah tidak ditemukan');
+
+    const course = courses[idx];
+    const defaultRps: CourseRps = {
+      courseId: course.id,
+      courseCode: course.code,
+      courseTitle: course.title,
+      curriculumYear: 'Kurikulum OBE 2026/2027',
+      shortDescription: `Rencana Pembelajaran Semester (RPS) berbasis Outcome-Based Education (OBE) untuk mata kuliah ${course.title}. Disusun terintegrasi dengan kebutuhan kompetensi lulusan geografi dan sains informasi spasial.`,
+      cpl: [
+        'CPL-01: Mampu mengaplikasikan konsep teoretis dan metodologis dalam analisis spasial komprehensif.',
+        'CPL-02: Mampu merancang, mengolah, dan memvisualisasikan data geospasial menggunakan perangkat komputasi modern.',
+        'CPL-03: Menunjukkan sikap bertanggung jawab atas pekerjaan di bidang keahliannya secara mandiri dan tim kolaborasi.',
+      ],
+      cpmk: [
+        {
+          code: 'CPMK-1',
+          description: `Mahasiswa mampu memahami prinsip dan teori dasar mata kuliah ${course.title}.`,
+          targetLevel: 'C3 (Aplikasi)',
+          weightPercentage: 25,
+        },
+        {
+          code: 'CPMK-2',
+          description: `Mahasiswa mampu menerapkan metode analisis dan pemecahan kasus praktikum dalam ${course.title}.`,
+          targetLevel: 'C4 (Analisis)',
+          weightPercentage: 45,
+        },
+        {
+          code: 'CPMK-3',
+          description: `Mahasiswa mampu menghasilkan laporan teknis atau proyek akhir yang teruji dan siap dipresentasikan.`,
+          targetLevel: 'C5 (Evaluasi)',
+          weightPercentage: 30,
+        },
+      ],
+      studyMaterials: [
+        'Kontrak Perkuliahan, Silabus, & Pengantar Ruang Lingkup',
+        'Dasar-dasar Teori dan Konseptualisasi Keilmuan',
+        'Metodologi Pengumpulan dan Karakteristik Data',
+        'Teknik Pemrosesan dan Standardisasi Format Data',
+        'Pemodelan dan Pendekatan Analisis Tematik',
+        'Studi Kasus 1: Aplikasi Lapangan dan Eksplorasi Data',
+        'Evaluasi Tengah Semester (UTS) - Ujian Teori & Praktik',
+        'Lanjutan Topik: Analisis Komparatif dan Spasial',
+        'Integrasi Teknologi Digital dan Otomasi Workflow',
+        'Studi Kasus 2: Perancangan Proyek Kelompok Terstruktur',
+        'Penyusunan Laporan Hasil dan Visualisasi Hasil',
+        'Evaluasi Akhir Semester (UAS) - Presentasi & Portofolio Proyek',
+      ],
+      learningMethods: [
+        'Case Method (Pembahasan Kasus Nyata)',
+        'Project-Based Learning (PBL)',
+        'Kuliah Interaktif & Diskusi Lab',
+        'Praktikum Berbantuan Komputer',
+      ],
+      assessmentComponents: [
+        { name: 'Kehadiran & Partisipasi Aktif', weightPercentage: 10, description: 'Presensi minimal 75% kehadiran kuliah dan keaktifan diskusi.' },
+        { name: 'Tugas Praktikum & Diskusi Mandiri', weightPercentage: 30, description: 'Tugas mingguan, laporan analisis lab, dan portofolio tugas.' },
+        { name: 'Ujian Tengah Semester (UTS)', weightPercentage: 30, description: 'Evaluasi penguasaan materi konseptual dan pemecahan kasus sesi 1-7.' },
+        { name: 'Ujian Akhir Semester (UAS)', weightPercentage: 30, description: 'Evaluasi proyek akhir, laporan komprehensif, dan presentasi tim.' },
+      ],
+      references: {
+        primary: [
+          `Panduan Akademik & Bahan Ajar Resmi Mata Kuliah ${course.title}, Universitas Negeri Medan, 2026.`,
+          'Standar Nasional Pendidikan Tinggi (SN-Dikti) & Panduan Penyusunan Kurikulum OBE.',
+        ],
+        supporting: [
+          'Jurnal Geografi & Sains Informasi Geospasial Indonesia (Terakreditasi Sinta).',
+          'Dokumentasi Teknis dan Standar Operasional Laboratorium Komputasi.',
+        ],
+      },
+      softwareTools: ['QGIS / ArcGIS Pro', 'Google Earth Engine', 'Spreadsheet Analytics', 'Smart Learning Hub'],
+      hardwareTools: ['PC / Laptop Komputasi', 'GPS Handheld / Smartphone', 'Display Proyektor'],
+      lastUpdated: new Date().toISOString().split('T')[0],
+    };
+
+    courses[idx] = {
+      ...courses[idx],
+      rps: defaultRps,
+    };
+    setStorage(STORAGE_KEYS.COURSES, courses);
+
+    supabaseDataService.saveCourse(courses[idx]).catch(() => {});
+    supabaseDataService.broadcastChange('course_updated', courses[idx]);
+    myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
+
+    return defaultRps;
   },
 
   getEnrolledCourses(studentEmail?: string): CourseClass[] {
@@ -3803,14 +3900,214 @@ export const studentService = {
       setStorage(STORAGE_KEYS.MEETINGS, meetings);
     }
     if (courseId) {
-      return meetings.filter((m) => m.courseId === courseId && m.isPublished);
+      return meetings.filter((m) => m.courseId === courseId && m.isPublished !== false);
     }
-    return meetings.filter((m) => m.isPublished);
+    return meetings.filter((m) => m.isPublished !== false);
   },
 
   getMeetingById(meetingId: string): Meeting | undefined {
     const meetings = this.getMeetings();
     return meetings.find((m) => m.id === meetingId);
+  },
+
+  createMeeting(data: {
+    courseId: string;
+    meetingNumber?: number;
+    title: string;
+    topic?: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    room?: string;
+    description?: string;
+    isOnline?: boolean;
+    meetingLink?: string;
+  }): Meeting {
+    const allMeetings = getStorage<Meeting[]>(STORAGE_KEYS.MEETINGS, initialMeetings);
+    const courseMeetings = allMeetings.filter((m) => m.courseId === data.courseId);
+    const meetingNumber = data.meetingNumber || (courseMeetings.length + 1);
+
+    const newMeeting: Meeting = {
+      id: `mtg_${data.courseId}_${meetingNumber}_${Date.now().toString(36)}`,
+      courseId: data.courseId,
+      meetingNumber: meetingNumber,
+      title: data.title.trim(),
+      topic: data.topic?.trim() || data.title.trim(),
+      date: data.date,
+      startTime: data.startTime || '08:00',
+      endTime: data.endTime || '10:30',
+      room: data.room || 'Lab Komputasi Spasial Lt. 3',
+      isOnline: Boolean(data.isOnline),
+      meetingLink: data.meetingLink || '',
+      learningObjectives: ['Memahami materi sesi perkuliahan.'],
+      description: data.description?.trim() || `Sesi pertemuan ke-${meetingNumber} perkuliahan.`,
+      activities: ['Penyampaian Materi', 'Diskusi Kelas'],
+      materials: [],
+      isCompletedByStudent: false,
+      isPublished: true,
+    };
+
+    allMeetings.push(newMeeting);
+    setStorage(STORAGE_KEYS.MEETINGS, allMeetings);
+
+    // Update totalMeetings in course if necessary
+    const courses = this.getAllCourses();
+    const cIdx = courses.findIndex((c) => c.id === data.courseId);
+    if (cIdx >= 0 && (courses[cIdx].totalMeetings || 0) < meetingNumber) {
+      courses[cIdx].totalMeetings = meetingNumber;
+      setStorage(STORAGE_KEYS.COURSES, courses);
+      supabaseDataService.saveCourse(courses[cIdx]).catch(() => {});
+    }
+
+    myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
+
+    this.addActivity({
+      title: 'Sesi Pertemuan Ditambahkan',
+      description: `Dosen menambahkan ${newMeeting.title} pada mata kuliah.`,
+      type: 'course',
+      courseTitle: newMeeting.title,
+    });
+
+    return newMeeting;
+  },
+
+  updateMeeting(meetingId: string, updates: Partial<Meeting>): Meeting {
+    const allMeetings = getStorage<Meeting[]>(STORAGE_KEYS.MEETINGS, initialMeetings);
+    const idx = allMeetings.findIndex((m) => m.id === meetingId);
+    if (idx === -1) throw new Error('Pertemuan tidak ditemukan');
+
+    allMeetings[idx] = {
+      ...allMeetings[idx],
+      ...updates,
+      isPublished: updates.isPublished !== undefined ? updates.isPublished : true,
+    };
+    setStorage(STORAGE_KEYS.MEETINGS, allMeetings);
+    myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
+    return allMeetings[idx];
+  },
+
+  deleteMeeting(meetingId: string): boolean {
+    const allMeetings = getStorage<Meeting[]>(STORAGE_KEYS.MEETINGS, initialMeetings);
+    const filtered = allMeetings.filter((m) => m.id !== meetingId);
+    setStorage(STORAGE_KEYS.MEETINGS, filtered);
+    myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
+    return true;
+  },
+
+  generate16MeetingsForCourse(courseId: string): Meeting[] {
+    const courses = this.getAllCourses();
+    const course = courses.find((c) => c.id === courseId);
+    if (!course) throw new Error('Mata kuliah tidak ditemukan');
+
+    const allMeetings = getStorage<Meeting[]>(STORAGE_KEYS.MEETINGS, initialMeetings);
+    const remainingMeetings = allMeetings.filter((m) => m.courseId !== courseId);
+
+    const startTime = course.scheduleTime?.split('-')[0]?.trim() || '08:00';
+    const endTime = course.scheduleTime?.split('-')[1]?.trim() || '10:30';
+    const room = course.room || 'Lab Komputasi Spasial Lt. 3';
+
+    const sampleTopics = [
+      'Kontrak Perkuliahan, Silabus OBE, dan Pengantar Ruang Lingkup',
+      'Konsep Dasar, Terminologi, dan Landasan Teoretis Keilmuan',
+      'Struktur Data, Karakteristik Sumber Informasi, dan Format Spasial',
+      'Metodologi Akuisisi Data, Survei Lapangan, dan Verifikasi Akurasi',
+      'Teknik Pemrosesan Data Digital dan Standardisasi Format Informasi',
+      'Analisis Spasial Dasar, Operasi Geometris, dan Transformasi Koordinat',
+      'Praktikum Terpandu: Pemecahan Masalah dan Studi Kasus Terstruktur',
+      'Evaluasi Tengah Semester (UTS): Ujian Teori Komprehensif & Praktik Lab',
+      'Analisis Lanjutan: Pemodelan Spasial, Interpolasi, dan Inferensi Tematik',
+      'Otomatisasi Alur Kerja Pemrosesan dan Integrasi Basis Data Modern',
+      'Penyajian Informasi Kartografis, Simbologi, dan Tata Letak Output Peta',
+      'Studi Kasus Mandiri / Perancangan Proyek Analisis Kelompok',
+      'Penyusunan Laporan Teknis Ilmiah dan Portofolio Hasil Analisis',
+      'Review Progres, Asistensi Teknis, dan Konsultasi Proyek Akhir',
+      'Presentasi Kelompok, Demonstrasi Produk, dan Uji Kelayakan Proyek',
+      'Evaluasi Akhir Semester (UAS): Portofolio Proyek Akhir & Sidang Hasil',
+    ];
+
+    const newMeetings: Meeting[] = Array.from({ length: 16 }, (_, i) => {
+      const meetingNum = i + 1;
+      const dayOffset = i * 7;
+      const d = new Date();
+      d.setDate(d.getDate() + dayOffset);
+      const dateStr = d.toISOString().split('T')[0];
+
+      return {
+        id: `mtg_${courseId}_${meetingNum}_${Date.now().toString(36)}`,
+        courseId: courseId,
+        meetingNumber: meetingNum,
+        title: `Pertemuan 0${meetingNum}: ${sampleTopics[i] || `Materi Sesi ${meetingNum}`}`,
+        topic: sampleTopics[i] || `Pembahasan topik sesi ke-${meetingNum}`,
+        date: dateStr,
+        startTime: startTime,
+        endTime: endTime,
+        room: room,
+        isOnline: false,
+        learningObjectives: [
+          `Memahami capaian kompetensi pertemuan ke-${meetingNum}`,
+          `Mampu mengaplikasikan materi pembelajaran secara mandiri`,
+        ],
+        description: `Sesi pembelajaran ke-${meetingNum} untuk mata kuliah ${course.title}. Mahasiswa diharapkan hadir tepat waktu dan mempelajari materi pendukung.`,
+        activities: ['Pemaparan Materi Dosen', 'Diskusi Interaktif', 'Praktik Laboratorium'],
+        materials: [],
+        isCompleted: false,
+        isPublished: true,
+      };
+    });
+
+    setStorage(STORAGE_KEYS.MEETINGS, [...remainingMeetings, ...newMeetings]);
+
+    const cIdx = courses.findIndex((c) => c.id === courseId);
+    if (cIdx >= 0) {
+      courses[cIdx].totalMeetings = 16;
+      setStorage(STORAGE_KEYS.COURSES, courses);
+      supabaseDataService.saveCourse(courses[cIdx]).catch(() => {});
+    }
+
+    myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
+    return newMeetings;
+  },
+
+  addMaterialToMeeting(meetingId: string, material: {
+    title: string;
+    type: MaterialType;
+    fileUrl?: string;
+    description?: string;
+  }): LearningMaterial {
+    const allMeetings = getStorage<Meeting[]>(STORAGE_KEYS.MEETINGS, initialMeetings);
+    const idx = allMeetings.findIndex((m) => m.id === meetingId);
+    if (idx === -1) throw new Error('Pertemuan tidak ditemukan');
+
+    const newMaterial: LearningMaterial = {
+      id: `mat_${meetingId}_${Date.now().toString(36)}`,
+      meetingId: meetingId,
+      courseId: allMeetings[idx].courseId,
+      title: material.title.trim(),
+      description: material.description || '',
+      type: material.type,
+      fileUrl: material.fileUrl || '#',
+      fileName: material.title.trim(),
+      isPublished: true,
+    };
+
+    if (!allMeetings[idx].materials) {
+      allMeetings[idx].materials = [];
+    }
+    allMeetings[idx].materials.push(newMaterial);
+    setStorage(STORAGE_KEYS.MEETINGS, allMeetings);
+    myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
+    return newMaterial;
+  },
+
+  deleteMaterialFromMeeting(meetingId: string, materialId: string): boolean {
+    const allMeetings = getStorage<Meeting[]>(STORAGE_KEYS.MEETINGS, initialMeetings);
+    const idx = allMeetings.findIndex((m) => m.id === meetingId);
+    if (idx === -1) return false;
+
+    allMeetings[idx].materials = (allMeetings[idx].materials || []).filter((m) => m.id !== materialId);
+    setStorage(STORAGE_KEYS.MEETINGS, allMeetings);
+    myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
+    return true;
   },
 
   toggleMeetingCompleted(meetingId: string): boolean {
@@ -3831,14 +4128,103 @@ export const studentService = {
   getAssignments(courseId?: string): Assignment[] {
     const assignments = getStorage<Assignment[]>(STORAGE_KEYS.ASSIGNMENTS, initialAssignments);
     if (courseId) {
-      return assignments.filter((a) => a.courseId === courseId && a.isPublished);
+      return assignments.filter((a) => a.courseId === courseId && a.isPublished !== false);
     }
-    return assignments.filter((a) => a.isPublished);
+    return assignments.filter((a) => a.isPublished !== false);
   },
 
   getAssignmentById(id: string): Assignment | undefined {
     const all = this.getAssignments();
     return all.find((a) => a.id === id);
+  },
+
+  createAssignment(data: {
+    courseId: string;
+    meetingId?: string;
+    title: string;
+    instructions: string;
+    deadline: string;
+    allowedFormats?: string[];
+    maxFileSizeMb?: number;
+    allowTextResponse?: boolean;
+    maxScore?: number;
+  }): Assignment {
+    const allAssignments = getStorage<Assignment[]>(STORAGE_KEYS.ASSIGNMENTS, initialAssignments);
+    const newAssignment: Assignment = {
+      id: `asg_${data.courseId}_${Date.now().toString(36)}`,
+      courseId: data.courseId,
+      meetingId: data.meetingId || undefined,
+      title: data.title.trim(),
+      instructions: data.instructions.trim(),
+      deadline: data.deadline,
+      allowedFormats: data.allowedFormats || ['.pdf', '.docx', '.zip'],
+      maxFileSizeMb: data.maxFileSizeMb || 15,
+      allowTextResponse: data.allowTextResponse !== undefined ? data.allowTextResponse : true,
+      allowResubmission: true,
+      latePenaltyPolicy: 'Toleransi keterlambatan maksimal 24 jam dengan potongan nilai 10%.',
+      isPublished: true,
+      rubric: [
+        {
+          id: `rub_${Date.now()}_1`,
+          title: 'Kesesuaian Metodologi & Prosedur Analisis',
+          description: 'Langkah kerja dan ketepatan penggunaan alat/data.',
+          maxScore: 40,
+        },
+        {
+          id: `rub_${Date.now()}_2`,
+          title: 'Kualitas Output & Visualisasi',
+          description: 'Kerapian layout, simbologi, dan keterbacaan data.',
+          maxScore: 35,
+        },
+        {
+          id: `rub_${Date.now()}_3`,
+          title: 'Interpretasi & Kesimpulan Pembahasan',
+          description: 'Argumen geografis dan kesesuaian kesimpulan.',
+          maxScore: 25,
+        },
+      ],
+    };
+
+    allAssignments.push(newAssignment);
+    setStorage(STORAGE_KEYS.ASSIGNMENTS, allAssignments);
+
+    supabaseDataService.saveAssignment(newAssignment).catch(() => {});
+    supabaseDataService.broadcastChange('assignment_updated', newAssignment);
+    myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
+
+    this.addActivity({
+      title: 'Tugas Kuliah Baru Diterbitkan',
+      description: `Dosen menerbitkan tugas "${newAssignment.title}" dengan batas pengumpulan ${data.deadline}.`,
+      type: 'assignment',
+      courseTitle: newAssignment.title,
+    });
+
+    return newAssignment;
+  },
+
+  updateAssignment(assignmentId: string, updates: Partial<Assignment>): Assignment {
+    const allAssignments = getStorage<Assignment[]>(STORAGE_KEYS.ASSIGNMENTS, initialAssignments);
+    const idx = allAssignments.findIndex((a) => a.id === assignmentId);
+    if (idx === -1) throw new Error('Tugas tidak ditemukan');
+
+    allAssignments[idx] = {
+      ...allAssignments[idx],
+      ...updates,
+      isPublished: updates.isPublished !== undefined ? updates.isPublished : true,
+    };
+    setStorage(STORAGE_KEYS.ASSIGNMENTS, allAssignments);
+    supabaseDataService.saveAssignment(allAssignments[idx]).catch(() => {});
+    myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
+    return allAssignments[idx];
+  },
+
+  deleteAssignment(assignmentId: string): boolean {
+    const allAssignments = getStorage<Assignment[]>(STORAGE_KEYS.ASSIGNMENTS, initialAssignments);
+    const filtered = allAssignments.filter((a) => a.id !== assignmentId);
+    setStorage(STORAGE_KEYS.ASSIGNMENTS, filtered);
+    supabaseDataService.deleteAssignment(assignmentId).catch(() => {});
+    myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
+    return true;
   },
 
   // Submissions
