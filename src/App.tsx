@@ -46,6 +46,7 @@ import {
   defaultLecturerUser 
 } from './services/studentService.ts';
 import { myJourneySyncService } from './services/myJourneySyncService.ts';
+import { supabaseDataService } from './services/supabaseDataService.ts';
 
 import type { 
   AuthUser,

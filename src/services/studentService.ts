@@ -271,9 +271,13 @@ export const studentService = {
     }
 
     if (user) {
+      if (!user.email || typeof user.email !== 'string') {
+        return null;
+      }
       let modified = false;
-      const isAltaf = user.email.toLowerCase() === 'altaf.aziz16@gmail.com';
-      const isMiftah = user.email.toLowerCase() === 'miftahurridlo.688@gmail.com';
+      const userEmailLower = user.email.toLowerCase().trim();
+      const isAltaf = userEmailLower === 'altaf.aziz16@gmail.com';
+      const isMiftah = userEmailLower === 'miftahurridlo.688@gmail.com';
       if (isAltaf) {
         if (user.name && user.name.includes('S.Pd')) {
           user.name = user.name.replace('S.Pd', 'S.Si');
