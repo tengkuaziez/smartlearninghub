@@ -347,9 +347,27 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
     }
   };
 
+  // Deduplikasi ketat daftar courses berdasarkan kode matkul dan ID
+  const uniqueCourseMap = new Map<string, CourseClass>();
+  courses.forEach((c) => {
+    const codeKey = (c.code || '').trim().toUpperCase();
+    const idKey = c.id;
+    const existing = uniqueCourseMap.get(codeKey) || uniqueCourseMap.get(idKey);
+    if (!existing) {
+      uniqueCourseMap.set(codeKey, c);
+      uniqueCourseMap.set(idKey, c);
+    } else {
+      const existingIsPending = !!existing.pendingLecturerEmail;
+      const cIsPending = !!c.pendingLecturerEmail;
+      const chosen = (existingIsPending && !cIsPending) ? c : existing;
+      uniqueCourseMap.set(codeKey, chosen);
+      uniqueCourseMap.set(idKey, chosen);
+    }
+  });
+  const dedupedCourses = Array.from(new Set(uniqueCourseMap.values()));
+
   // Check pending invitations for current lecturer
-  const allExistingCourses = studentService.getAllCourses();
-  const pendingInvitations = allExistingCourses.filter(
+  const pendingInvitations = dedupedCourses.filter(
     (c) => c.pendingLecturerEmail?.toLowerCase() === currentUser?.email?.toLowerCase()
   );
 
@@ -357,7 +375,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
 
   // Kelas yang ditampilkan di Tab "1. Kelas":
   // Meliputi kelas buatan user, kelas tim yang sudah di-acc, serta kelas yang mengundang user (menunggu persetujuan user)
-  const classesTabCourses = courses.filter((c) => {
+  const classesTabCourses = dedupedCourses.filter((c) => {
     const isPrimary = (c.teacher?.email || '').toLowerCase() === userEmail ||
       (c.primaryLecturer || '').toLowerCase().includes(userEmail.split('@')[0]);
     const isPartner = (c.secondaryTeacher?.email || '').toLowerCase() === userEmail ||
@@ -368,7 +386,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
 
   // Kelas yang sudah disetujui resmi (untuk Tab "4. RPS" dan Tab "5. Jadwal Sesi"):
   // Kelas yang belum di-acc oleh user TIDAK akan muncul di RPS atau Jadwal Sesi sampai disetujui!
-  const approvedCourses = courses.filter((c) => {
+  const approvedCourses = dedupedCourses.filter((c) => {
     const isPendingForMe = (c.pendingLecturerEmail || '').toLowerCase() === userEmail;
     if (isPendingForMe) return false;
     const isPrimary = (c.teacher?.email || '').toLowerCase() === userEmail ||

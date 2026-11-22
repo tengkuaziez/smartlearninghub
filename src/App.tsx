@@ -166,6 +166,58 @@ export default function App() {
     }).catch(() => {});
   }, [currentUser?.email]);
 
+  // Realtime Cloud Listener & Fast Cross-Browser Broadcast (< 300ms)
+  useEffect(() => {
+    const sub = supabaseDataService.setupRealtimeSubscription((table, payload) => {
+      if (table === 'courses') {
+        if (payload) {
+          studentService.applyRealtimeCourseUpdate(payload);
+        } else {
+          studentService.syncCoursesFromSupabase().catch(() => {});
+        }
+      } else if (table === 'students') {
+        if (payload) {
+          studentService.applyRealtimeStudentUpdate(payload);
+        } else {
+          studentService.syncStudentsFromSupabase().catch(() => {});
+        }
+      }
+      reloadData();
+    });
+
+    // Window focus & tab visibility change listener: sync immediately on tab switch
+    const handleTabFocus = () => {
+      studentService.syncCoursesFromSupabase().then(() => {
+        reloadData();
+      }).catch(() => {});
+    };
+    window.addEventListener('focus', handleTabFocus);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        handleTabFocus();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // Fast polling fallback: checks Supabase every 4 seconds while active
+    const intervalId = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        studentService.syncCoursesFromSupabase().then((res) => {
+          if (res.success && res.count > 0) {
+            reloadData();
+          }
+        }).catch(() => {});
+      }
+    }, 4000);
+
+    return () => {
+      sub?.unsubscribe();
+      window.removeEventListener('focus', handleTabFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      clearInterval(intervalId);
+    };
+  }, [currentUser?.email]);
+
   // Background Auto-sync Teaching ke Google Sheets & My Journey saat Dosen Aktif
   useEffect(() => {
     if (currentUser?.role === 'dosen') {

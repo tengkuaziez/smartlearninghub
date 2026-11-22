@@ -341,3 +341,69 @@ test('Set Primary Lecturer: Swaps primary and secondary lecturer roles correctly
   assert.equal(switchedCourse?.secondaryTeacher?.email, 'altaf.aziz16@gmail.com');
   assert.equal(switchedCourse?.primaryLecturer, 'Muhammad Miftahurrodlo, M.Sc.');
 });
+
+test('Deduplication: getAllCourses and createCourse prevent duplicate course creation', () => {
+  studentService.login('miftahurridlo.688@gmail.com', 'DosenUtama2026!');
+  
+  // Create first course
+  const c1 = studentService.createCourse({
+    code: 'GEO-TEST',
+    title: 'Geografi Pengujian',
+    description: 'Deskripsi test',
+    room: 'Lab 1',
+    scheduleDay: 'Senin',
+    scheduleTime: '08:00 - 10:30 WIB',
+  });
+
+  // Attempt to create course with exact same code
+  const c2 = studentService.createCourse({
+    code: 'GEO-TEST',
+    title: 'Geografi Pengujian Duplikat',
+    description: 'Deskripsi duplikat',
+    room: 'Lab 2',
+    scheduleDay: 'Selasa',
+    scheduleTime: '08:00 - 10:30 WIB',
+  });
+
+  assert.equal(c1.id, c2.id);
+
+  const all = studentService.getAllCourses();
+  const testCourses = all.filter((c) => c.code.toUpperCase() === 'GEO-TEST');
+  assert.equal(testCourses.length, 1);
+
+  // Clean up
+  studentService.deleteCourse(c1.id);
+});
+
+test('Realtime: applyRealtimeCourseUpdate applies new course and pending notification instantly', () => {
+  studentService.login('altaf.aziz16@gmail.com', 'DosenPartner2026!');
+
+  const incomingCourse: any = {
+    id: 'course_incoming_realtime',
+    code: 'GEO-REALTIME',
+    title: 'Geografi Realtime Broadcast',
+    teacher: {
+      id: 'dos_miftah',
+      name: 'Muhammad Miftahurrodlo, M.Sc.',
+      email: 'miftahurridlo.688@gmail.com',
+    },
+    pendingLecturerEmail: 'altaf.aziz16@gmail.com',
+    pendingLecturerName: 'Tengku Abdillah Azis, S.Si',
+    scheduleDay: 'Rabu',
+    scheduleTime: '08:00 - 10:30 WIB',
+    room: 'Lab GIS',
+  };
+
+  studentService.applyRealtimeCourseUpdate(incomingCourse);
+
+  const found = studentService.getCourseById('course_incoming_realtime');
+  assert.ok(found);
+  assert.equal(found?.code, 'GEO-REALTIME');
+
+  const notifs = studentService.getNotifications();
+  const invNotif = notifs.find((n) => n.invitationData?.courseCode === 'GEO-REALTIME');
+  assert.ok(invNotif);
+
+  // Clean up
+  studentService.deleteCourse('course_incoming_realtime');
+});

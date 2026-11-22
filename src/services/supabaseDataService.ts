@@ -554,13 +554,56 @@ export const supabaseDataService = {
   },
 
   // =========================================================================
-  // 6. REALTIME CLOUD LISTENER (Pemberitahuan Langsung)
+  // 6. REALTIME CLOUD LISTENER & INSTANT BROADCAST (Pemberitahuan Langsung < 300ms)
   // =========================================================================
-  setupRealtimeSubscription(onDataChange: (table: string) => void): { unsubscribe: () => void } | null {
+  _realtimeChannel: null as any,
+
+  getRealtimeChannel() {
+    if (!isSupabaseConfigured() || !supabase) return null;
+    if (!this._realtimeChannel) {
+      this._realtimeChannel = supabase.channel('slh-unified-realtime');
+    }
+    return this._realtimeChannel;
+  },
+
+  /**
+   * Mengirim event realtime broadcast ke seluruh browser dosen/mahasiswa aktif secara instan (< 300ms)
+   */
+  broadcastChange(event: string, payload: any): void {
+    if (!isSupabaseConfigured() || !supabase) return;
+    try {
+      const ch = this.getRealtimeChannel();
+      if (ch) {
+        ch.send({
+          type: 'broadcast',
+          event,
+          payload,
+        }).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('[SupabaseDataService] broadcastChange warning:', e);
+    }
+  },
+
+  setupRealtimeSubscription(onDataChange: (table: string, payload?: any) => void): { unsubscribe: () => void } | null {
     if (!isSupabaseConfigured() || !supabase) return null;
     try {
-      const channel = supabase
-        .channel('slh-unified-realtime')
+      const channel = this.getRealtimeChannel();
+      if (!channel) return null;
+
+      channel
+        .on('broadcast', { event: 'course_updated' }, (msg: any) => {
+          onDataChange('courses', msg?.payload);
+        })
+        .on('broadcast', { event: 'course_deleted' }, (msg: any) => {
+          onDataChange('courses', { type: 'delete', ...msg?.payload });
+        })
+        .on('broadcast', { event: 'student_updated' }, (msg: any) => {
+          onDataChange('students', msg?.payload);
+        })
+        .on('broadcast', { event: 'invitation_response' }, (msg: any) => {
+          onDataChange('courses', msg?.payload);
+        })
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'students' },
@@ -585,7 +628,7 @@ export const supabaseDataService = {
 
       return {
         unsubscribe: () => {
-          supabase?.removeChannel(channel);
+          // Channel dibiarkan aktif untuk broadcast persistent
         },
       };
     } catch {

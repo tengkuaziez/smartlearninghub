@@ -1190,7 +1190,68 @@ export const studentService = {
       }
 
       const currentCourses = this.getAllCourses();
-      const syncedCourses: CourseClass[] = data.map((row) => {
+
+      // Deduplicate rows from Supabase (prevent multi-user duplicate rows for same course)
+      const groups = new Map<string, any[]>();
+      data.forEach((row) => {
+        const d = row.data || {};
+        const code = String(d.code || '').trim().toUpperCase();
+        const id = String(row.id || d.id || '').trim();
+        const canonicalKey = code || id;
+        if (!canonicalKey) return;
+        if (!groups.has(canonicalKey)) {
+          groups.set(canonicalKey, []);
+        }
+        groups.get(canonicalKey)!.push(row);
+      });
+
+      const deduplicatedRows: any[] = [];
+      groups.forEach((rows) => {
+        if (rows.length === 1) {
+          deduplicatedRows.push(rows[0]);
+          return;
+        }
+
+        // Sort by updated_at descending (newest first)
+        rows.sort((a, b) => {
+          const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+          const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+          return tB - tA;
+        });
+
+        const latest = { ...rows[0], data: { ...rows[0].data } };
+
+        // Union enrolled student emails across all rows
+        const allEmails = new Set<string>();
+        rows.forEach((r) => {
+          const list = r.data?.enrolledStudentEmails || [];
+          if (Array.isArray(list)) {
+            list.forEach((e: string) => {
+              if (e && e.includes('@')) allEmails.add(e.toLowerCase().trim());
+            });
+          }
+        });
+        latest.data.enrolledStudentEmails = Array.from(allEmails);
+        latest.data.enrolledCount = allEmails.size;
+
+        // If ANY row has accepted partner status, the course is accepted!
+        const acceptedRow = rows.find((r) => {
+          const p = String(r.data?.partnerLecturer || '').trim();
+          const pend = String(r.data?.pendingLecturerEmail || '').trim();
+          return p && !p.startsWith('PENDING:') && p !== '-' && (!pend || pend === 'null' || pend === 'undefined');
+        });
+
+        if (acceptedRow) {
+          latest.data.partnerLecturer = acceptedRow.data.partnerLecturer;
+          latest.data.partnerLecturerEmail = acceptedRow.data.partnerLecturerEmail;
+          latest.data.pendingLecturerEmail = null;
+          latest.data.pendingLecturerName = null;
+        }
+
+        deduplicatedRows.push(latest);
+      });
+
+      const syncedCourses: CourseClass[] = deduplicatedRows.map((row) => {
         const d = row.data || {};
         const existing = currentCourses.find((c) => c.id === row.id || c.code.toLowerCase() === (d.code || '').toLowerCase());
         
@@ -1244,7 +1305,7 @@ export const studentService = {
             id: primaryUser.id,
             name: primaryUser.name,
             title: 'Dosen Pengampu Utama',
-            email: primaryUser.email,
+            email: primaryEmail,
             avatarUrl: primaryUser.avatarUrl,
             department: primaryUser.department,
           },
@@ -1252,7 +1313,7 @@ export const studentService = {
             id: partnerUser.id,
             name: partnerUser.name,
             title: 'Dosen Pengampu Partner',
-            email: partnerUser.email,
+            email: partnerEmail,
             avatarUrl: partnerUser.avatarUrl,
             department: partnerUser.department,
           } : undefined,
@@ -1261,7 +1322,7 @@ export const studentService = {
               id: primaryUser.id,
               name: primaryUser.name,
               title: 'Dosen Pengampu Utama',
-              email: primaryUser.email,
+              email: primaryEmail,
               avatarUrl: primaryUser.avatarUrl,
               department: primaryUser.department,
             },
@@ -1269,7 +1330,7 @@ export const studentService = {
               id: partnerUser.id,
               name: partnerUser.name,
               title: 'Dosen Pengampu Partner',
-              email: partnerUser.email,
+              email: partnerEmail,
               avatarUrl: partnerUser.avatarUrl,
               department: partnerUser.department,
             },
@@ -1278,7 +1339,7 @@ export const studentService = {
               id: primaryUser.id,
               name: primaryUser.name,
               title: 'Dosen Pengampu Utama',
-              email: primaryUser.email,
+              email: primaryEmail,
               avatarUrl: primaryUser.avatarUrl,
               department: primaryUser.department,
             },
@@ -1298,18 +1359,48 @@ export const studentService = {
 
       // Supabase is authoritative: prune deleted courses, keep only recent offline courses (< 30s)
       const supaIds = new Set(syncedCourses.map((c) => c.id));
-      const prunedCourses = syncedCourses.concat(
-        currentCourses.filter((c) => {
-          const isRecentOffline = (c as any)._localCreatedAt && Date.now() - (c as any)._localCreatedAt < 30000;
-          return isRecentOffline && !supaIds.has(c.id) && !isDummyCourse(c);
-        })
-      );
+      const supaCodes = new Set(syncedCourses.map((c) => (c.code || '').toUpperCase()));
 
+      const localRemaining = currentCourses.filter((c) => {
+        const isRecentOffline = (c as any)._localCreatedAt && Date.now() - (c as any)._localCreatedAt < 30000;
+        return isRecentOffline && !supaIds.has(c.id) && !supaCodes.has((c.code || '').toUpperCase()) && !isDummyCourse(c);
+      });
+
+      const combined = [...syncedCourses, ...localRemaining];
+
+      // Strict uniqueness guarantee by code and id
+      const uniqueMap = new Map<string, CourseClass>();
+      combined.forEach((c) => {
+        const codeKey = (c.code || '').trim().toUpperCase();
+        const idKey = c.id;
+        const existing = uniqueMap.get(codeKey) || uniqueMap.get(idKey);
+        if (!existing) {
+          uniqueMap.set(codeKey, c);
+          uniqueMap.set(idKey, c);
+        } else {
+          const existingIsPending = !!existing.pendingLecturerEmail;
+          const cIsPending = !!c.pendingLecturerEmail;
+          const chosen = (existingIsPending && !cIsPending) ? c : existing;
+          const other = (chosen === c) ? existing : c;
+
+          const mergedEmails = Array.from(new Set([
+            ...(chosen.enrolledStudentEmails || []),
+            ...(other.enrolledStudentEmails || []),
+          ]));
+          chosen.enrolledStudentEmails = mergedEmails;
+          chosen.enrolledCount = mergedEmails.length;
+
+          uniqueMap.set(codeKey, chosen);
+          uniqueMap.set(idKey, chosen);
+        }
+      });
+
+      const prunedCourses = Array.from(new Set(uniqueMap.values()));
       setStorage(STORAGE_KEYS.COURSES, prunedCourses);
       return {
         success: true,
-        count: syncedCourses.length,
-        message: `Berhasil menyelaraskan ${syncedCourses.length} mata kuliah dari Supabase My Journey!`,
+        count: prunedCourses.length,
+        message: `Berhasil menyelaraskan ${prunedCourses.length} mata kuliah dari Supabase My Journey!`,
       };
     } catch (err: any) {
       return { success: false, count: 0, message: `Gagal menyinkronkan Supabase: ${err.message}` };
@@ -2233,7 +2324,40 @@ export const studentService = {
     if (updatedNeeded) {
       setStorage(STORAGE_KEYS.COURSES, synced);
     }
-    return synced;
+
+    // Deduplicate synced courses by course code and id
+    const uniqueMap = new Map<string, CourseClass>();
+    synced.forEach((c) => {
+      const codeKey = (c.code || '').trim().toUpperCase();
+      const idKey = c.id;
+      const existing = uniqueMap.get(codeKey) || uniqueMap.get(idKey);
+      if (!existing) {
+        uniqueMap.set(codeKey, c);
+        uniqueMap.set(idKey, c);
+      } else {
+        const existingIsPending = !!existing.pendingLecturerEmail;
+        const cIsPending = !!c.pendingLecturerEmail;
+        const chosen = (existingIsPending && !cIsPending) ? c : existing;
+        const other = (chosen === c) ? existing : c;
+
+        const mergedEmails = Array.from(new Set([
+          ...(chosen.enrolledStudentEmails || []),
+          ...(other.enrolledStudentEmails || []),
+        ]));
+        chosen.enrolledStudentEmails = mergedEmails;
+        chosen.enrolledCount = mergedEmails.length;
+
+        uniqueMap.set(codeKey, chosen);
+        uniqueMap.set(idKey, chosen);
+        updatedNeeded = true;
+      }
+    });
+
+    const finalUnique = Array.from(new Set(uniqueMap.values()));
+    if (updatedNeeded || finalUnique.length !== courses.length) {
+      setStorage(STORAGE_KEYS.COURSES, finalUnique);
+    }
+    return finalUnique;
   },
 
   getCourseRps(courseId: string): CourseRps | undefined {
@@ -2418,6 +2542,8 @@ export const studentService = {
     // Save to Supabase Cloud & trigger Google Sheets push
     supabaseDataService.saveStudent(studentRecord).catch(() => {});
     supabaseDataService.saveCourse(updatedCourse).catch(() => {});
+    supabaseDataService.broadcastChange('student_updated', { student: studentRecord, course: updatedCourse });
+    supabaseDataService.broadcastChange('course_updated', updatedCourse);
     myJourneySyncService.triggerDebouncedAutoSync();
 
     this.addActivity({
@@ -2449,10 +2575,17 @@ export const studentService = {
   }): CourseClass {
     const courses = this.getAllCourses();
     const currentLecturer = this.getCurrentUser() || defaultLecturerUser;
-    const newCourseId = `course_${Date.now()}`;
     const cleanCode = data.code.toUpperCase().trim();
     const cleanTitle = data.title.trim();
     const invitedEmail = data.invitedLecturerEmail?.trim().toLowerCase();
+
+    // Hindari duplikasi jika kode matkul sudah ada
+    const existingIdx = courses.findIndex(
+      (c) => c.code.toUpperCase() === cleanCode
+    );
+    const newCourseId = existingIdx >= 0
+      ? courses[existingIdx].id
+      : `course_${cleanCode.replace(/[^A-Z0-9]/g, '_')}`;
 
     const newCourse: CourseClass = {
       id: newCourseId,
@@ -2477,13 +2610,13 @@ export const studentService = {
       totalMeetings: 16,
       completedMeetings: 0,
       colorScheme: 'blue',
-      enrolledStudentEmails: [],
+      enrolledStudentEmails: existingIdx >= 0 ? (courses[existingIdx].enrolledStudentEmails || []) : [],
     };
 
     if (invitedEmail) {
       const isMiftah = invitedEmail.includes('miftah');
       const partnerUser = DEFAULT_LECTURERS[invitedEmail] || this.getRegisteredLecturers().find((l) => l.email.toLowerCase() === invitedEmail) || (isMiftah ? DEFAULT_LECTURERS['miftahurridlo.688@gmail.com'] : DEFAULT_LECTURERS['altaf.aziz16@gmail.com']);
-      const partnerName = partnerUser?.name || (isMiftah ? 'Muhammad Miftahurrodlo, S.Pd., M.Sc' : 'Tengku Abdillah Azis, S.Pd');
+      const partnerName = partnerUser?.name || (isMiftah ? 'Muhammad Miftahurrodlo, M.Sc.' : 'Tengku Abdillah Azis, S.Si');
 
       // Set status PENDING: Rekan dosen baru resmi menjadi secondaryTeacher setelah menerima undangan
       newCourse.pendingLecturerEmail = invitedEmail.toLowerCase();
@@ -2493,25 +2626,36 @@ export const studentService = {
       newCourse.teamTeachers = [newCourse.teacher];
     }
 
-    // Auto generate 16 meetings for OBE matrix
+    // Auto generate 16 meetings for OBE matrix if new course
     const allMeetings = this.getMeetings();
-    const newMeetings: Meeting[] = Array.from({ length: 16 }, (_, i) => ({
-      id: `mtg_${newCourseId}_${i + 1}`,
-      courseId: newCourseId,
-      meetingNumber: i + 1,
-      title: `Pertemuan 0${i + 1}: ${i === 0 ? 'Kontrak Kuliah & Pengantar' : i === 7 ? 'Evaluasi Tengah Semester (UTS)' : i === 15 ? 'Presentasi Proyek Akhir (UAS)' : `Modul ${i + 1} Perkuliahan`}`,
-      topic: `Pembahasan materi dan studi kasus perkuliahan pertemuan ke-${i + 1}.`,
-      date: `2026-09-${String(Math.min(30, 1 + i * 7)).padStart(2, '0')}`,
-      startTime: data.scheduleTime?.split('-')[0]?.trim() || '08:00',
-      endTime: data.scheduleTime?.split('-')[1]?.trim() || '10:30',
-      room: data.room || 'Lab Komputasi Spasial',
-      isCompleted: false,
-      materials: [],
-      assignments: [],
-    }));
+    const existingMeetings = allMeetings.filter((m) => m.courseId === newCourseId);
+    if (existingMeetings.length === 0) {
+      const newMeetings: Meeting[] = Array.from({ length: 16 }, (_, i) => ({
+        id: `mtg_${newCourseId}_${i + 1}`,
+        courseId: newCourseId,
+        meetingNumber: i + 1,
+        title: `Pertemuan 0${i + 1}: ${i === 0 ? 'Kontrak Kuliah & Pengantar' : i === 7 ? 'Evaluasi Tengah Semester (UTS)' : i === 15 ? 'Presentasi Proyek Akhir (UAS)' : `Modul ${i + 1} Perkuliahan`}`,
+        topic: `Pembahasan materi dan studi kasus perkuliahan pertemuan ke-${i + 1}.`,
+        date: `2026-09-${String(Math.min(30, 1 + i * 7)).padStart(2, '0')}`,
+        startTime: data.scheduleTime?.split('-')[0]?.trim() || '08:00',
+        endTime: data.scheduleTime?.split('-')[1]?.trim() || '10:30',
+        room: data.room || 'Lab Komputasi Spasial',
+        isCompleted: false,
+        materials: [],
+        assignments: [],
+      }));
+      setStorage(STORAGE_KEYS.MEETINGS, [...allMeetings, ...newMeetings]);
+    }
 
-    setStorage(STORAGE_KEYS.COURSES, [...courses, newCourse]);
-    setStorage(STORAGE_KEYS.MEETINGS, [...allMeetings, ...newMeetings]);
+    if (existingIdx >= 0) {
+      courses[existingIdx] = {
+        ...courses[existingIdx],
+        ...newCourse,
+      };
+      setStorage(STORAGE_KEYS.COURSES, courses);
+    } else {
+      setStorage(STORAGE_KEYS.COURSES, [...courses, newCourse]);
+    }
 
     // Kirim undangan ke rekan dosen jika email diisi
     if (invitedEmail) {
@@ -2525,8 +2669,9 @@ export const studentService = {
       });
     }
 
-    // Kirim sinkronisasi ke Supabase Cloud (My Journey Unified DB) & Google Sheets
+    // Kirim sinkronisasi ke Supabase Cloud & Broadcast ke rekan dosen secara instan (< 300ms)
     supabaseDataService.saveCourse(newCourse).catch(() => {});
+    supabaseDataService.broadcastChange('course_updated', newCourse);
     myJourneySyncService.triggerDebouncedAutoSync();
 
     this.addActivity({
@@ -2667,6 +2812,7 @@ export const studentService = {
     setStorage(STORAGE_KEYS.COURSES, courses);
 
     supabaseDataService.saveCourse(updatedCourse).catch(() => {});
+    supabaseDataService.broadcastChange('course_updated', updatedCourse);
     myJourneySyncService.triggerDebouncedAutoSync();
 
     this.addActivity({
@@ -2769,6 +2915,8 @@ export const studentService = {
     });
 
     supabaseDataService.saveCourse(updatedCourse).catch(() => {});
+    supabaseDataService.broadcastChange('course_updated', updatedCourse);
+    myJourneySyncService.triggerDebouncedAutoSync();
 
     this.addActivity({
       title: 'Undangan Tim Dosen Dikirim',
@@ -2821,6 +2969,7 @@ export const studentService = {
     setStorage(STORAGE_KEYS.COURSES, courses);
 
     supabaseDataService.saveCourse(updatedCourse).catch(() => {});
+    supabaseDataService.broadcastChange('course_updated', updatedCourse);
     myJourneySyncService.triggerDebouncedAutoSync();
 
     // Perbarui notifikasi terkait
@@ -2995,14 +3144,106 @@ export const studentService = {
     const meetings = this.getMeetings().filter((m) => m.courseId !== courseId);
     setStorage(STORAGE_KEYS.MEETINGS, meetings);
 
-    // Kirim delete ke Supabase Cloud (My Journey Unified DB)
+    // Kirim delete ke Supabase Cloud (My Journey Unified DB) & Broadcast ke seluruh browser
     supabaseDataService.deleteCourse(courseId).catch(() => {});
+    supabaseDataService.broadcastChange('course_deleted', { courseId });
 
     // Kirim delete ke Google Sheets
     myJourneySyncService.deleteCourseFromGoogleSheets(courseId).catch(() => {});
 
     // Perbarui daftar teaching di Google Sheets
     myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
+  },
+
+  /**
+   * Menangani pembaruan course realtime instan dari browser rekan dosen (< 300ms)
+   */
+  applyRealtimeCourseUpdate(payload: any): void {
+    if (!payload) return;
+    if (payload.type === 'delete' && payload.courseId) {
+      const deletedIds = getStorage<string[]>('slh_deleted_course_ids', []);
+      if (!deletedIds.includes(payload.courseId)) {
+        deletedIds.push(payload.courseId);
+        setStorage('slh_deleted_course_ids', deletedIds);
+      }
+      const courses = this.getAllCourses().filter(
+        (c) => c.id !== payload.courseId && c.code.toUpperCase() !== payload.courseId.toUpperCase()
+      );
+      setStorage(STORAGE_KEYS.COURSES, courses);
+      return;
+    }
+
+    if (payload.id && payload.code) {
+      const incoming = payload as CourseClass;
+      const courses = this.getAllCourses();
+      const codeKey = (incoming.code || '').trim().toUpperCase();
+      const idKey = incoming.id;
+
+      const idx = courses.findIndex(
+        (c) => c.id === idKey || (c.code && c.code.toUpperCase() === codeKey)
+      );
+
+      if (idx >= 0) {
+        courses[idx] = {
+          ...courses[idx],
+          ...incoming,
+          enrolledStudentEmails: Array.from(new Set([
+            ...(courses[idx].enrolledStudentEmails || []),
+            ...(incoming.enrolledStudentEmails || []),
+          ])),
+        };
+      } else {
+        courses.push(incoming);
+      }
+
+      setStorage(STORAGE_KEYS.COURSES, courses);
+
+      // Pastikan notifikasi undangan masuk secara instan jika ditujukan untuk currentUser
+      const currentUser = this.getCurrentUser();
+      const myEmail = (currentUser?.email || '').toLowerCase().trim();
+      if (
+        myEmail &&
+        incoming.pendingLecturerEmail &&
+        incoming.pendingLecturerEmail.toLowerCase().trim() === myEmail
+      ) {
+        this.sendCourseInvitationNotification({
+          courseId: incoming.id,
+          courseCode: incoming.code,
+          courseTitle: incoming.title,
+          inviterName: incoming.teacher?.name || 'Rekan Dosen',
+          inviterEmail: incoming.teacher?.email || '',
+          invitedEmail: myEmail,
+        });
+      }
+    }
+  },
+
+  /**
+   * Menangani pembaruan student realtime instan dari browser rekan dosen (< 300ms)
+   */
+  applyRealtimeStudentUpdate(payload: any): void {
+    if (!payload) return;
+    if (payload.student) {
+      const masterStudents = this.getMasterStudents();
+      const cleanEmail = (payload.student.email || '').toLowerCase().trim();
+      const idx = masterStudents.findIndex((m) => m.email.toLowerCase() === cleanEmail);
+      if (idx >= 0) {
+        masterStudents[idx] = {
+          ...masterStudents[idx],
+          ...payload.student,
+          enrolledCourseCodes: Array.from(new Set([
+            ...(masterStudents[idx].enrolledCourseCodes || []),
+            ...(payload.student.enrolledCourseCodes || []),
+          ])),
+        };
+      } else {
+        masterStudents.push(payload.student);
+      }
+      setStorage(STORAGE_KEYS.MASTER_STUDENTS, masterStudents);
+    }
+    if (payload.course) {
+      this.applyRealtimeCourseUpdate(payload.course);
+    }
   },
 
   // Lecturer Action: Register Student with Details and enroll to course
@@ -3071,6 +3312,7 @@ export const studentService = {
     }
 
     supabaseDataService.saveCourse(updatedCourse).catch(() => {});
+    supabaseDataService.broadcastChange('course_updated', updatedCourse);
     myJourneySyncService.triggerDebouncedAutoSync();
 
     return {
