@@ -132,6 +132,7 @@ export const supabaseDataService = {
           partnerLecturerEmail: course.secondaryTeacher?.email || '',
           pendingLecturerEmail: course.pendingLecturerEmail || null,
           pendingLecturerName: course.pendingLecturerName || null,
+          deletionRequest: course.deletionRequest || null,
           color: course.color || 'blue',
           category: course.category || 'Geografi & Komputasi',
         },
@@ -150,11 +151,14 @@ export const supabaseDataService = {
     }
   },
 
-  async deleteCourse(courseId: string): Promise<boolean> {
+  async deleteCourse(courseId: string, courseCode?: string): Promise<boolean> {
     if (!isSupabaseConfigured() || !supabase || !courseId) return false;
     try {
-      const { error } = await supabase.from('courses').delete().eq('id', courseId);
-      return !error;
+      await supabase.from('courses').delete().eq('id', courseId);
+      if (courseCode) {
+        await supabase.from('courses').delete().filter('data->>code', 'ilike', courseCode);
+      }
+      return true;
     } catch {
       return false;
     }

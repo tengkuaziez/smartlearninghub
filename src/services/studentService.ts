@@ -1194,10 +1194,22 @@ export const studentService = {
       }
 
       const currentCourses = this.getAllCourses();
+      const deletedIds = getStorage<string[]>('slh_deleted_course_ids', []);
+
+      // Filter out courses that were explicitly deleted so they never resurrect from Supabase
+      const activeRows = data.filter((row) => {
+        const d = row.data || {};
+        const code = String(d.code || '').trim().toUpperCase();
+        const id = String(row.id || d.id || '').trim();
+        if (deletedIds.includes(id) || (code && deletedIds.includes(code))) {
+          return false;
+        }
+        return true;
+      });
 
       // Deduplicate rows from Supabase (prevent multi-user duplicate rows for same course)
       const groups = new Map<string, any[]>();
-      data.forEach((row) => {
+      activeRows.forEach((row) => {
         const d = row.data || {};
         const code = String(d.code || '').trim().toUpperCase();
         const id = String(row.id || d.id || '').trim();
@@ -1252,6 +1264,12 @@ export const studentService = {
           latest.data.pendingLecturerName = null;
         }
 
+        // Check if ANY row has active deletion request
+        const delReqRow = rows.find((r) => r.data?.deletionRequest?.status === 'pending');
+        if (delReqRow) {
+          latest.data.deletionRequest = delReqRow.data.deletionRequest;
+        }
+
         deduplicatedRows.push(latest);
       });
 
@@ -1268,18 +1286,33 @@ export const studentService = {
         const primaryUser = DEFAULT_LECTURERS[primaryEmail];
         const partnerUser = DEFAULT_LECTURERS[partnerEmail];
 
-        // Check pending invitation status
-        const rawPartnerStr = String(d.partnerLecturer || existing?.partnerLecturer || '').trim();
+        // Check pending invitation status with strict cloud authority (never revive stale pending from existing!)
+        const rawPartnerStr = String(d.partnerLecturer || '').trim();
         const isPendingFromStr = rawPartnerStr.startsWith('PENDING:');
-        const pendingEmail = (d.pendingLecturerEmail || (isPendingFromStr ? rawPartnerStr.replace('PENDING:', '').trim() : '') || existing?.pendingLecturerEmail || '').trim().toLowerCase();
-        const pendingName = d.pendingLecturerName || existing?.pendingLecturerName || (pendingEmail ? partnerUser.name : undefined);
+        const hasExplicitPending = !!d.pendingLecturerEmail && d.pendingLecturerEmail !== 'null' && d.pendingLecturerEmail !== 'undefined';
+        
+        let pendingEmail: string | undefined = undefined;
+        let pendingName: string | undefined = undefined;
+
+        if (hasExplicitPending) {
+          pendingEmail = String(d.pendingLecturerEmail).trim().toLowerCase();
+          pendingName = d.pendingLecturerName || (pendingEmail ? partnerUser.name : undefined);
+        } else if (isPendingFromStr) {
+          pendingEmail = rawPartnerStr.replace('PENDING:', '').trim().toLowerCase();
+          pendingName = d.pendingLecturerName || (pendingEmail ? partnerUser.name : undefined);
+        }
 
         const hasPendingInvitation = !!pendingEmail;
         const hasAcceptedPartner = !hasPendingInvitation && (
           (rawPartnerStr && rawPartnerStr !== '-' && !isPendingFromStr) ||
-          !!existing?.secondaryTeacher ||
-          !!d.secondaryTeacherEmail
+          !!d.partnerLecturerEmail ||
+          !!d.secondaryTeacherEmail ||
+          (!!existing?.secondaryTeacher && !hasPendingInvitation)
         );
+
+        const deletionReq = d.deletionRequest && d.deletionRequest.status === 'pending'
+          ? d.deletionRequest
+          : (existing?.deletionRequest && existing.deletionRequest.status === 'pending' ? existing.deletionRequest : undefined);
 
         return {
           id: row.id,
@@ -1353,6 +1386,7 @@ export const studentService = {
           totalMeetings: 16,
           completedMeetings: existing?.completedMeetings || 0,
           colorScheme: existing?.colorScheme || 'blue',
+          deletionRequest: deletionReq,
         };
       });
 
@@ -2400,6 +2434,12 @@ export const studentService = {
 
   getEnrolledCourses(studentEmail?: string): CourseClass[] {
     const courses = this.getAllCourses();
+    const deletedIds = getStorage<string[]>('slh_deleted_course_ids', []);
+    const activeCourses = courses.filter((c) => 
+      !deletedIds.includes(c.id) && 
+      (!c.code || !deletedIds.includes(c.code.toUpperCase()))
+    );
+
     const user = this.getCurrentUser();
     if (!user && !studentEmail) {
       return [];
@@ -2409,7 +2449,7 @@ export const studentService = {
     // If querying as lecturer for lecturer's own portal: return courses where lecturer is creator OR accepted partner
     const isLecturerSelfQuery = user?.role === 'dosen' && (!studentEmail || studentEmail.toLowerCase().trim() === user.email.toLowerCase().trim());
     if (isLecturerSelfQuery) {
-      return courses.filter((c) => {
+      return activeCourses.filter((c) => {
         const primary = (c.teacher?.email || '').toLowerCase().trim();
         const secondary = (c.secondaryTeacher?.email || '').toLowerCase().trim();
         const pending = (c.pendingLecturerEmail || '').toLowerCase().trim();
@@ -2444,7 +2484,7 @@ export const studentService = {
     );
 
     let modified = false;
-    const enrolled = courses.filter((c) => {
+    const enrolled = activeCourses.filter((c) => {
       const inWhitelist = (c.enrolledStudentEmails || [])
         .map((e) => e.toLowerCase().trim())
         .includes(emailToFilter);
@@ -2583,13 +2623,19 @@ export const studentService = {
     const cleanTitle = data.title.trim();
     const invitedEmail = data.invitedLecturerEmail?.trim().toLowerCase();
 
+    // Pastikan kode matkul ini dibersihkan dari daftar terhapus jika sebelumnya pernah ada kelas dengan kode sama
+    const deletedIds = getStorage<string[]>('slh_deleted_course_ids', []);
+    if (deletedIds.includes(cleanCode) || deletedIds.includes(cleanCode.toLowerCase())) {
+      setStorage('slh_deleted_course_ids', deletedIds.filter((id) => id.toUpperCase() !== cleanCode));
+    }
+
     // Hindari duplikasi jika kode matkul sudah ada
     const existingIdx = courses.findIndex(
       (c) => c.code.toUpperCase() === cleanCode
     );
     const newCourseId = existingIdx >= 0
       ? courses[existingIdx].id
-      : `course_${cleanCode.replace(/[^A-Z0-9]/g, '_')}`;
+      : `course_${cleanCode.replace(/[^A-Z0-9]/g, '_')}_${Date.now().toString(36)}`;
 
     const newCourse: CourseClass = {
       id: newCourseId,
@@ -2614,7 +2660,8 @@ export const studentService = {
       totalMeetings: 16,
       completedMeetings: 0,
       colorScheme: 'blue',
-      enrolledStudentEmails: existingIdx >= 0 ? (courses[existingIdx].enrolledStudentEmails || []) : [],
+      // Kelas baru wajib dimulai dengan daftar mahasiswa KOSONG (mencegah bocornya mahasiswa dari kelas lain)
+      enrolledStudentEmails: [],
     };
 
     if (invitedEmail) {
@@ -3137,26 +3184,197 @@ export const studentService = {
 
   // Lecturer Action: Delete Course (Sinkronisasi 2 Arah: Lokal, Supabase & Google Sheets)
   deleteCourse(courseId: string): void {
-    // Catat ID yang dihapus agar tidak pernah ter-restore saat sync cloud berikutnya
-    const deletedIds = getStorage<string[]>('slh_deleted_course_ids', []);
-    if (!deletedIds.includes(courseId)) {
-      setStorage('slh_deleted_course_ids', [...deletedIds, courseId]);
-    }
+    const target = this.getCourseById(courseId) || this.getAllCourses().find(c => c.id === courseId || c.code.toUpperCase() === courseId.toUpperCase());
+    const courseCode = target?.code;
 
-    const courses = this.getAllCourses().filter((c) => c.id !== courseId);
+    // Catat ID dan code yang dihapus agar tidak pernah ter-restore saat sync cloud berikutnya
+    const deletedIds = getStorage<string[]>('slh_deleted_course_ids', []);
+    const toAdd = [courseId];
+    if (courseCode) {
+      toAdd.push(courseCode);
+      toAdd.push(courseCode.toUpperCase());
+      toAdd.push(courseCode.toLowerCase());
+    }
+    toAdd.forEach((id) => {
+      if (!deletedIds.includes(id)) deletedIds.push(id);
+    });
+    setStorage('slh_deleted_course_ids', deletedIds);
+
+    const courses = this.getAllCourses().filter((c) => 
+      c.id !== courseId && 
+      (!courseCode || c.code.toUpperCase() !== courseCode.toUpperCase())
+    );
     setStorage(STORAGE_KEYS.COURSES, courses);
+
     const meetings = this.getMeetings().filter((m) => m.courseId !== courseId);
     setStorage(STORAGE_KEYS.MEETINGS, meetings);
 
+    const assignments = getStorage<Assignment[]>(STORAGE_KEYS.ASSIGNMENTS, []).filter(a => a.courseId !== courseId);
+    setStorage(STORAGE_KEYS.ASSIGNMENTS, assignments);
+
+    const submissions = getStorage<AssignmentSubmission[]>(STORAGE_KEYS.SUBMISSIONS, []).filter(s => s.courseId !== courseId);
+    setStorage(STORAGE_KEYS.SUBMISSIONS, submissions);
+
+    const attendanceSessions = getStorage<AttendanceSession[]>(STORAGE_KEYS.ATTENDANCE_SESSIONS, []).filter(s => s.courseId !== courseId);
+    setStorage(STORAGE_KEYS.ATTENDANCE_SESSIONS, attendanceSessions);
+
+    const attendanceRecords = getStorage<AttendanceRecord[]>(STORAGE_KEYS.ATTENDANCE_RECORDS, []).filter(r => r.courseId !== courseId);
+    setStorage(STORAGE_KEYS.ATTENDANCE_RECORDS, attendanceRecords);
+
+    const announcements = getStorage<Announcement[]>(STORAGE_KEYS.ANNOUNCEMENTS, []).filter(a => a.courseId !== courseId);
+    setStorage(STORAGE_KEYS.ANNOUNCEMENTS, announcements);
+
+    // Bersihkan dari masterStudents (database mahasiswa terdaftar)
+    const masterStudents = getStorage<MasterStudent[]>(STORAGE_KEYS.MASTER_STUDENTS, []);
+    let stdModified = false;
+    const updatedStudents = masterStudents.map((std) => {
+      const origCodes = std.enrolledCourseCodes || [];
+      const newCodes = origCodes.filter((c) => 
+        c !== courseId && 
+        (!courseCode || c.toUpperCase() !== courseCode.toUpperCase())
+      );
+      if (newCodes.length !== origCodes.length) {
+        stdModified = true;
+        return { ...std, enrolledCourseCodes: newCodes };
+      }
+      return std;
+    });
+    if (stdModified) {
+      setStorage(STORAGE_KEYS.MASTER_STUDENTS, updatedStudents);
+      updatedStudents.forEach((s) => {
+        supabaseDataService.saveStudent(s).catch(() => {});
+      });
+    }
+
+    // Bersihkan custom roster
+    const customRoster = getStorage<Record<string, any>>(STORAGE_KEYS.CUSTOM_ROSTER, {});
+    if (customRoster[courseId] || (courseCode && customRoster[courseCode])) {
+      delete customRoster[courseId];
+      if (courseCode) delete customRoster[courseCode];
+      setStorage(STORAGE_KEYS.CUSTOM_ROSTER, customRoster);
+    }
+
     // Kirim delete ke Supabase Cloud (My Journey Unified DB) & Broadcast ke seluruh browser
-    supabaseDataService.deleteCourse(courseId).catch(() => {});
-    supabaseDataService.broadcastChange('course_deleted', { courseId });
+    supabaseDataService.deleteCourse(courseId, courseCode).catch(() => {});
+    supabaseDataService.broadcastChange('course_deleted', { courseId, courseCode });
 
     // Kirim delete ke Google Sheets
     myJourneySyncService.deleteCourseFromGoogleSheets(courseId).catch(() => {});
-
-    // Perbarui daftar teaching di Google Sheets
     myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
+  },
+
+  // Collaborative Course Deletion: Pengajuan Persetujuan Penghapusan Bersama
+  requestCourseDeletion(courseId: string): { success: boolean; message: string; requiresApproval: boolean } {
+    const course = this.getCourseById(courseId) || this.getAllCourses().find(c => c.id === courseId);
+    if (!course) return { success: false, message: 'Kelas tidak ditemukan.', requiresApproval: false };
+
+    const currentUser = this.getCurrentUser() || defaultLecturerUser;
+    const hasActivePartner = !!course.secondaryTeacher?.email && !course.pendingLecturerEmail;
+
+    if (!hasActivePartner) {
+      // Kelas solo/belum ada partner resmi: bisa langsung dihapus
+      this.deleteCourse(courseId);
+      return { success: true, message: `Kelas "${course.title}" berhasil dihapus permanen.`, requiresApproval: false };
+    }
+
+    // Kelas kolaborasi: buat pengajuan penghapusan
+    const updatedCourse: CourseClass = {
+      ...course,
+      deletionRequest: {
+        requestedBy: currentUser.email,
+        requestedByName: currentUser.name,
+        requestedAt: new Date().toISOString(),
+        status: 'pending',
+      },
+    };
+
+    const courses = this.getAllCourses().map(c => c.id === courseId ? updatedCourse : c);
+    setStorage(STORAGE_KEYS.COURSES, courses);
+
+    supabaseDataService.saveCourse(updatedCourse).catch(() => {});
+    supabaseDataService.broadcastChange('course_updated', updatedCourse);
+
+    const partnerEmail = (currentUser.email.toLowerCase() === (course.teacher?.email || '').toLowerCase())
+      ? course.secondaryTeacher?.email
+      : course.teacher?.email;
+
+    if (partnerEmail) {
+      const notifs = getStorage<StudentNotification[]>(STORAGE_KEYS.NOTIFICATIONS, initialNotifications);
+      notifs.unshift({
+        id: `notif_del_${courseId}_${Date.now()}`,
+        title: 'Pengajuan Penghapusan Kelas Kolaborasi',
+        message: `${this.formatLecturerGreeting(currentUser.name)} mengajukan penghapusan kelas bersama "${course.code} - ${course.title}". Konfirmasi persetujuan Anda diperlukan.`,
+        timestamp: 'Baru Saja',
+        type: 'invitation',
+        isRead: false,
+        recipientEmail: partnerEmail.toLowerCase(),
+        linkTab: 'kelas',
+        linkId: courseId,
+      });
+      setStorage(STORAGE_KEYS.NOTIFICATIONS, notifs);
+    }
+
+    return {
+      success: true,
+      message: `Permohonan penghapusan kelas telah dikirimkan ke rekan dosen Anda. Kelas akan dihapus permanen setelah rekan dosen menyetujui.`,
+      requiresApproval: true,
+    };
+  },
+
+  cancelCourseDeletionRequest(courseId: string): { success: boolean; message: string } {
+    const course = this.getCourseById(courseId) || this.getAllCourses().find(c => c.id === courseId);
+    if (!course) return { success: false, message: 'Kelas tidak ditemukan.' };
+
+    const updatedCourse: CourseClass = { ...course };
+    delete updatedCourse.deletionRequest;
+
+    const courses = this.getAllCourses().map(c => c.id === courseId ? updatedCourse : c);
+    setStorage(STORAGE_KEYS.COURSES, courses);
+
+    supabaseDataService.saveCourse(updatedCourse).catch(() => {});
+    supabaseDataService.broadcastChange('course_updated', updatedCourse);
+
+    return { success: true, message: 'Pengajuan penghapusan kelas berhasil dibatalkan.' };
+  },
+
+  respondToCourseDeletion(courseId: string, approve: boolean): { success: boolean; message: string } {
+    const course = this.getCourseById(courseId) || this.getAllCourses().find(c => c.id === courseId);
+    if (!course) return { success: false, message: 'Kelas tidak ditemukan.' };
+
+    const currentUser = this.getCurrentUser() || defaultLecturerUser;
+
+    if (approve) {
+      this.deleteCourse(courseId);
+      return { success: true, message: `Penghapusan kelas "${course.title}" telah disetujui dan dihapus permanen.` };
+    } else {
+      const requesterEmail = course.deletionRequest?.requestedBy;
+      const updatedCourse: CourseClass = { ...course };
+      delete updatedCourse.deletionRequest;
+
+      const courses = this.getAllCourses().map(c => c.id === courseId ? updatedCourse : c);
+      setStorage(STORAGE_KEYS.COURSES, courses);
+
+      supabaseDataService.saveCourse(updatedCourse).catch(() => {});
+      supabaseDataService.broadcastChange('course_updated', updatedCourse);
+
+      if (requesterEmail) {
+        const notifs = getStorage<StudentNotification[]>(STORAGE_KEYS.NOTIFICATIONS, initialNotifications);
+        notifs.unshift({
+          id: `notif_del_rej_${courseId}_${Date.now()}`,
+          title: 'Pengajuan Penghapusan Ditolak',
+          message: `${this.formatLecturerGreeting(currentUser.name)} menolak pengajuan penghapusan kelas "${course.code} - ${course.title}". Kelas tetap aktif.`,
+          timestamp: 'Baru Saja',
+          type: 'announcement',
+          isRead: false,
+          recipientEmail: requesterEmail.toLowerCase(),
+          linkTab: 'kelas',
+          linkId: courseId,
+        });
+        setStorage(STORAGE_KEYS.NOTIFICATIONS, notifs);
+      }
+
+      return { success: true, message: 'Pengajuan penghapusan kelas ditolak. Kelas tetap aktif.' };
+    }
   },
 
   /**
@@ -3164,16 +3382,28 @@ export const studentService = {
    */
   applyRealtimeCourseUpdate(payload: any): void {
     if (!payload) return;
-    if (payload.type === 'delete' && payload.courseId) {
+    if (payload.type === 'delete' || payload.type === 'course_deleted') {
+      const cId = payload.courseId || payload.id;
+      const cCode = (payload.courseCode || payload.code || '').trim().toUpperCase();
       const deletedIds = getStorage<string[]>('slh_deleted_course_ids', []);
-      if (!deletedIds.includes(payload.courseId)) {
-        deletedIds.push(payload.courseId);
-        setStorage('slh_deleted_course_ids', deletedIds);
-      }
+      if (cId && !deletedIds.includes(cId)) deletedIds.push(cId);
+      if (cCode && !deletedIds.includes(cCode)) deletedIds.push(cCode);
+      setStorage('slh_deleted_course_ids', deletedIds);
+
       const courses = this.getAllCourses().filter(
-        (c) => c.id !== payload.courseId && c.code.toUpperCase() !== payload.courseId.toUpperCase()
+        (c) => c.id !== cId && (!cCode || c.code.toUpperCase() !== cCode)
       );
       setStorage(STORAGE_KEYS.COURSES, courses);
+
+      // Clean masterStudents
+      const masterStudents = getStorage<MasterStudent[]>(STORAGE_KEYS.MASTER_STUDENTS, []);
+      const updatedStudents = masterStudents.map((std) => ({
+        ...std,
+        enrolledCourseCodes: (std.enrolledCourseCodes || []).filter(
+          (c) => c !== cId && (!cCode || c.toUpperCase() !== cCode)
+        ),
+      }));
+      setStorage(STORAGE_KEYS.MASTER_STUDENTS, updatedStudents);
       return;
     }
 
@@ -3187,15 +3417,25 @@ export const studentService = {
         (c) => c.id === idKey || (c.code && c.code.toUpperCase() === codeKey)
       );
 
+      const isAccepted = !!incoming.secondaryTeacher || (incoming.partnerLecturer && !incoming.partnerLecturer.startsWith('PENDING:'));
+
       if (idx >= 0) {
-        courses[idx] = {
+        const merged: CourseClass = {
           ...courses[idx],
           ...incoming,
+          deletionRequest: incoming.deletionRequest || undefined,
+          pendingLecturerEmail: isAccepted ? undefined : (incoming.pendingLecturerEmail ?? courses[idx].pendingLecturerEmail),
+          pendingLecturerName: isAccepted ? undefined : (incoming.pendingLecturerName ?? courses[idx].pendingLecturerName),
           enrolledStudentEmails: Array.from(new Set([
             ...(courses[idx].enrolledStudentEmails || []),
             ...(incoming.enrolledStudentEmails || []),
           ])),
         };
+        if (isAccepted) {
+          delete merged.pendingLecturerEmail;
+          delete merged.pendingLecturerName;
+        }
+        courses[idx] = merged;
       } else {
         courses.push(incoming);
       }
@@ -3334,25 +3574,34 @@ export const studentService = {
     registeredAt?: string;
   }> {
     const courses = this.getAllCourses();
+    const deletedIds = getStorage<string[]>('slh_deleted_course_ids', []);
+    const activeCourses = courses.filter((c) => 
+      !deletedIds.includes(c.id) && 
+      (!c.code || !deletedIds.includes(c.code.toUpperCase()))
+    );
     const masterStudents = this.getMasterStudents();
     const customRoster = getStorage<Record<string, any>>(STORAGE_KEYS.CUSTOM_ROSTER, {});
     const studentsMap = new Map<string, { email: string; name: string; nim: string; enrolledCourseCodes: string[]; registeredAt?: string }>();
 
-    // 1. Seed from Master Students database
+    // 1. Seed from Master Students database (excluding deleted course codes)
     masterStudents.forEach((ms) => {
       const clean = ms.email.toLowerCase().trim();
       if (!clean) return;
+      const validCodes = (ms.enrolledCourseCodes || []).filter((code) => 
+        !deletedIds.includes(code) && 
+        !deletedIds.includes(code.toUpperCase())
+      );
       studentsMap.set(clean, {
         email: clean,
         name: ms.name,
         nim: ms.nim,
-        enrolledCourseCodes: [...(ms.enrolledCourseCodes || [])],
+        enrolledCourseCodes: validCodes,
       });
     });
 
-    // 2. Augment from courses enrolledStudentEmails
+    // 2. Augment from active courses enrolledStudentEmails
     let coursesModified = false;
-    courses.forEach((course) => {
+    activeCourses.forEach((course) => {
       (course.enrolledStudentEmails || []).forEach((email) => {
         const clean = email.toLowerCase().trim();
         const info = customRoster[clean] || getStudentRosterInfo(clean);
@@ -3373,9 +3622,9 @@ export const studentService = {
       });
     });
 
-    // 3. Self-heal courses enrolledStudentEmails from studentsMap
+    // 3. Self-heal active courses enrolledStudentEmails from studentsMap
     studentsMap.forEach((std) => {
-      courses.forEach((course) => {
+      activeCourses.forEach((course) => {
         if (std.enrolledCourseCodes.some((code) => code.toUpperCase() === course.code.toUpperCase() || code === course.id)) {
           if (!course.enrolledStudentEmails) course.enrolledStudentEmails = [];
           if (!course.enrolledStudentEmails.map((e) => e.toLowerCase().trim()).includes(std.email)) {
@@ -3388,7 +3637,7 @@ export const studentService = {
     });
 
     if (coursesModified) {
-      setStorage(STORAGE_KEYS.COURSES, courses);
+      setStorage(STORAGE_KEYS.COURSES, activeCourses);
     }
 
     return Array.from(studentsMap.values());

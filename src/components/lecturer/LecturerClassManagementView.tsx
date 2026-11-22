@@ -14,6 +14,7 @@ import {
   ExternalLink, 
   CheckCircle2, 
   AlertCircle, 
+  AlertTriangle,
   GraduationCap, 
   Layers, 
   Sparkles,
@@ -169,6 +170,17 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
     return matchesSearch && targetCourse && s.enrolledCourseCodes.includes(targetCourse.code);
   });
 
+  // Modern In-App Notification / Feedback Modal State
+  const [feedbackModal, setFeedbackModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type?: 'success' | 'info' | 'warning' | 'error';
+  } | null>(null);
+
+  // In-App Course Deletion & Collaborative Deletion Approval Modal State
+  const [deleteModalCourse, setDeleteModalCourse] = useState<CourseClass | null>(null);
+
   // Time helpers for interactive class schedule
   const calculateEndTime = (startTime: string, credits: number) => {
     try {
@@ -198,7 +210,12 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
   const handleCreateCourseSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCourseCode || !newCourseTitle) {
-      alert('Kode mata kuliah dan nama mata kuliah wajib diisi.');
+      setFeedbackModal({
+        isOpen: true,
+        title: 'Form Belum Lengkap',
+        message: 'Kode mata kuliah dan nama mata kuliah wajib diisi.',
+        type: 'warning',
+      });
       return;
     }
 
@@ -219,6 +236,8 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
 
     onDataUpdated();
     setIsAddCourseModalOpen(false);
+    const createdTitle = newCourseTitle;
+    const invitedEmail = newCourseCoLecturerEmail.trim();
     setNewCourseCode('');
     setNewCourseTitle('');
     setNewCourseDesc('');
@@ -230,6 +249,15 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
     setNewCourseCoLecturerEmail('');
     // Auto-sync pembaruan ke Google Sheets & My Journey
     myJourneySyncService.triggerDebouncedAutoSync();
+
+    setFeedbackModal({
+      isOpen: true,
+      title: 'Kelas Berhasil Dibuat',
+      message: invitedEmail
+        ? `Kelas "${createdTitle}" berhasil dibuat dan undangan mengajar telah dikirimkan ke ${invitedEmail}.`
+        : `Kelas "${createdTitle}" berhasil dibuat dengan matriks 16 pertemuan otomatis.`,
+      type: 'success',
+    });
   };
 
   // Handle Edit Course Modal
@@ -284,11 +312,23 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
   const handleQuickInviteSubmit = (courseId: string, email: string) => {
     if (!email.trim()) return;
     const res = studentService.inviteLecturerToCourse(courseId, email.trim());
-    alert(res.message);
     if (res.success) {
       setQuickInviteCourseId(null);
       setQuickInviteEmail('');
       onDataUpdated();
+      setFeedbackModal({
+        isOpen: true,
+        title: 'Undangan Berhasil Dikirim',
+        message: res.message,
+        type: 'success',
+      });
+    } else {
+      setFeedbackModal({
+        isOpen: true,
+        title: 'Undangan Dosen',
+        message: res.message,
+        type: 'warning',
+      });
     }
   };
 
@@ -296,7 +336,12 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
   const handleAddStudentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStudentName || !newStudentEmail || !newStudentCourseId) {
-      alert('Nama, Email, dan Mata Kuliah wajib diisi.');
+      setFeedbackModal({
+        isOpen: true,
+        title: 'Form Belum Lengkap',
+        message: 'Nama, Email, dan Mata Kuliah wajib diisi.',
+        type: 'warning',
+      });
       return;
     }
 
@@ -307,15 +352,26 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
       courseId: newStudentCourseId,
     });
 
-    alert(res.message);
     if (res.success) {
       onDataUpdated();
       setIsAddStudentModalOpen(false);
       setNewStudentName('');
       setNewStudentNim('');
       setNewStudentEmail('');
-      // Auto-sync pembaruan ke Google Sheets & My Journey
       myJourneySyncService.triggerDebouncedAutoSync();
+      setFeedbackModal({
+        isOpen: true,
+        title: 'Mahasiswa Berhasil Didaftarkan',
+        message: res.message,
+        type: 'success',
+      });
+    } else {
+      setFeedbackModal({
+        isOpen: true,
+        title: 'Gagal Mendaftarkan Mahasiswa',
+        message: res.message,
+        type: 'error',
+      });
     }
   };
 
@@ -402,27 +458,83 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
       setSelectedPendingCourse(null);
       await myJourneySyncService.pushTeachingToGoogleSheets();
       onDataUpdated();
+      setFeedbackModal({
+        isOpen: true,
+        title: 'Berhasil Bergabung',
+        message: 'Anda telah resmi bergabung sebagai rekan dosen pengampu mata kuliah ini.',
+        type: 'success',
+      });
     }
   };
 
   const handleDeclineInvitation = async (courseId: string) => {
-    if (confirm('Tolak undangan kolaborasi mengajar ini?')) {
-      const res = studentService.declineCourseInvitation(courseId, currentUser?.email);
-      if (res.success) {
-        setSelectedPendingCourse(null);
-        await myJourneySyncService.pushTeachingToGoogleSheets();
-        onDataUpdated();
-      }
+    const res = studentService.declineCourseInvitation(courseId, currentUser?.email);
+    if (res.success) {
+      setSelectedPendingCourse(null);
+      await myJourneySyncService.pushTeachingToGoogleSheets();
+      onDataUpdated();
+      setFeedbackModal({
+        isOpen: true,
+        title: 'Undangan Ditolak',
+        message: 'Undangan kolaborasi mengajar telah ditolak.',
+        type: 'info',
+      });
     }
   };
 
-  // Handle Delete Course
-  const handleDeleteCourse = async (courseId: string, courseTitle: string) => {
-    if (confirm(`Apakah Anda yakin ingin menghapus kelas "${courseTitle}"? Semua data pertemuan dan silabus akan dihapus.`)) {
-      studentService.deleteCourse(courseId);
-      await myJourneySyncService.pushTeachingToGoogleSheets();
-      onDataUpdated();
-    }
+  // Collaborative & Solo Course Deletion Handlers
+  const handleOpenDeleteModal = (course: CourseClass) => {
+    setDeleteModalCourse(course);
+  };
+
+  const handleConfirmSoloDelete = async (courseId: string) => {
+    studentService.deleteCourse(courseId);
+    setDeleteModalCourse(null);
+    await myJourneySyncService.pushTeachingToGoogleSheets();
+    onDataUpdated();
+    setFeedbackModal({
+      isOpen: true,
+      title: 'Kelas Berhasil Dihapus',
+      message: 'Kelas beserta seluruh data pertemuan, silabus, dan daftar mahasiswa telah dihapus permanen.',
+      type: 'info',
+    });
+  };
+
+  const handleRequestCollaborativeDelete = async (courseId: string) => {
+    const res = studentService.requestCourseDeletion(courseId);
+    setDeleteModalCourse(null);
+    onDataUpdated();
+    setFeedbackModal({
+      isOpen: true,
+      title: 'Permohonan Hapus Diajukan',
+      message: res.message,
+      type: 'warning',
+    });
+  };
+
+  const handleCancelDeleteRequest = async (courseId: string) => {
+    const res = studentService.cancelCourseDeletionRequest(courseId);
+    setDeleteModalCourse(null);
+    onDataUpdated();
+    setFeedbackModal({
+      isOpen: true,
+      title: 'Pengajuan Dibatalkan',
+      message: res.message,
+      type: 'info',
+    });
+  };
+
+  const handleRespondDeleteRequest = async (courseId: string, approve: boolean) => {
+    const res = studentService.respondToCourseDeletion(courseId, approve);
+    setDeleteModalCourse(null);
+    await myJourneySyncService.pushTeachingToGoogleSheets();
+    onDataUpdated();
+    setFeedbackModal({
+      isOpen: true,
+      title: approve ? 'Penghapusan Disetujui' : 'Penghapusan Ditolak',
+      message: res.message,
+      type: approve ? 'info' : 'warning',
+    });
   };
 
   return (
@@ -714,6 +826,59 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                           )
                         )}
 
+                        {course.deletionRequest?.status === 'pending' && (
+                          course.deletionRequest.requestedBy === currentUser?.email ? (
+                            <div className="text-[11px] px-2.5 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-800 font-semibold flex items-center justify-between">
+                              <span className="flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-amber-500" />
+                                <span>Menunggu Persetujuan Hapus Rekan</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCancelDeleteRequest(course.id);
+                                }}
+                                className="text-[10px] text-rose-600 dark:text-rose-400 hover:underline font-bold"
+                              >
+                                Batal
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 space-y-1.5">
+                              <div className="text-[11px] font-bold text-rose-800 dark:text-rose-200 flex items-center gap-1.5">
+                                <span>⚠️</span>
+                                <span>Permohonan Hapus: {course.deletionRequest.requestedByName}</span>
+                              </div>
+                              <p className="text-[10px] text-rose-600 dark:text-rose-400">
+                                Rekan dosen mengajukan penghapusan kelas ini. Konfirmasi Anda diperlukan.
+                              </p>
+                              <div className="flex gap-2 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenDeleteModal(course);
+                                  }}
+                                  className="flex-1 py-1 px-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold shadow-xs cursor-pointer"
+                                >
+                                  Konfirmasi
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRespondDeleteRequest(course.id, false);
+                                  }}
+                                  className="px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-slate-700 dark:text-slate-200 text-[11px] font-semibold cursor-pointer"
+                                >
+                                  Tolak
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        )}
+
                         {/* Quick Invite Form on Card ("Add Friend" Style) */}
                         {quickInviteCourseId === course.id && (
                           <div
@@ -794,9 +959,9 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleDeleteCourse(course.id, course.title);
+                              handleOpenDeleteModal(course);
                             }}
-                            className="p-1 rounded text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
+                            className="p-1 rounded text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors cursor-pointer"
                             title="Hapus Kelas"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1180,8 +1345,9 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
       {/* ========================================================= */}
       {isAddCourseModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-5 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="w-full max-w-2xl max-h-[90vh] flex flex-col bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-200 overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-6 pb-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
               <div>
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                   Tambah Kelas Kuliah Baru
@@ -1191,15 +1357,17 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                 </p>
               </div>
               <button
+                type="button"
                 onClick={() => setIsAddCourseModalOpen(false)}
-                className="p-1 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateCourseSubmit} className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
+            {/* Scrollable Form Body */}
+            <form onSubmit={handleCreateCourseSubmit} className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
                     Kode Mata Kuliah
@@ -1210,7 +1378,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                     placeholder="Contoh: SIG atau GEO-301"
                     value={newCourseCode}
                     onChange={(e) => setNewCourseCode(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>
                 <div>
@@ -1223,7 +1391,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                     placeholder="Contoh: Sains Informasi Geografi"
                     value={newCourseTitle}
                     onChange={(e) => setNewCourseTitle(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>
               </div>
@@ -1239,7 +1407,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                     placeholder="Contoh: Kelas A"
                     value={newCourseSection}
                     onChange={(e) => setNewCourseSection(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>
                 <div>
@@ -1253,7 +1421,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                     required
                     value={newCourseCredits}
                     onChange={(e) => setNewCourseCredits(Number(e.target.value) || 3)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>
                 <div>
@@ -1265,115 +1433,122 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                     placeholder="Contoh: Semester 5"
                     value={newCourseSemester}
                     onChange={(e) => setNewCourseSemester(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                    Hari Kuliah
-                  </label>
-                  <select
-                    value={newCourseDay}
-                    onChange={(e) => setNewCourseDay(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  >
-                    <option value="Senin">Senin</option>
-                    <option value="Selasa">Selasa</option>
-                    <option value="Rabu">Rabu</option>
-                    <option value="Kamis">Kamis</option>
-                    <option value="Jumat">Jumat</option>
-                    <option value="Sabtu">Sabtu</option>
-                  </select>
+              {/* Hari & Jadwal Perkuliahan */}
+              <div className="p-4 rounded-2xl bg-slate-50/70 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-1">
+                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                      Hari Kuliah
+                    </label>
+                    <select
+                      value={newCourseDay}
+                      onChange={(e) => setNewCourseDay(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    >
+                      <option value="Senin">Senin</option>
+                      <option value="Selasa">Selasa</option>
+                      <option value="Rabu">Rabu</option>
+                      <option value="Kamis">Kamis</option>
+                      <option value="Jumat">Jumat</option>
+                      <option value="Sabtu">Sabtu</option>
+                    </select>
+                  </div>
+
+                  <div className="sm:col-span-2 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block text-xs">
+                        Jam Sesi Perkuliahan
+                      </label>
+                      <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {(newCourseCredits || 3) * 50} Menit ({newCourseCredits || 3} SKS)
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 min-w-[110px]">
+                        <span className="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Mulai</span>
+                        <input
+                          type="time"
+                          required
+                          value={newCourseStartTime}
+                          onChange={(e) => {
+                            const st = e.target.value;
+                            setNewCourseStartTime(st);
+                            setNewCourseEndTime(calculateEndTime(st, newCourseCredits));
+                          }}
+                          className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        />
+                      </div>
+                      <span className="text-slate-400 font-bold self-end pb-2">s/d</span>
+                      <div className="flex-1 min-w-[110px]">
+                        <span className="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Selesai</span>
+                        <input
+                          type="time"
+                          required
+                          value={newCourseEndTime}
+                          onChange={(e) => setNewCourseEndTime(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        />
+                      </div>
+                      <div className="w-20">
+                        <span className="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Zona</span>
+                        <select
+                          value={newCourseTimezone}
+                          onChange={(e) => setNewCourseTimezone(e.target.value)}
+                          className="w-full px-2 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-center focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        >
+                          <option value="WIB">WIB</option>
+                          <option value="WITA">WITA</option>
+                          <option value="WIT">WIT</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="font-bold text-slate-700 dark:text-slate-300 block text-xs">
-                      Jam Sesi Perkuliahan
-                    </label>
-                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {(newCourseCredits || 3) * 50} Menit ({newCourseCredits || 3} SKS)
-                    </span>
-                  </div>
+                {/* Preset Quick Chips */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[10px] text-slate-500 font-semibold mr-1">Preset Jam:</span>
+                  {[
+                    { label: '08:00 - 09:40 (2 SKS)', s: '08:00', e: '09:40', sks: 2 },
+                    { label: '08:00 - 10:30 (3 SKS)', s: '08:00', e: '10:30', sks: 3 },
+                    { label: '10:40 - 12:20 (2 SKS)', s: '10:40', e: '12:20', sks: 2 },
+                    { label: '13:30 - 16:00 (3 SKS)', s: '13:30', e: '16:00', sks: 3 },
+                  ].map((chip) => (
+                    <button
+                      key={chip.label}
+                      type="button"
+                      onClick={() => {
+                        setNewCourseStartTime(chip.s);
+                        setNewCourseEndTime(chip.e);
+                        setNewCourseCredits(chip.sks);
+                      }}
+                      className={`text-[10px] px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                        newCourseStartTime === chip.s && newCourseEndTime === chip.e
+                          ? 'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 border-blue-300 font-bold'
+                          : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
 
-                  <div className="grid grid-cols-12 gap-1.5 items-center">
-                    <div className="col-span-5">
-                      <input
-                        type="time"
-                        required
-                        value={newCourseStartTime}
-                        onChange={(e) => {
-                          const st = e.target.value;
-                          setNewCourseStartTime(st);
-                          setNewCourseEndTime(calculateEndTime(st, newCourseCredits));
-                        }}
-                        className="w-full px-2 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                      />
-                    </div>
-                    <span className="col-span-1 text-center text-slate-400 font-bold">-</span>
-                    <div className="col-span-4">
-                      <input
-                        type="time"
-                        required
-                        value={newCourseEndTime}
-                        onChange={(e) => setNewCourseEndTime(e.target.value)}
-                        className="w-full px-2 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <select
-                        value={newCourseTimezone}
-                        onChange={(e) => setNewCourseTimezone(e.target.value)}
-                        className="w-full px-1 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[10px] font-bold text-center focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                      >
-                        <option value="WIB">WIB</option>
-                        <option value="WITA">WITA</option>
-                        <option value="WIT">WIT</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Preset Quick Chips */}
-                  <div className="flex flex-wrap gap-1 pt-0.5">
-                    {[
-                      { label: '08:00 - 09:40', s: '08:00', e: '09:40', sks: 2 },
-                      { label: '08:00 - 10:30', s: '08:00', e: '10:30', sks: 3 },
-                      { label: '10:40 - 12:20', s: '10:40', e: '12:20', sks: 2 },
-                      { label: '13:30 - 16:00', s: '13:30', e: '16:00', sks: 3 },
-                    ].map((chip) => (
-                      <button
-                        key={chip.label}
-                        type="button"
-                        onClick={() => {
-                          setNewCourseStartTime(chip.s);
-                          setNewCourseEndTime(chip.e);
-                          setNewCourseCredits(chip.sks);
-                        }}
-                        className={`text-[9px] px-2 py-0.5 rounded-md border transition-all ${
-                          newCourseStartTime === chip.s && newCourseEndTime === chip.e
-                            ? 'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 border-blue-300 font-bold'
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-200'
-                        }`}
-                      >
-                        {chip.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Schedule preview badge */}
-                  <div className="p-2 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-900/40 flex items-center justify-between text-[11px] text-blue-800 dark:text-blue-300 font-medium">
-                    <span className="flex items-center gap-1.5 font-bold">
-                      <Clock className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                      {newCourseDay}, {newCourseStartTime} - {newCourseEndTime} {newCourseTimezone}
-                    </span>
-                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
-                      Terintegrasi Jadwal
-                    </span>
-                  </div>
+                {/* Schedule preview badge */}
+                <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-900/40 flex items-center justify-between text-xs text-blue-800 dark:text-blue-300 font-medium">
+                  <span className="flex items-center gap-1.5 font-bold">
+                    <Clock className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    {newCourseDay}, {newCourseStartTime} - {newCourseEndTime} {newCourseTimezone}
+                  </span>
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold bg-blue-100/60 dark:bg-blue-900/40 px-2 py-0.5 rounded-md">
+                    Terintegrasi Jadwal
+                  </span>
                 </div>
               </div>
 
@@ -1383,10 +1558,10 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                 </label>
                 <input
                   type="text"
-                  placeholder="Contoh: Lab Jaringan & Cloud Computing Lt. 3"
+                  placeholder="Contoh: Lab Komputasi Spasial Lt. 3"
                   value={newCourseRoom}
                   onChange={(e) => setNewCourseRoom(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
 
@@ -1395,15 +1570,16 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                   Deskripsi / Pengantar Singkat
                 </label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   placeholder="Deskripsi silabus dan capaian perkuliahan..."
                   value={newCourseDesc}
                   onChange={(e) => setNewCourseDesc(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none"
                 />
               </div>
 
-              <div className="space-y-2.5">
+              {/* Rekan Dosen Pengampu */}
+              <div className="space-y-2.5 pt-1">
                 <div className="flex items-center justify-between">
                   <label className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 text-xs">
                     <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
@@ -1418,14 +1594,14 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                   Tambahkan rekan dosen resmi My Journey untuk mengampu mata kuliah ini secara bersama-sama.
                 </p>
 
-                {/* Colleague Selection Cards ("Add Friend" Style) */}
+                {/* Colleague Selection Cards */}
                 <div className="space-y-2">
                   {colleagueLecturers.map((colleague) => {
                     const isSelected = newCourseCoLecturerEmail.toLowerCase() === colleague.email.toLowerCase();
                     return (
                       <div
                         key={colleague.email}
-                        className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
+                        className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
                           isSelected
                             ? 'bg-blue-50/70 dark:bg-blue-950/40 border-blue-500 ring-2 ring-blue-500/20 shadow-xs'
                             : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-slate-300'
@@ -1468,7 +1644,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                               setNewCourseCoLecturerEmail(colleague.email);
                             }
                           }}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
                             isSelected
                               ? 'bg-emerald-600 hover:bg-rose-600 text-white shadow-xs group'
                               : 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs'
@@ -1496,7 +1672,7 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                 {newCourseCoLecturerEmail ? (
                   <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5 pt-1">
                     <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                    <span>Rekan dosen dipilih: Undangan kolaborasi tim dosen akan dikirimkan ke akun beliau untuk persetujuan (ACC) terlebih dahulu sebelum resmi bergabung.</span>
+                    <span>Rekan dosen dipilih: Undangan kolaborasi tim dosen akan dikirimkan ke akun rekan dosen untuk persetujuan (ACC) terlebih dahulu sebelum resmi bergabung.</span>
                   </p>
                 ) : (
                   <p className="text-[10px] text-slate-400 italic">
@@ -1505,17 +1681,18 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                 )}
               </div>
 
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
+              {/* Modal Footer Buttons */}
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsAddCourseModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
+                  className="px-6 py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer"
                 >
                   Simpan & Buat 16 Pertemuan
                 </button>
@@ -2196,6 +2373,214 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
                 <span>Setujui</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL: MODERN IN-APP FEEDBACK / NOTIFICATION */}
+      {/* ========================================================= */}
+      {feedbackModal && feedbackModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 animate-in zoom-in-95 duration-200 text-center">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto ${
+              feedbackModal.type === 'error'
+                ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-600'
+                : feedbackModal.type === 'warning'
+                ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-600'
+                : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600'
+            }`}>
+              {feedbackModal.type === 'error' ? (
+                <X className="w-6 h-6" />
+              ) : feedbackModal.type === 'warning' ? (
+                <AlertTriangle className="w-6 h-6" />
+              ) : (
+                <CheckCircle2 className="w-6 h-6" />
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                {feedbackModal.title}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                {feedbackModal.message}
+              </p>
+            </div>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setFeedbackModal(null)}
+                className="w-full py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer"
+              >
+                Mengerti
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL: PENGHAPUSAN KELAS & PERLINDUNGAN KELAS KOLABORASI */}
+      {/* ========================================================= */}
+      {deleteModalCourse && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-5 animate-in zoom-in-95 duration-200">
+            {(() => {
+              const hasActivePartner = (!!deleteModalCourse.secondaryTeacher?.email || (!!deleteModalCourse.partnerLecturer && !deleteModalCourse.partnerLecturer.startsWith('PENDING:') && deleteModalCourse.partnerLecturer !== '-')) && !deleteModalCourse.pendingLecturerEmail;
+              const delReq = deleteModalCourse.deletionRequest;
+              const isReqByMe = delReq?.status === 'pending' && delReq?.requestedBy === currentUser?.email;
+              const isReqByColleague = delReq?.status === 'pending' && delReq?.requestedBy !== currentUser?.email;
+
+              if (isReqByColleague) {
+                return (
+                  <>
+                    <div className="w-12 h-12 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 flex items-center justify-center mx-auto">
+                      <AlertTriangle className="w-6 h-6" />
+                    </div>
+                    <div className="text-center space-y-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-md border border-rose-200 dark:border-rose-900">
+                        Permohonan Penghapusan dari Rekan
+                      </span>
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                        Konfirmasi Persetujuan Hapus Kelas
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        Rekan dosen Anda (<strong>{delReq?.requestedByName}</strong>) telah mengajukan permohonan penghapusan kelas <strong>{deleteModalCourse.code} - {deleteModalCourse.title}</strong>.
+                      </p>
+                      <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">
+                        Jika Anda menyetujui, kelas beserta 16 pertemuan dan data mahasiswa akan dihapus permanen untuk Anda berdua.
+                      </p>
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => handleRespondDeleteRequest(deleteModalCourse.id, false)}
+                        className="flex-1 px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 cursor-pointer"
+                      >
+                        Tolak
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRespondDeleteRequest(deleteModalCourse.id, true)}
+                        className="flex-1 px-4 py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs cursor-pointer"
+                      >
+                        Setujui Hapus Permanen
+                      </button>
+                    </div>
+                  </>
+                );
+              }
+
+              if (isReqByMe) {
+                return (
+                  <>
+                    <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center mx-auto">
+                      <Clock className="w-6 h-6 animate-pulse" />
+                    </div>
+                    <div className="text-center space-y-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-900">
+                        Menunggu Persetujuan Rekan
+                      </span>
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                        Pengajuan Penghapusan Sedang Berjalan
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        Anda telah mengajukan permohonan penghapusan untuk kelas <strong>{deleteModalCourse.code} - {deleteModalCourse.title}</strong>. Notifikasi konfirmasi telah dikirimkan ke rekan dosen Anda.
+                      </p>
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setDeleteModalCourse(null)}
+                        className="flex-1 px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 cursor-pointer"
+                      >
+                        Tutup
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCancelDeleteRequest(deleteModalCourse.id)}
+                        className="flex-1 px-4 py-2.5 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-xs cursor-pointer"
+                      >
+                        Batalkan Pengajuan
+                      </button>
+                    </div>
+                  </>
+                );
+              }
+
+              if (hasActivePartner) {
+                return (
+                  <>
+                    <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center mx-auto">
+                      <ShieldCheck className="w-6 h-6" />
+                    </div>
+                    <div className="text-center space-y-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-900">
+                        🔒 Perlindungan Kelas Kolaborasi
+                      </span>
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                        Pengajuan Hapus Kelas Bersama
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        Mata kuliah <strong>{deleteModalCourse.code} - {deleteModalCourse.title}</strong> diampu bersama oleh tim dosen (<strong>{deleteModalCourse.teacher?.name}</strong> & <strong>{deleteModalCourse.secondaryTeacher?.name || deleteModalCourse.partnerLecturer}</strong>).
+                      </p>
+                      <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 text-left text-[11px] text-amber-800 dark:text-amber-200 leading-relaxed">
+                        Agar data pengajaran tidak terhapus sepihak, penghapusan memerlukan <strong>persetujuan (ACC) dari rekan dosen pengampu</strong>. Notifikasi persetujuan akan dikirimkan ke rekan dosen Anda.
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setDeleteModalCourse(null)}
+                        className="flex-1 px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRequestCollaborativeDelete(deleteModalCourse.id)}
+                        className="flex-1 px-4 py-2.5 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-xs cursor-pointer"
+                      >
+                        Ajukan Hapus ke Rekan
+                      </button>
+                    </div>
+                  </>
+                );
+              }
+
+              // Solo course deletion
+              return (
+                <>
+                  <div className="w-12 h-12 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 flex items-center justify-center mx-auto">
+                    <Trash2 className="w-6 h-6" />
+                  </div>
+                  <div className="text-center space-y-2">
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                      Hapus Kelas Perkuliahan?
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Apakah Anda yakin ingin menghapus kelas <strong>{deleteModalCourse.code} - {deleteModalCourse.title}</strong>? Seluruh data 16 pertemuan, silabus, dan daftar mahasiswa akan dihapus permanen.
+                    </p>
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setDeleteModalCourse(null)}
+                      className="flex-1 px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleConfirmSoloDelete(deleteModalCourse.id)}
+                      className="flex-1 px-4 py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs cursor-pointer"
+                    >
+                      Hapus Permanen
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

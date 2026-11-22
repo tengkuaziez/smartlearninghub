@@ -90,6 +90,7 @@ export const LecturerClassDetailView: React.FC<LecturerClassDetailViewProps> = (
   const [annTitle, setAnnTitle] = useState('');
   const [annContent, setAnnContent] = useState('');
   const [annSuccess, setAnnSuccess] = useState(false);
+  const [studentToRemove, setStudentToRemove] = useState<string | null>(null);
 
   // Edit Course Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -217,8 +218,13 @@ export const LecturerClassDetailView: React.FC<LecturerClassDetailViewProps> = (
   };
 
   const handleRemoveEmail = (email: string) => {
-    if (confirm(`Hapus ${email} dari daftar kelas ini? Mahasiswa ini tidak akan bisa mengakses kelas lagi.`)) {
-      studentService.removeStudentEmailFromCourse(course.id, email);
+    setStudentToRemove(email);
+  };
+
+  const handleConfirmRemoveEmail = () => {
+    if (studentToRemove) {
+      studentService.removeStudentEmailFromCourse(course.id, studentToRemove);
+      setStudentToRemove(null);
       onDataUpdated();
     }
   };
@@ -311,12 +317,28 @@ export const LecturerClassDetailView: React.FC<LecturerClassDetailViewProps> = (
             <span>Dosen Utama: <strong>{course.teacher?.name || course.primaryLecturer || 'Dosen Pengampu'}</strong></span>
             {course.secondaryTeacher?.name ? (
               <span>• Dosen Partner: <strong>{course.secondaryTeacher.name}</strong></span>
+            ) : (!course.secondaryTeacher && course.partnerLecturer && !course.partnerLecturer.startsWith('PENDING:') && course.partnerLecturer !== '-') ? (
+              <span>• Dosen Partner: <strong>{course.partnerLecturer}</strong></span>
             ) : course.pendingLecturerEmail ? (
               <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-200 border border-amber-400/30">
                 ⏳ Menunggu Konfirmasi Mitra: {course.pendingLecturerName || course.pendingLecturerEmail}
               </span>
             ) : null}
           </div>
+
+          {course.deletionRequest?.status === 'pending' && (
+            <div className="mt-3 p-3 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-200 text-xs flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2">
+                <span>⚠️</span>
+                <span>
+                  Permohonan penghapusan kelas diajukan oleh <strong>{course.deletionRequest.requestedByName}</strong>.
+                </span>
+              </span>
+              <span className="px-2 py-0.5 rounded-md bg-amber-400/20 text-[10px] font-bold uppercase tracking-wider text-amber-300">
+                Persetujuan Tertunda
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Active Session Status or Guidance & Edit Button */}
@@ -1549,6 +1571,40 @@ export const LecturerClassDetailView: React.FC<LecturerClassDetailViewProps> = (
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Modal Konfirmasi Hapus Mahasiswa dari Kelas */}
+      {studentToRemove && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                Hapus Akses Mahasiswa?
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Apakah Anda yakin ingin menghapus <strong className="font-mono text-slate-700 dark:text-slate-300">{studentToRemove}</strong> dari daftar kelas ini? Mahasiswa ini tidak akan bisa mengakses kelas lagi.
+              </p>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setStudentToRemove(null)}
+                className="flex-1 px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRemoveEmail}
+                className="flex-1 px-4 py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs cursor-pointer"
+              >
+                Hapus
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -121,6 +121,13 @@ export interface CourseRps {
   lastUpdated: string;
 }
 
+export interface CourseDeletionRequest {
+  requestedBy: string; // Email rekan dosen pemohon
+  requestedByName: string; // Nama rekan dosen pemohon
+  requestedAt: string; // Timestamp ISO
+  status: 'pending';
+}
+
 export interface CourseClass {
   id: string;
   code: string;
@@ -145,6 +152,7 @@ export interface CourseClass {
   syllabusUrl?: string;
   rps?: CourseRps; // Dokumen Rencana Pembelajaran Semester resmi
   enrolledStudentEmails: string[]; // Whitelist email mahasiswa yang didaftarkan dosen
+  deletionRequest?: CourseDeletionRequest; // Permohonan penghapusan kelas kolaborasi
 }
 
 export interface LearningMaterial {

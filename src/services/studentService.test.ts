@@ -407,3 +407,90 @@ test('Realtime: applyRealtimeCourseUpdate applies new course and pending notific
   // Clean up
   studentService.deleteCourse('course_incoming_realtime');
 });
+
+test('Collaborative Course Deletion: requires 2-way approval for team-taught courses', () => {
+  studentService.login('altaf.aziz16@gmail.com', 'password123');
+  const course = studentService.createCourse({
+    code: 'GEO-COLLAB-DEL',
+    title: 'Geografi Kolaborasi Eksklusif',
+    description: 'Kelas kolaborasi 2 dosen',
+    room: 'Lab Spasial',
+    scheduleDay: 'Senin',
+    scheduleTime: '08:00 - 10:30 WIB',
+    invitedLecturerEmail: 'miftahurridlo.688@gmail.com',
+  });
+
+  // Partner accepts
+  studentService.login('miftahurridlo.688@gmail.com', 'password123');
+  studentService.acceptCourseInvitation(course.id, 'miftahurridlo.688@gmail.com');
+
+  const confirmedCourse = studentService.getCourseById(course.id);
+  assert.ok(confirmedCourse?.secondaryTeacher);
+
+  // Azis requests deletion
+  studentService.login('altaf.aziz16@gmail.com', 'password123');
+  const reqRes = studentService.requestCourseDeletion(course.id);
+  assert.equal(reqRes.requiresApproval, true);
+
+  // Verify course is NOT deleted yet
+  const pendingCourse = studentService.getCourseById(course.id);
+  assert.ok(pendingCourse);
+  assert.equal(pendingCourse?.deletionRequest?.status, 'pending');
+
+  // Miftah logs in and rejects first
+  studentService.login('miftahurridlo.688@gmail.com', 'password123');
+  const rejectRes = studentService.respondToCourseDeletion(course.id, false);
+  assert.equal(rejectRes.success, true);
+
+  // Verify course is still alive and deletionRequest cleared
+  const aliveCourse = studentService.getCourseById(course.id);
+  assert.ok(aliveCourse);
+  assert.equal(aliveCourse?.deletionRequest, undefined);
+
+  // Now request again and approve
+  studentService.login('altaf.aziz16@gmail.com', 'password123');
+  studentService.requestCourseDeletion(course.id);
+
+  studentService.login('miftahurridlo.688@gmail.com', 'password123');
+  const approveRes = studentService.respondToCourseDeletion(course.id, true);
+  assert.equal(approveRes.success, true);
+
+  // Now course is permanently deleted
+  const deletedCourse = studentService.getCourseById(course.id);
+  assert.equal(deletedCourse, undefined);
+});
+
+test('Student view: pruned immediately on course delete & new course starts empty', () => {
+  studentService.login('altaf.aziz16@gmail.com', 'password123');
+  const course = studentService.createCourse({
+    code: 'SIG-STUDENT-TEST',
+    title: 'Mata Kuliah Uji Hapus Mahasiswa',
+    description: 'Testing',
+    room: 'Lab Spasial',
+    scheduleDay: 'Kamis',
+    scheduleTime: '08:00 - 10:30 WIB',
+  });
+
+  // Verify new course starts strictly with empty students
+  assert.equal(course.enrolledStudentEmails.length, 0);
+
+  // Register student
+  const studentEmail = 'mahasiswa.test.del@student.ac.id';
+  studentService.registerStudentWithDetails({
+    name: 'Budi Test Delete',
+    nim: '10999999',
+    email: studentEmail,
+    courseId: course.id,
+  });
+
+  // Student checks enrolled courses
+  const studentCoursesBefore = studentService.getEnrolledCourses(studentEmail);
+  assert.ok(studentCoursesBefore.some((c) => c.id === course.id));
+
+  // Lecturer deletes course
+  studentService.deleteCourse(course.id);
+
+  // Student checks enrolled courses after deletion
+  const studentCoursesAfter = studentService.getEnrolledCourses(studentEmail);
+  assert.ok(!studentCoursesAfter.some((c) => c.id === course.id || c.code === 'SIG-STUDENT-TEST'));
+});
