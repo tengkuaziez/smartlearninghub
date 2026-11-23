@@ -162,6 +162,16 @@ export const supabaseDataService = {
         } catch {}
       }
 
+      let courseAnnouncements: any[] = course.announcements || [];
+      if (courseAnnouncements.length === 0 && typeof localStorage !== 'undefined') {
+        try {
+          const localAnns = JSON.parse(localStorage.getItem('slh_announcements') || '[]');
+          courseAnnouncements = localAnns.filter(
+            (a: any) => a.courseId === course.id || (course.code && String(a.courseId || '').toUpperCase().includes(course.code.toUpperCase()))
+          );
+        } catch {}
+      }
+
       const payload = {
         id: course.id,
         user_id: activeUserId,
@@ -195,6 +205,7 @@ export const supabaseDataService = {
           meetings: courseMeetings,
           rps: courseRps || null,
           submissions: courseSubmissions,
+          announcements: courseAnnouncements,
         },
         updated_at: new Date().toISOString(),
       };
@@ -585,7 +596,11 @@ export const supabaseDataService = {
         for (const row of matchingRows) {
           const d = row.data || {};
           const asgs: Assignment[] = Array.isArray(d.assignments) ? d.assignments : [];
-          const idx = asgs.findIndex((a) => a.id === assignment.id);
+          const idx = asgs.findIndex(
+            (a) => a.id === assignment.id || (
+              a.title && assignment.title && a.title.trim().toLowerCase() === assignment.title.trim().toLowerCase()
+            )
+          );
           if (idx >= 0) {
             asgs[idx] = { ...asgs[idx], ...assignment };
           } else {
@@ -627,6 +642,72 @@ export const supabaseDataService = {
       }
 
       this.broadcastChange('assignment_deleted', { id: assignmentId });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  async saveAnnouncement(announcement: Announcement): Promise<boolean> {
+    if (!isSupabaseConfigured() || !supabase || !announcement.id) return false;
+    try {
+      const { data: rows } = await supabase.from('courses').select('*');
+      if (rows && rows.length > 0) {
+        const isUniversal = !announcement.courseId || announcement.courseId === 'all' || announcement.courseId === 'semua';
+        const matchingRows = isUniversal
+          ? rows
+          : rows.filter((r) => {
+              const d = r.data || {};
+              const cCode = String(d.code || '').trim().toUpperCase();
+              const target = String(announcement.courseId || '').trim().toUpperCase();
+              return r.id === announcement.courseId || d.id === announcement.courseId || (cCode && target.includes(cCode)) || (cCode && cCode.includes(target));
+            });
+
+        for (const row of matchingRows) {
+          const d = row.data || {};
+          const anns: Announcement[] = Array.isArray(d.announcements) ? d.announcements : [];
+          const idx = anns.findIndex((a) => a.id === announcement.id);
+          if (idx >= 0) {
+            anns[idx] = { ...anns[idx], ...announcement };
+          } else {
+            anns.unshift(announcement);
+          }
+          d.announcements = anns;
+
+          await supabase.from('courses').update({
+            data: d,
+            updated_at: new Date().toISOString(),
+          }).eq('id', row.id).eq('user_id', row.user_id);
+        }
+      }
+
+      this.broadcastChange('announcement_updated', announcement);
+      return true;
+    } catch (err) {
+      console.warn('[SupabaseDataService] saveAnnouncement failed:', err);
+      return false;
+    }
+  },
+
+  async deleteAnnouncement(announcementId: string): Promise<boolean> {
+    if (!isSupabaseConfigured() || !supabase || !announcementId) return false;
+    try {
+      const { data: rows } = await supabase.from('courses').select('*');
+      if (rows && rows.length > 0) {
+        for (const row of rows) {
+          const d = row.data || {};
+          const anns: any[] = Array.isArray(d.announcements) ? d.announcements : [];
+          if (anns.some((a) => a.id === announcementId)) {
+            d.announcements = anns.filter((a) => a.id !== announcementId);
+            await supabase.from('courses').update({
+              data: d,
+              updated_at: new Date().toISOString(),
+            }).eq('id', row.id).eq('user_id', row.user_id);
+          }
+        }
+      }
+
+      this.broadcastChange('announcement_deleted', { id: announcementId });
       return true;
     } catch {
       return false;
@@ -768,6 +849,12 @@ export const supabaseDataService = {
         })
         .on('broadcast', { event: 'submission_graded' }, (msg: any) => {
           onDataChange('submissions', msg?.payload);
+        })
+        .on('broadcast', { event: 'announcement_updated' }, (msg: any) => {
+          onDataChange('announcements', msg?.payload);
+        })
+        .on('broadcast', { event: 'announcement_deleted' }, (msg: any) => {
+          onDataChange('announcements', { type: 'delete', ...msg?.payload });
         })
         .on(
           'postgres_changes',

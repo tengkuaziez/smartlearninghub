@@ -49,12 +49,33 @@ export const AssignmentListView: React.FC<AssignmentListViewProps> = ({
 
   // Compute status for all assignments
   const enrichedAssignments = useMemo(() => {
-    return assignments.map((asg) => {
+    const validList: { asg: Assignment; sub?: AssignmentSubmission; course: CourseClass; status: SubmissionStatus }[] = [];
+    const seenMap = new Map<string, { asg: Assignment; sub?: AssignmentSubmission; course: CourseClass; status: SubmissionStatus }>();
+
+    assignments.forEach((asg) => {
+      if (asg.isPublished === false) return;
+      const course = courses.find(
+        (c) => c.id === asg.courseId || (c.code && asg.courseId && asg.courseId.toUpperCase().includes(c.code.toUpperCase()))
+      );
+      // Only include assignments belonging to the student's enrolled courses
+      if (!course) return;
+
       const sub = submissions.find((s) => s.assignmentId === asg.id);
-      const course = courses.find((c) => c.id === asg.courseId || (c.code && asg.courseId && asg.courseId.toUpperCase().includes(c.code.toUpperCase())));
       const status = getAssignmentSubmissionStatus(asg, sub);
-      return { asg, sub, course, status };
+      const canonicalKey = `${course.id}_${asg.title.trim().toLowerCase()}`;
+
+      // Deduplicate: if an assignment with same title for the same course exists, keep the latest
+      if (!seenMap.has(canonicalKey)) {
+        seenMap.set(canonicalKey, { asg, sub, course, status });
+      } else {
+        const existing = seenMap.get(canonicalKey)!;
+        if (new Date(asg.deadline).getTime() >= new Date(existing.asg.deadline).getTime()) {
+          seenMap.set(canonicalKey, { asg, sub, course, status });
+        }
+      }
     });
+
+    return Array.from(seenMap.values());
   }, [assignments, submissions, courses]);
 
   // Tab counts

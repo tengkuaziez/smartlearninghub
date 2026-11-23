@@ -1300,6 +1300,7 @@ export const studentService = {
       const cloudAssignments: Assignment[] = [];
       const cloudMeetings: Meeting[] = [];
       const cloudSubmissions: AssignmentSubmission[] = [];
+      const cloudAnnouncements: Announcement[] = [];
 
       activeRows.forEach((row) => {
         const d = row.data || {};
@@ -1336,6 +1337,16 @@ export const studentService = {
             }
           });
         }
+        if (Array.isArray(d.announcements)) {
+          d.announcements.forEach((a: any) => {
+            if (a && a.id) {
+              cloudAnnouncements.push({
+                ...a,
+                courseId: a.courseId || cId,
+              });
+            }
+          });
+        }
         if (d.rps && cId) {
           try {
             localStorage.setItem(`slh_rps_${cId}`, JSON.stringify(d.rps));
@@ -1362,6 +1373,13 @@ export const studentService = {
         const subMap = new Map(localSubs.map((s) => [s.id, s]));
         cloudSubmissions.forEach((cs) => subMap.set(cs.id, { ...subMap.get(cs.id), ...cs }));
         setStorage(STORAGE_KEYS.SUBMISSIONS, Array.from(subMap.values()));
+      }
+
+      if (cloudAnnouncements.length > 0) {
+        const localAnns = getStorage<Announcement[]>(STORAGE_KEYS.ANNOUNCEMENTS, initialAnnouncements);
+        const annMap = new Map(localAnns.map((a) => [a.id, a]));
+        cloudAnnouncements.forEach((ca) => annMap.set(ca.id, { ...annMap.get(ca.id), ...ca }));
+        setStorage(STORAGE_KEYS.ANNOUNCEMENTS, Array.from(annMap.values()));
       }
 
       // Deduplicate rows from Supabase (prevent multi-user duplicate rows for same course)
@@ -3837,9 +3855,41 @@ export const studentService = {
     if (idx >= 0) {
       all[idx] = { ...all[idx], ...asg };
     } else {
-      all.push(asg);
+      const titleMatchIdx = all.findIndex((a) => 
+        (a.courseId === asg.courseId || (a.courseId && asg.courseId && a.courseId.toUpperCase().includes(asg.courseId.toUpperCase()))) &&
+        a.title && asg.title && a.title.trim().toLowerCase() === asg.title.trim().toLowerCase()
+      );
+      if (titleMatchIdx >= 0) {
+        all[titleMatchIdx] = { ...all[titleMatchIdx], ...asg };
+      } else {
+        all.push(asg);
+      }
     }
     setStorage(STORAGE_KEYS.ASSIGNMENTS, all);
+  },
+
+  /**
+   * Menangani pembaruan pengumuman perkuliahan secara realtime instan (< 300ms)
+   */
+  applyRealtimeAnnouncementUpdate(payload: any): void {
+    if (!payload) return;
+    if (payload.type === 'delete' || payload.type === 'announcement_deleted') {
+      const id = payload.id;
+      if (!id) return;
+      const all = getStorage<Announcement[]>(STORAGE_KEYS.ANNOUNCEMENTS, initialAnnouncements);
+      setStorage(STORAGE_KEYS.ANNOUNCEMENTS, all.filter((a) => a.id !== id));
+      return;
+    }
+    const ann = (payload.announcement || payload) as Announcement;
+    if (!ann.id) return;
+    const all = getStorage<Announcement[]>(STORAGE_KEYS.ANNOUNCEMENTS, initialAnnouncements);
+    const idx = all.findIndex((a) => a.id === ann.id);
+    if (idx >= 0) {
+      all[idx] = { ...all[idx], ...ann };
+    } else {
+      all.unshift(ann);
+    }
+    setStorage(STORAGE_KEYS.ANNOUNCEMENTS, all);
   },
 
   /**
@@ -4322,6 +4372,22 @@ export const studentService = {
       }
     }
 
+    // Deduplicate assignments by canonical courseId + title
+    const asgMap = new Map<string, Assignment>();
+    assignments.forEach((a) => {
+      if (!a || !a.id || a.isPublished === false) return;
+      const key = `${a.courseId || ''}_${a.title.trim().toLowerCase()}`;
+      if (!asgMap.has(key)) {
+        asgMap.set(key, a);
+      } else {
+        const existing = asgMap.get(key)!;
+        if (new Date(a.deadline).getTime() >= new Date(existing.deadline).getTime()) {
+          asgMap.set(key, a);
+        }
+      }
+    });
+    assignments = Array.from(asgMap.values());
+
     if (courseId) {
       const crs = this.getCourseById(courseId);
       const crsCode = crs?.code?.toUpperCase();
@@ -4389,17 +4455,27 @@ export const studentService = {
       ],
     };
 
-    allAssignments.push(newAssignment);
+    // Deduplicate against existing assignment with same title for course
+    const existingIdx = allAssignments.findIndex((a) =>
+      (a.courseId === newAssignment.courseId || (a.courseId && newAssignment.courseId && a.courseId.toUpperCase().includes(newAssignment.courseId.toUpperCase()))) &&
+      a.title.trim().toLowerCase() === newAssignment.title.trim().toLowerCase()
+    );
+    if (existingIdx >= 0) {
+      allAssignments[existingIdx] = { ...allAssignments[existingIdx], ...newAssignment };
+    } else {
+      allAssignments.push(newAssignment);
+    }
     setStorage(STORAGE_KEYS.ASSIGNMENTS, allAssignments);
 
-    // Save to course payload in Supabase
+    // 1. Instant realtime broadcast (< 100ms)
+    supabaseDataService.broadcastChange('assignment_updated', newAssignment);
+
+    // 2. Persist to Supabase course payload and assignment table
     const course = this.getCourseById(data.courseId);
     if (course) {
       supabaseDataService.saveCourse(course).catch(() => {});
     }
-
     supabaseDataService.saveAssignment(newAssignment).catch(() => {});
-    supabaseDataService.broadcastChange('assignment_updated', newAssignment);
     myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
 
     this.addActivity({
@@ -4424,14 +4500,16 @@ export const studentService = {
     };
     setStorage(STORAGE_KEYS.ASSIGNMENTS, allAssignments);
 
+    // 1. Instant realtime broadcast (< 100ms)
+    supabaseDataService.broadcastChange('assignment_updated', allAssignments[idx]);
+
+    // 2. Persist to Supabase
     const targetCourseId = allAssignments[idx].courseId;
     const course = this.getCourseById(targetCourseId);
     if (course) {
       supabaseDataService.saveCourse(course).catch(() => {});
     }
-
     supabaseDataService.saveAssignment(allAssignments[idx]).catch(() => {});
-    supabaseDataService.broadcastChange('assignment_updated', allAssignments[idx]);
     myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
     return allAssignments[idx];
   },
@@ -4874,47 +4952,117 @@ export const studentService = {
   // Announcements
   getAnnouncements(courseId?: string): Announcement[] {
     const user = this.getCurrentUser();
-    const enrolledCourses = this.getEnrolledCourses();
-    const enrolledCourseIds = new Set(enrolledCourses.map((c) => c.id));
-
+    const enrolledCourses = this.getEnrolledCourses(user?.email);
     const announcements = getStorage<Announcement[]>(STORAGE_KEYS.ANNOUNCEMENTS, initialAnnouncements);
     
+    let list = announcements;
+
     // Lecturer can see all announcements
     if (user?.role === 'dosen') {
-      return courseId ? announcements.filter((a) => a.courseId === courseId) : announcements;
+      if (courseId && courseId !== 'all') {
+        const crs = this.getCourseById(courseId);
+        const crsCode = crs?.code?.toUpperCase();
+        list = announcements.filter((a) => 
+          a.courseId === courseId || 
+          (crsCode && a.courseId && a.courseId.toUpperCase().includes(crsCode))
+        );
+      }
+    } else if (user) {
+      // Students only see announcements for their enrolled classes or universal announcements
+      list = announcements.filter((a) => {
+        if (!a.courseId || a.courseId === 'all' || a.courseId === 'semua' || a.courseId === '') return true;
+        return enrolledCourses.some((c) => 
+          c.id === a.courseId || 
+          (c.code && a.courseId && a.courseId.toUpperCase().includes(c.code.toUpperCase())) ||
+          (c.title && a.courseTitle && c.title.toLowerCase() === a.courseTitle.toLowerCase())
+        );
+      });
+      if (courseId && courseId !== 'all') {
+        const crs = this.getCourseById(courseId);
+        const crsCode = crs?.code?.toUpperCase();
+        list = list.filter((a) => 
+          a.courseId === courseId || 
+          (crsCode && a.courseId && a.courseId.toUpperCase().includes(crsCode))
+        );
+      }
+    } else {
+      if (courseId && courseId !== 'all') {
+        list = announcements.filter((a) => a.courseId === courseId);
+      }
     }
 
-    // Guest / unauthenticated sees all announcements
-    if (!user) {
-      return courseId ? announcements.filter((a) => a.courseId === courseId) : announcements;
-    }
-
-    // Students only see announcements for their enrolled classes or universal announcements
-    const allowed = announcements.filter((a) => !a.courseId || enrolledCourseIds.has(a.courseId));
-    return courseId ? allowed.filter((a) => a.courseId === courseId) : allowed;
+    // Sort: pinned first, then by date descending
+    return list.slice().sort((a, b) => {
+      if (a.isPinned !== b.isPinned) {
+        return a.isPinned ? -1 : 1;
+      }
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
   },
 
-  postAnnouncement(data: { courseId: string; title: string; content: string }): Announcement {
+  postAnnouncement(data: {
+    courseId: string;
+    title: string;
+    content: string;
+    isPinned?: boolean;
+    authorName?: string;
+    authorRole?: string;
+  }): Announcement {
     const announcements = getStorage<Announcement[]>(STORAGE_KEYS.ANNOUNCEMENTS, initialAnnouncements);
     const user = this.getCurrentUser() || defaultLecturerUser;
-    const course = this.getCourseById(data.courseId);
+    const isUniversal = !data.courseId || data.courseId === 'all' || data.courseId === 'semua';
+    const course = !isUniversal ? this.getCourseById(data.courseId) : undefined;
 
     const newAnn: Announcement = {
-      id: `ann_${Date.now()}`,
-      courseId: data.courseId,
-      courseTitle: course?.title,
-      title: data.title,
-      content: data.content,
-      authorName: user.name,
-      authorRole: 'Dosen Pengampu',
+      id: `ann_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`,
+      courseId: isUniversal ? 'all' : (course?.id || data.courseId),
+      courseTitle: isUniversal ? 'Semua Kelas Perkuliahan' : (course?.title || data.courseId),
+      title: data.title.trim(),
+      content: data.content.trim(),
+      authorName: data.authorName || user.name,
+      authorRole: data.authorRole || (user.role === 'dosen' ? 'Dosen Pengampu' : 'Pusat Informasi'),
       authorEmail: user.email,
       date: new Date().toISOString(),
-      isPinned: false,
+      isPinned: !!data.isPinned,
       isRead: false,
     };
 
-    setStorage(STORAGE_KEYS.ANNOUNCEMENTS, [newAnn, ...announcements]);
+    const updated = [newAnn, ...announcements.filter((a) => a.id !== newAnn.id)];
+    setStorage(STORAGE_KEYS.ANNOUNCEMENTS, updated);
+
+    // 1. Instant Realtime broadcast across clients (< 100ms)
+    supabaseDataService.broadcastChange('announcement_updated', newAnn);
+
+    // 2. Persist to Supabase
+    supabaseDataService.saveAnnouncement(newAnn).catch(() => {});
+    if (course) {
+      supabaseDataService.saveCourse(course).catch(() => {});
+    }
+
+    // 3. Push to Google Sheets
+    myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
+
+    this.addActivity({
+      title: 'Pengumuman Baru Diterbitkan',
+      description: `Dosen menerbitkan pengumuman "${newAnn.title}" untuk ${newAnn.courseTitle}.`,
+      type: 'announcement',
+      courseTitle: newAnn.courseTitle,
+    });
+
     return newAnn;
+  },
+
+  deleteAnnouncement(announcementId: string): boolean {
+    const announcements = getStorage<Announcement[]>(STORAGE_KEYS.ANNOUNCEMENTS, initialAnnouncements);
+    const target = announcements.find((a) => a.id === announcementId);
+    const filtered = announcements.filter((a) => a.id !== announcementId);
+    setStorage(STORAGE_KEYS.ANNOUNCEMENTS, filtered);
+
+    // Instant Realtime broadcast
+    supabaseDataService.broadcastChange('announcement_deleted', { id: announcementId, courseId: target?.courseId });
+    supabaseDataService.deleteAnnouncement(announcementId).catch(() => {});
+    myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
+    return true;
   },
 
   markAnnouncementAsRead(announcementId: string): void {

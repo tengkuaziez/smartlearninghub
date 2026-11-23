@@ -198,6 +198,12 @@ export default function App() {
         }
       } else if (table === 'submissions') {
         studentService.syncAssignmentsFromSupabase().catch(() => {});
+      } else if (table === 'announcements') {
+        if (payload) {
+          studentService.applyRealtimeAnnouncementUpdate(payload);
+        } else {
+          studentService.syncCoursesFromSupabase().catch(() => {});
+        }
       }
       reloadData();
     });
@@ -388,7 +394,7 @@ export default function App() {
     : undefined;
 
   const activeAssignmentCourse = activeAssignment
-    ? allLecturerCourses.find((c) => c.id === activeAssignment.courseId)
+    ? allLecturerCourses.find((c) => c.id === activeAssignment.courseId || (c.code && activeAssignment.courseId && activeAssignment.courseId.toUpperCase().includes(c.code.toUpperCase())))
     : undefined;
 
   const activeAssignmentSubmission = activeAssignment && currentUser
@@ -727,6 +733,8 @@ export default function App() {
                 <AnnouncementsView
                   announcements={announcements}
                   courses={allLecturerCourses}
+                  currentUser={currentUser}
+                  onDataUpdated={reloadData}
                   onMarkRead={(id) => {
                     studentService.markAnnouncementAsRead(id);
                     reloadData();
@@ -865,6 +873,8 @@ export default function App() {
                 <AnnouncementsView
                   announcements={announcements}
                   courses={courses}
+                  currentUser={currentUser}
+                  onDataUpdated={reloadData}
                   onMarkRead={(id) => {
                     studentService.markAnnouncementAsRead(id);
                     reloadData();

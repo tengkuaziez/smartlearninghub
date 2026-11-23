@@ -37,7 +37,7 @@ import type {
   LearningMaterial 
 } from '../../types/index.ts';
 
-export type ManagementSubTab = 'kelas' | 'mahasiswa' | 'bahan_ajar' | 'rps' | 'jadwal';
+export type ManagementSubTab = 'kelas';
 
 interface LecturerClassManagementViewProps {
   courses: CourseClass[];
@@ -58,8 +58,6 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
   onOpenCourse,
   onDataUpdated,
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<ManagementSubTab>('kelas');
-
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [courseFilter, setCourseFilter] = useState('all');
@@ -568,124 +566,41 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      {/* 1. Header (Modeled directly after My Journey) */}
-      <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
+      {/* 1. Header with Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
             Manajemen Kelas
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            Kelola kelas perkuliahan, mahasiswa, RPS & jadwal sesi perkuliahan.
+            Kelola ruang kelas perkuliahan mandiri dan kolaborasi tim dosen.
           </p>
         </div>
-      </div>
 
-      {/* 2. Sub-navigation Pills (Identical to My Journey: 1. Kelas, 2. Mahasiswa, 3. Bahan Ajar, 4. RPS, 5. Jadwal Sesi) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-          <button
-            onClick={() => setActiveSubTab('kelas')}
-            className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all shrink-0 flex items-center gap-1.5 ${
-              activeSubTab === 'kelas'
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
-                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
-            }`}
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>1. Kelas ({classesTabCourses.length})</span>
-            {pendingInvitations.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white animate-pulse">
-                +{pendingInvitations.length} Undangan
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveSubTab('mahasiswa')}
-            className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all shrink-0 flex items-center gap-1.5 ${
-              activeSubTab === 'mahasiswa'
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
-                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>2. Mahasiswa ({studentsList.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveSubTab('bahan_ajar')}
-            className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all shrink-0 flex items-center gap-1.5 ${
-              activeSubTab === 'bahan_ajar'
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
-                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5" />
-            <span>3. Bahan Ajar ({allMaterials.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveSubTab('rps')}
-            className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all shrink-0 flex items-center gap-1.5 ${
-              activeSubTab === 'rps'
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
-                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>4. RPS ({approvedCourses.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveSubTab('jadwal')}
-            className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all shrink-0 flex items-center gap-1.5 ${
-              activeSubTab === 'jadwal'
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
-                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
-            }`}
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            <span>5. Jadwal Sesi ({approvedCourses.length})</span>
-          </button>
-        </div>
-
-        {/* Right Action: Sync My Journey & + Tambah Kelas Baru Button */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Right Action: Sync Google Sheets & + Tambah Kelas Baru Button */}
+        <div className="flex items-center gap-2.5 shrink-0">
           <button
             onClick={() => setIsSyncModalOpen(true)}
             title="Kelola sinkronisasi otomatis Google Sheets & My Journey"
-            className="px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-50 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1.5 transition-all shadow-xs"
+            className="px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-50 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             <span>Sync Google Sheets</span>
           </button>
 
-          {activeSubTab === 'mahasiswa' ? (
-            <button
-              onClick={() => setIsAddStudentModalOpen(true)}
-              className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs flex items-center gap-2 transition-all"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>+ Tambah Mahasiswa Whitelist</span>
-            </button>
-          ) : (
-            <button
-              onClick={() => setIsAddCourseModalOpen(true)}
-              className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-900 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 text-white shadow-xs flex items-center gap-2 transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              <span>+ Tambah Kelas Baru</span>
-            </button>
-          )}
+          <button
+            onClick={() => setIsAddCourseModalOpen(true)}
+            className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-900 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 text-white shadow-xs flex items-center gap-2 transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Tambah Kelas Baru</span>
+          </button>
         </div>
       </div>
 
-      {/* ========================================================= */}
-      {/* SUB-TAB 1: 1. KELAS (Styled directly like My Journey) */}
-      {/* ========================================================= */}
-      {activeSubTab === 'kelas' && (
-        <div className="space-y-4">
-          {/* Action Banner: Undangan Tim Mengajar dari Rekan Dosen */}
+      {/* Main Content: Petakan Ruang Kelas */}
+      <div className="space-y-4">
+        {/* Action Banner: Undangan Tim Mengajar dari Rekan Dosen */}
           {pendingInvitations.length > 0 && (
             <div className="space-y-3 mb-5">
               {pendingInvitations.map((inv) => (
@@ -1036,338 +951,6 @@ export const LecturerClassManagementView: React.FC<LecturerClassManagementViewPr
             </div>
           )}
         </div>
-      )}
-
-      {/* ========================================================= */}
-      {/* SUB-TAB 2: 2. MAHASISWA (Explicit User Request!) */}
-      {/* ========================================================= */}
-      {activeSubTab === 'mahasiswa' && (
-        <div className="space-y-5">
-          {/* Top Search & Filter Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-1">
-              {/* Search input */}
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Cari nama, NIM, atau email mahasiswa..."
-                  className="w-full pl-10 pr-4 py-2 rounded-xl text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-white"
-                />
-              </div>
-
-              {/* Class Filter */}
-              <div className="w-full sm:w-60">
-                <select
-                  value={courseFilter}
-                  onChange={(e) => setCourseFilter(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-white"
-                >
-                  <option value="all">Semua Kelas ({courses.length})</option>
-                  {courses.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.code} - {c.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="text-xs font-medium text-slate-500 dark:text-slate-400 shrink-0">
-              Menampilkan <strong>{filteredStudents.length}</strong> mahasiswa
-            </div>
-          </div>
-
-          {/* Quick Roster Stats Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-              <span className="text-xs text-slate-500 dark:text-slate-400">Total Mahasiswa Whitelist</span>
-              <p className="text-2xl font-extrabold text-blue-600 dark:text-blue-400 mt-1">
-                {studentsList.length}
-              </p>
-              <span className="text-[11px] text-emerald-600 font-medium">100% Terverifikasi</span>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-              <span className="text-xs text-slate-500 dark:text-slate-400">Rata-rata Presensi</span>
-              <p className="text-2xl font-extrabold text-emerald-600 mt-1">
-                {studentsList.length > 0 
-                  ? `${Math.round(studentsList.reduce((acc, s) => acc + s.attendancePct, 0) / studentsList.length)}%` 
-                  : '100%'}
-              </p>
-              <span className="text-[11px] text-slate-400">Tingkat Kehadiran Kelas</span>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-              <span className="text-xs text-slate-500 dark:text-slate-400">Tugas Terkumpul</span>
-              <p className="text-2xl font-extrabold text-indigo-600 mt-1">
-                {submissions.length}
-              </p>
-              <span className="text-[11px] text-slate-400">Dari seluruh penugasan</span>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-              <span className="text-xs text-slate-500 dark:text-slate-400">Status Whitelist</span>
-              <p className="text-2xl font-extrabold text-teal-600 mt-1">
-                Terkunci
-              </p>
-              <span className="text-[11px] text-slate-400">Hanya Email Dosen & Mahasiswa</span>
-            </div>
-          </div>
-
-          {/* Student Table / Cards */}
-          <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 text-slate-400 uppercase font-semibold">
-                    <th className="py-3 px-4">Mahasiswa</th>
-                    <th className="py-3 px-4">NIM</th>
-                    <th className="py-3 px-4">Kelas Diikuti</th>
-                    <th className="py-3 px-4">Tingkat Presensi</th>
-                    <th className="py-3 px-4">Tugas Selesai</th>
-                    <th className="py-3 px-4">Status Whitelist</th>
-                    <th className="py-3 px-4 text-right">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {filteredStudents.map((std) => (
-                    <tr key={std.email} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold flex items-center justify-center shrink-0 text-xs">
-                            {std.name.charAt(0)}
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-900 dark:text-white">{std.name}</p>
-                            <p className="text-[11px] text-slate-400 font-mono">{std.email}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 font-mono font-semibold text-slate-700 dark:text-slate-300">
-                        {std.nim}
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex flex-wrap gap-1">
-                          {std.enrolledCourseCodes.map((code) => (
-                            <span
-                              key={code}
-                              className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300"
-                            >
-                              {code}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                            <div 
-                              className="h-full bg-emerald-500 rounded-full" 
-                              style={{ width: `${std.attendancePct}%` }}
-                            />
-                          </div>
-                          <span className="font-bold text-slate-800 dark:text-slate-200 font-mono">
-                            {std.attendancePct}%
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 font-mono">
-                        {std.submissionsCount} tugas
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
-                          <ShieldCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                          <span>Whitelist Aktif</span>
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => {
-                              const crs = courses.find((c) => c.enrolledStudentEmails?.includes(std.email));
-                              if (crs) onOpenCourse(crs.id);
-                            }}
-                            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-blue-600 transition-colors"
-                          >
-                            Buka Kelas
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {filteredStudents.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-400 text-xs">
-                        Tidak ada mahasiswa yang cocok dengan kriteria pencarian.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================= */}
-      {/* SUB-TAB 3: 3. BAHAN AJAR */}
-      {/* ========================================================= */}
-      {activeSubTab === 'bahan_ajar' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {allMaterials.map((mat) => (
-              <div
-                key={mat.id}
-                className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-mono font-bold text-xs px-2.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-                    {mat.courseCode}
-                  </span>
-                  <span className="text-[11px] font-bold text-slate-500 uppercase">
-                    {mat.type}
-                  </span>
-                </div>
-
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                    {mat.title}
-                  </h4>
-                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
-                    {mat.description}
-                  </p>
-                  <span className="text-[11px] text-slate-400 block mt-2">
-                    {mat.meetingTitle}
-                  </span>
-                </div>
-
-                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Tersimpan di Google Drive</span>
-                  <a
-                    href={mat.fileUrl || mat.embedUrl || '#'}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1 font-semibold text-blue-600 hover:underline"
-                  >
-                    <span>Buka File</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-              </div>
-            ))}
-            {allMaterials.length === 0 && (
-              <div className="col-span-full py-12 text-center text-slate-400 text-xs">
-                Belum ada bahan ajar yang diunggah ke Google Drive.
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================= */}
-      {/* SUB-TAB 4: 4. RPS */}
-      {/* ========================================================= */}
-      {activeSubTab === 'rps' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {approvedCourses.map((c) => (
-              <div
-                key={c.id}
-                className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-mono font-bold text-xs px-2.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-                    {c.code}
-                  </span>
-                  <span className="text-xs font-semibold text-emerald-600">
-                    Kurikulum OBE 2024 / 2026
-                  </span>
-                </div>
-
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  {c.title}
-                </h3>
-                <p className="text-xs text-slate-500 line-clamp-2">
-                  {c.rps?.shortDescription || c.description}
-                </p>
-
-                <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <div>
-                    <span className="text-slate-400">Total CPL:</span>
-                    <p className="font-bold text-slate-800 dark:text-slate-200">
-                      {c.rps?.cpl?.length || 4} Capaian Sikap & Keterampilan
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-slate-400">Total CPMK:</span>
-                    <p className="font-bold text-slate-800 dark:text-slate-200">
-                      {c.rps?.cpmk?.length || 5} Sasaran Pembelajaran
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => onOpenCourse(c.id)}
-                  className="w-full py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 dark:bg-white dark:text-slate-900 text-white flex items-center justify-center gap-1.5 transition-all mt-2"
-                >
-                  <span>Buka & Kelola Dokumen RPS Lengkap</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================= */}
-      {/* SUB-TAB 5: 5. JADWAL SESI */}
-      {/* ========================================================= */}
-      {activeSubTab === 'jadwal' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {approvedCourses.map((c) => (
-              <div
-                key={c.id}
-                className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-mono">
-                    {c.scheduleDay}
-                  </span>
-                  <span className="text-xs font-semibold text-slate-400 font-mono">
-                    {c.scheduleTime}
-                  </span>
-                </div>
-
-                <h4 className="text-base font-bold text-slate-900 dark:text-white">
-                  {c.title}
-                </h4>
-
-                <div className="space-y-1.5 text-xs text-slate-500">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{c.room}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Users className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{c.enrolledStudentEmails?.length || 0} Mahasiswa Terdaftar</span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => onOpenCourse(c.id)}
-                  className="w-full py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors"
-                >
-                  Buka Jadwal Sesi Pertemuan
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* ========================================================= */}
       {/* MODAL 1: + Tambah Kelas Baru */}

@@ -797,4 +797,107 @@ test('Class Detail Management: Meetings, Materials, Assignments, and OBE RPS gen
   studentService.deleteCourse(course.id);
 });
 
+test('Assignments: deduplicates assignments by title for the same course and updates in place', () => {
+  const course = studentService.createCourse({
+    code: 'SIGD-TEST',
+    title: 'SIG Dasar Test',
+    description: 'Testing assignments',
+    room: 'Lab 1',
+    scheduleDay: 'Senin',
+    scheduleTime: '08:00 - 10:30 WIB',
+  });
+
+  // Create assignment CBR
+  const asg1 = studentService.createAssignment({
+    courseId: course.id,
+    title: 'CBR',
+    instructions: 'Critical Book Review 1',
+    deadline: '2026-11-29T23:59',
+  });
+  assert.ok(asg1.id);
+
+  // Update session / deadline of CBR
+  const asg2 = studentService.createAssignment({
+    courseId: course.id,
+    title: 'CBR',
+    instructions: 'Critical Book Review 1 Updated Session',
+    deadline: '2026-11-30T23:59',
+  });
+
+  // getAssignments should only have 1 CBR assignment for this course
+  const courseAsgs = studentService.getAssignments(course.id);
+  const cbrs = courseAsgs.filter((a) => a.title.trim().toLowerCase() === 'cbr');
+  assert.equal(cbrs.length, 1);
+  assert.equal(cbrs[0].deadline, '2026-11-30T23:59');
+
+  // Clean up
+  studentService.deleteAssignment(asg1.id);
+  studentService.deleteCourse(course.id);
+});
+
+test('Announcements: posts announcement with target course and handles student visibility correctly', () => {
+  const course = studentService.createCourse({
+    code: 'GEO-ANN-TEST',
+    title: 'Geografi Pengumuman Test',
+    description: 'Testing announcements',
+    room: 'Lab 2',
+    scheduleDay: 'Rabu',
+    scheduleTime: '08:00 - 10:30 WIB',
+  });
+
+  const enrolledStudent = 'student.enrolled@student.ac.id';
+  const otherStudent = 'student.other@student.ac.id';
+  studentService.addStudentEmailToCourse(course.id, enrolledStudent);
+
+  // 1. Post class-specific announcement
+  const annClass = studentService.postAnnouncement({
+    courseId: course.id,
+    title: 'Pengumuman Kuliah Geografi Khusus',
+    content: 'Tolong persiapkan software GIS untuk kelas ini.',
+    isPinned: true,
+  });
+  assert.ok(annClass.id);
+  assert.equal(annClass.courseId, course.id);
+  assert.equal(annClass.isPinned, true);
+
+  // 2. Post universal announcement
+  const annUniversal = studentService.postAnnouncement({
+    courseId: 'all',
+    title: 'Pengumuman Libur Nasional Fakultas',
+    content: 'Kuliah ditiadakan pada hari libur nasional.',
+    isPinned: false,
+  });
+  assert.ok(annUniversal.id);
+  assert.equal(annUniversal.courseId, 'all');
+
+  // Enrolled student should see both
+  studentService.setCurrentUser({
+    id: 'std_enrolled',
+    name: 'Student Enrolled',
+    email: enrolledStudent,
+    role: 'mahasiswa',
+  });
+  const enrolledStudentAnns = studentService.getAnnouncements();
+  assert.ok(enrolledStudentAnns.some((a) => a.id === annClass.id));
+  assert.ok(enrolledStudentAnns.some((a) => a.id === annUniversal.id));
+
+  // Other student should ONLY see universal announcement
+  studentService.setCurrentUser({
+    id: 'std_other',
+    name: 'Student Other',
+    email: otherStudent,
+    role: 'mahasiswa',
+  });
+  const otherStudentAnns = studentService.getAnnouncements();
+  assert.ok(!otherStudentAnns.some((a) => a.id === annClass.id));
+  assert.ok(otherStudentAnns.some((a) => a.id === annUniversal.id));
+
+  // Clean up
+  studentService.deleteAnnouncement(annClass.id);
+  studentService.deleteAnnouncement(annUniversal.id);
+  studentService.deleteCourse(course.id);
+  studentService.logout();
+});
+
+
 
