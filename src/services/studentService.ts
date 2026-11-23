@@ -1296,6 +1296,74 @@ export const studentService = {
         return true;
       });
 
+      // Synchronize assignments, meetings, and submissions across all active course rows from Supabase
+      const cloudAssignments: Assignment[] = [];
+      const cloudMeetings: Meeting[] = [];
+      const cloudSubmissions: AssignmentSubmission[] = [];
+
+      activeRows.forEach((row) => {
+        const d = row.data || {};
+        const cId = String(row.id || d.id || '').trim();
+        if (Array.isArray(d.assignments)) {
+          d.assignments.forEach((a: any) => {
+            if (a && a.id) {
+              cloudAssignments.push({
+                ...a,
+                courseId: a.courseId || cId,
+                isPublished: a.isPublished !== false,
+              });
+            }
+          });
+        }
+        if (Array.isArray(d.meetings)) {
+          d.meetings.forEach((m: any) => {
+            if (m && m.id) {
+              cloudMeetings.push({
+                ...m,
+                courseId: m.courseId || cId,
+                isPublished: m.isPublished !== false,
+              });
+            }
+          });
+        }
+        if (Array.isArray(d.submissions)) {
+          d.submissions.forEach((s: any) => {
+            if (s && s.id) {
+              cloudSubmissions.push({
+                ...s,
+                courseId: s.courseId || cId,
+              });
+            }
+          });
+        }
+        if (d.rps && cId) {
+          try {
+            localStorage.setItem(`slh_rps_${cId}`, JSON.stringify(d.rps));
+          } catch {}
+        }
+      });
+
+      if (cloudAssignments.length > 0) {
+        const localAsgs = getStorage<Assignment[]>(STORAGE_KEYS.ASSIGNMENTS, initialAssignments);
+        const asgMap = new Map(localAsgs.map((a) => [a.id, a]));
+        cloudAssignments.forEach((ca) => asgMap.set(ca.id, { ...asgMap.get(ca.id), ...ca }));
+        setStorage(STORAGE_KEYS.ASSIGNMENTS, Array.from(asgMap.values()));
+      }
+
+      if (cloudMeetings.length > 0) {
+        const localMeets = getStorage<Meeting[]>(STORAGE_KEYS.MEETINGS, initialMeetings);
+        const meetMap = new Map(localMeets.map((m) => [m.id, m]));
+        cloudMeetings.forEach((cm) => meetMap.set(cm.id, { ...meetMap.get(cm.id), ...cm }));
+        setStorage(STORAGE_KEYS.MEETINGS, Array.from(meetMap.values()));
+      }
+
+      if (cloudSubmissions.length > 0) {
+        const localSubs = getStorage<AssignmentSubmission[]>(STORAGE_KEYS.SUBMISSIONS, initialSubmissions);
+        const subMap = new Map(localSubs.map((s) => [s.id, s]));
+        cloudSubmissions.forEach((cs) => subMap.set(cs.id, { ...subMap.get(cs.id), ...cs }));
+        setStorage(STORAGE_KEYS.SUBMISSIONS, Array.from(subMap.values()));
+      }
+
       // Deduplicate rows from Supabase (prevent multi-user duplicate rows for same course)
       const groups = new Map<string, any[]>();
       activeRows.forEach((row) => {
@@ -1326,12 +1394,17 @@ export const studentService = {
 
         const latest = { ...rows[0], data: { ...rows[0].data } };
 
-        // Authoritative enrolled student emails from latest row (do not resurrect deleted students)
-        const latestEmails = Array.isArray(rows[0].data?.enrolledStudentEmails)
-          ? rows[0].data.enrolledStudentEmails
-          : [];
-        latest.data.enrolledStudentEmails = latestEmails;
-        latest.data.enrolledCount = latestEmails.length;
+        // Union enrolled student emails across all rows of this course (never drop students added by either lecturer)
+        const allEmails = new Set<string>();
+        rows.forEach((r) => {
+          const list = Array.isArray(r.data?.enrolledStudentEmails) ? r.data.enrolledStudentEmails : [];
+          list.forEach((e: string) => {
+            const clean = String(e || '').trim().toLowerCase();
+            if (clean) allEmails.add(clean);
+          });
+        });
+        latest.data.enrolledStudentEmails = Array.from(allEmails);
+        latest.data.enrolledCount = latest.data.enrolledStudentEmails.length;
 
         // If ANY row has accepted partner status, the course is accepted!
         const acceptedRow = rows.find((r) => {
@@ -2671,18 +2744,36 @@ export const studentService = {
       });
     }
 
-    // For students: strictly check enrolledStudentEmails (Lecturer's class roster whitelist authority)
+    // For students: check enrolledStudentEmails & MasterStudent roster codes
     const enrolled = activeCourses.filter((c) => {
       const studentEmails = (c.enrolledStudentEmails || []).map((e) => e.toLowerCase().trim());
-      return studentEmails.includes(emailToFilter);
+      if (studentEmails.includes(emailToFilter)) return true;
+
+      const masterList = getStorage<MasterStudent[]>(STORAGE_KEYS.MASTER_STUDENTS, []);
+      const masterEntry = masterList.find((s) => s.email.toLowerCase().trim() === emailToFilter);
+      if (masterEntry && masterEntry.enrolledCourseCodes) {
+        const cCode = (c.code || '').toUpperCase();
+        return masterEntry.enrolledCourseCodes.some((code) => {
+          const uCode = code.toUpperCase();
+          return uCode === cCode || uCode === c.id.toUpperCase() || (cCode && uCode.includes(cCode)) || (cCode && cCode.includes(uCode));
+        });
+      }
+      return false;
     });
 
     return enrolled;
   },
 
   getCourseById(courseId: string): CourseClass | undefined {
+    if (!courseId) return undefined;
     const courses = this.getAllCourses();
-    return courses.find((c) => c.id === courseId);
+    const clean = courseId.trim();
+    return courses.find(
+      (c) => c.id === clean || 
+             c.code.toLowerCase() === clean.toLowerCase() ||
+             clean.includes(c.id) ||
+             (c.code && clean.toLowerCase().includes(c.code.toLowerCase()))
+    );
   },
 
   // Lecturer Action: Add Student Email to Course Roster
@@ -3727,6 +3818,54 @@ export const studentService = {
     }
   },
 
+  /**
+   * Menangani pembaruan tugas perkuliahan secara realtime instan (< 300ms)
+   */
+  applyRealtimeAssignmentUpdate(payload: any): void {
+    if (!payload) return;
+    if (payload.type === 'delete' || payload.type === 'assignment_deleted') {
+      const id = payload.id;
+      if (!id) return;
+      const all = getStorage<Assignment[]>(STORAGE_KEYS.ASSIGNMENTS, initialAssignments);
+      setStorage(STORAGE_KEYS.ASSIGNMENTS, all.filter((a) => a.id !== id));
+      return;
+    }
+    const asg = (payload.assignment || payload) as Assignment;
+    if (!asg.id) return;
+    const all = getStorage<Assignment[]>(STORAGE_KEYS.ASSIGNMENTS, initialAssignments);
+    const idx = all.findIndex((a) => a.id === asg.id);
+    if (idx >= 0) {
+      all[idx] = { ...all[idx], ...asg };
+    } else {
+      all.push(asg);
+    }
+    setStorage(STORAGE_KEYS.ASSIGNMENTS, all);
+  },
+
+  /**
+   * Menangani pembaruan sesi pertemuan perkuliahan secara realtime instan (< 300ms)
+   */
+  applyRealtimeMeetingUpdate(payload: any): void {
+    if (!payload) return;
+    if (payload.type === 'delete' || payload.type === 'meeting_deleted') {
+      const id = payload.id;
+      if (!id) return;
+      const all = getStorage<Meeting[]>(STORAGE_KEYS.MEETINGS, initialMeetings);
+      setStorage(STORAGE_KEYS.MEETINGS, all.filter((m) => m.id !== id));
+      return;
+    }
+    const meet = (payload.meeting || payload) as Meeting;
+    if (!meet.id) return;
+    const all = getStorage<Meeting[]>(STORAGE_KEYS.MEETINGS, initialMeetings);
+    const idx = all.findIndex((m) => m.id === meet.id);
+    if (idx >= 0) {
+      all[idx] = { ...all[idx], ...meet };
+    } else {
+      all.push(meet);
+    }
+    setStorage(STORAGE_KEYS.MEETINGS, all);
+  },
+
   // Lecturer Action: Register Student with Details and enroll to course
   registerStudentWithDetails(data: {
     name: string;
@@ -3900,7 +4039,26 @@ export const studentService = {
       setStorage(STORAGE_KEYS.MEETINGS, meetings);
     }
     if (courseId) {
-      return meetings.filter((m) => m.courseId === courseId && m.isPublished !== false);
+      const crs = this.getCourseById(courseId);
+      const crsCode = crs?.code?.toUpperCase();
+      const crsId = crs?.id;
+      let filtered = meetings.filter((m) => {
+        if (m.isPublished === false) return false;
+        if (m.courseId === courseId) return true;
+        if (crsId && m.courseId === crsId) return true;
+        if (crsCode && m.courseId && m.courseId.toUpperCase().includes(crsCode)) return true;
+        return false;
+      });
+
+      // If this course has no meetings yet, auto-generate 16 meetings
+      if (filtered.length === 0 && crs) {
+        try {
+          const generated = this.generate16MeetingsForCourse(crs.id);
+          return generated;
+        } catch {}
+      }
+
+      return filtered;
     }
     return meetings.filter((m) => m.isPublished !== false);
   },
@@ -3950,15 +4108,18 @@ export const studentService = {
     allMeetings.push(newMeeting);
     setStorage(STORAGE_KEYS.MEETINGS, allMeetings);
 
-    // Update totalMeetings in course if necessary
+    // Update totalMeetings in course if necessary & persist to Supabase
     const courses = this.getAllCourses();
-    const cIdx = courses.findIndex((c) => c.id === data.courseId);
-    if (cIdx >= 0 && (courses[cIdx].totalMeetings || 0) < meetingNumber) {
-      courses[cIdx].totalMeetings = meetingNumber;
-      setStorage(STORAGE_KEYS.COURSES, courses);
+    const cIdx = courses.findIndex((c) => c.id === data.courseId || c.code.toUpperCase() === data.courseId.toUpperCase());
+    if (cIdx >= 0) {
+      if ((courses[cIdx].totalMeetings || 0) < meetingNumber) {
+        courses[cIdx].totalMeetings = meetingNumber;
+        setStorage(STORAGE_KEYS.COURSES, courses);
+      }
       supabaseDataService.saveCourse(courses[cIdx]).catch(() => {});
     }
 
+    supabaseDataService.broadcastChange('meeting_updated', newMeeting);
     myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
 
     this.addActivity({
@@ -3982,14 +4143,29 @@ export const studentService = {
       isPublished: updates.isPublished !== undefined ? updates.isPublished : true,
     };
     setStorage(STORAGE_KEYS.MEETINGS, allMeetings);
+
+    const course = this.getCourseById(allMeetings[idx].courseId);
+    if (course) {
+      supabaseDataService.saveCourse(course).catch(() => {});
+    }
+    supabaseDataService.broadcastChange('meeting_updated', allMeetings[idx]);
     myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
     return allMeetings[idx];
   },
 
   deleteMeeting(meetingId: string): boolean {
     const allMeetings = getStorage<Meeting[]>(STORAGE_KEYS.MEETINGS, initialMeetings);
+    const target = allMeetings.find((m) => m.id === meetingId);
     const filtered = allMeetings.filter((m) => m.id !== meetingId);
     setStorage(STORAGE_KEYS.MEETINGS, filtered);
+
+    if (target) {
+      const course = this.getCourseById(target.courseId);
+      if (course) {
+        supabaseDataService.saveCourse(course).catch(() => {});
+      }
+      supabaseDataService.broadcastChange('meeting_updated', { type: 'delete', id: meetingId, courseId: target.courseId });
+    }
     myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
     return true;
   },
@@ -4126,9 +4302,37 @@ export const studentService = {
 
   // Assignments
   getAssignments(courseId?: string): Assignment[] {
-    const assignments = getStorage<Assignment[]>(STORAGE_KEYS.ASSIGNMENTS, initialAssignments);
+    let assignments = getStorage<Assignment[]>(STORAGE_KEYS.ASSIGNMENTS, initialAssignments);
+    const allCourses = this.getAllCourses();
+
+    // Only populate initial assignments if their parent course exists
+    if (allCourses.length > 0 && initialAssignments.length > 0) {
+      let changed = false;
+      initialAssignments.forEach((initA) => {
+        const parentCourse = allCourses.find(
+          (c) => c.id === initA.courseId || (c.code && initA.courseId && initA.courseId.toUpperCase().includes(c.code.toUpperCase()))
+        );
+        if (parentCourse && !assignments.some((a) => a.id === initA.id)) {
+          assignments.push(initA);
+          changed = true;
+        }
+      });
+      if (changed) {
+        setStorage(STORAGE_KEYS.ASSIGNMENTS, assignments);
+      }
+    }
+
     if (courseId) {
-      return assignments.filter((a) => a.courseId === courseId && a.isPublished !== false);
+      const crs = this.getCourseById(courseId);
+      const crsCode = crs?.code?.toUpperCase();
+      const crsId = crs?.id;
+      return assignments.filter((a) => {
+        if (a.isPublished === false) return false;
+        if (a.courseId === courseId) return true;
+        if (crsId && a.courseId === crsId) return true;
+        if (crsCode && a.courseId && a.courseId.toUpperCase().includes(crsCode)) return true;
+        return false;
+      });
     }
     return assignments.filter((a) => a.isPublished !== false);
   },
@@ -4188,6 +4392,12 @@ export const studentService = {
     allAssignments.push(newAssignment);
     setStorage(STORAGE_KEYS.ASSIGNMENTS, allAssignments);
 
+    // Save to course payload in Supabase
+    const course = this.getCourseById(data.courseId);
+    if (course) {
+      supabaseDataService.saveCourse(course).catch(() => {});
+    }
+
     supabaseDataService.saveAssignment(newAssignment).catch(() => {});
     supabaseDataService.broadcastChange('assignment_updated', newAssignment);
     myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
@@ -4213,16 +4423,34 @@ export const studentService = {
       isPublished: updates.isPublished !== undefined ? updates.isPublished : true,
     };
     setStorage(STORAGE_KEYS.ASSIGNMENTS, allAssignments);
+
+    const targetCourseId = allAssignments[idx].courseId;
+    const course = this.getCourseById(targetCourseId);
+    if (course) {
+      supabaseDataService.saveCourse(course).catch(() => {});
+    }
+
     supabaseDataService.saveAssignment(allAssignments[idx]).catch(() => {});
+    supabaseDataService.broadcastChange('assignment_updated', allAssignments[idx]);
     myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
     return allAssignments[idx];
   },
 
   deleteAssignment(assignmentId: string): boolean {
     const allAssignments = getStorage<Assignment[]>(STORAGE_KEYS.ASSIGNMENTS, initialAssignments);
+    const target = allAssignments.find((a) => a.id === assignmentId);
     const filtered = allAssignments.filter((a) => a.id !== assignmentId);
     setStorage(STORAGE_KEYS.ASSIGNMENTS, filtered);
+
+    if (target) {
+      const course = this.getCourseById(target.courseId);
+      if (course) {
+        supabaseDataService.saveCourse(course).catch(() => {});
+      }
+    }
+
     supabaseDataService.deleteAssignment(assignmentId).catch(() => {});
+    supabaseDataService.broadcastChange('assignment_deleted', { id: assignmentId, courseId: target?.courseId });
     myJourneySyncService.pushTeachingToGoogleSheets().catch(() => {});
     return true;
   },
@@ -4282,8 +4510,15 @@ export const studentService = {
     }
     setStorage(STORAGE_KEYS.SUBMISSIONS, updatedList);
 
-    // Kirim sinkronisasi ke Supabase Cloud (My Journey Unified DB)
+    // Save to course payload in Supabase & cloud
+    if (assignment) {
+      const course = this.getCourseById(assignment.courseId);
+      if (course) {
+        supabaseDataService.saveCourse(course).catch(() => {});
+      }
+    }
     supabaseDataService.saveSubmission(newSubmission).catch(() => {});
+    supabaseDataService.broadcastChange('submission_created', newSubmission);
 
     if (assignment) {
       const course = this.getCourseById(assignment.courseId);
@@ -4327,7 +4562,14 @@ export const studentService = {
         grades[existingGradeIdx].feedback = feedback;
         setStorage(STORAGE_KEYS.GRADES, grades);
       }
+      const course = this.getCourseById(assignment.courseId);
+      if (course) {
+        supabaseDataService.saveCourse(course).catch(() => {});
+      }
     }
+
+    supabaseDataService.saveSubmission(updated).catch(() => {});
+    supabaseDataService.broadcastChange('submission_graded', updated);
 
     return updated;
   },

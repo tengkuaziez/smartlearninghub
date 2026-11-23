@@ -81,8 +81,30 @@ export const initialCourses: CourseClass[] = [];
 // Pertemuan / Sesi Kelas Kosong (0 meetings)
 export const initialMeetings: Meeting[] = [];
 
-// Tugas Kuliah Kosong (0 assignments)
-export const initialAssignments: Assignment[] = [];
+// Tugas Kuliah (Default & Aktif)
+export const initialAssignments: Assignment[] = [
+  {
+    id: 'asg_course_KARTOGRAFI_cbr',
+    courseId: 'course_KARTOGRAFI_mwrymbwh',
+    title: 'CBR',
+    instructions: 'CBR',
+    deadline: '2026-11-29T23:59',
+    allowedFormats: ['.pdf', '.zip', '.docx'],
+    maxFileSizeMb: 25,
+    allowTextResponse: true,
+    allowResubmission: true,
+    latePenaltyPolicy: 'Toleransi keterlambatan maksimal 24 jam dengan potongan nilai 10%.',
+    isPublished: true,
+    rubric: [
+      {
+        id: 'rub_cbr_1',
+        title: 'Kesesuaian Format & Analisis Critical Book Review',
+        description: 'Struktur telaah buku teks, pemahaman konsep kartografi, dan orisinalitas ulasan.',
+        maxScore: 100,
+      },
+    ],
+  },
+];
 
 // Pengumpulan Tugas Kosong (0 submissions)
 export const initialSubmissions: AssignmentSubmission[] = [];

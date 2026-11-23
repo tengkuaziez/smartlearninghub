@@ -75,12 +75,22 @@ export const ClassDetailView: React.FC<ClassDetailViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<ClassTab>('ringkasan');
 
+  // Resilient course matcher (handles ID vs code format differences)
+  const isMatchCourse = (targetCourseId?: string) => {
+    if (!targetCourseId) return false;
+    if (targetCourseId === course.id) return true;
+    const cCode = (course.code || '').toUpperCase();
+    const tCode = targetCourseId.toUpperCase();
+    if (cCode && (tCode.includes(cCode) || cCode.includes(tCode))) return true;
+    return false;
+  };
+
   // Filter strictly to this class
-  const classMeetings = meetings.filter((m) => m.courseId === course.id);
-  const classAssignments = assignments.filter((a) => a.courseId === course.id);
-  const classAttendance = attendanceRecords.filter((r) => r.courseId === course.id);
-  const classGrades = grades.filter((g) => g.courseId === course.id);
-  const classAnnouncements = announcements.filter((a) => a.courseId === course.id);
+  const classMeetings = meetings.filter((m) => isMatchCourse(m.courseId));
+  const classAssignments = assignments.filter((a) => isMatchCourse(a.courseId));
+  const classAttendance = attendanceRecords.filter((r) => isMatchCourse(r.courseId));
+  const classGrades = grades.filter((g) => isMatchCourse(g.courseId));
+  const classAnnouncements = announcements.filter((a) => isMatchCourse(a.courseId));
 
   // Extract all materials from this course's meetings
   const allMaterials = classMeetings.flatMap((m) => m.materials || []);

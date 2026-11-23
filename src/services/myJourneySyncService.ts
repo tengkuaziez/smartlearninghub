@@ -102,6 +102,7 @@ export interface SyncTeachingPayload {
     department: string;
     avatarUrl: string;
   }>;
+  assignments?: Array<any>;
 }
 
 export interface SyncResult {
@@ -335,6 +336,24 @@ export const myJourneySyncService = {
       });
     }
 
+    // 7. Assignments
+    const allAssignments = studentService.getAssignments();
+    const assignmentsPayload = allAssignments.map((a) => {
+      const crs = courses.find((c) => c.id === a.courseId || (c.code && a.courseId && a.courseId.toUpperCase().includes(c.code.toUpperCase())));
+      return {
+        id: a.id,
+        courseId: a.courseId,
+        courseCode: crs?.code || '',
+        courseName: crs?.title || 'Kuliah',
+        title: a.title,
+        instructions: a.instructions,
+        deadline: a.deadline,
+        allowedFormats: a.allowedFormats,
+        maxFileSizeMb: a.maxFileSizeMb,
+        isPublished: a.isPublished,
+      };
+    });
+
     return {
       action: 'syncTeaching',
       syncedBy: uploaderEmail,
@@ -346,6 +365,7 @@ export const myJourneySyncService = {
       rps: rpsPayload,
       sessions: sessionsPayload,
       profiles: profilesPayload,
+      assignments: assignmentsPayload,
     };
   },
 

@@ -102,6 +102,9 @@ export const supabaseDataService = {
             title: 'Dosen Pengampu',
             avatarUrl: '',
           },
+          assignments: Array.isArray(d.assignments) ? d.assignments : [],
+          meetings: Array.isArray(d.meetings) ? d.meetings : [],
+          rps: d.rps || undefined,
         };
       });
     } catch (err: any) {
@@ -120,6 +123,45 @@ export const supabaseDataService = {
           ? ALTAF_USER_ID
           : LECTURER_USER_ID;
       }
+
+      // Collect assignments, meetings, rps, and submissions for this course
+      let courseAssignments: any[] = course.assignments || [];
+      if (courseAssignments.length === 0 && typeof localStorage !== 'undefined') {
+        try {
+          const localAsgs = JSON.parse(localStorage.getItem('slh_assignments') || '[]');
+          courseAssignments = localAsgs.filter(
+            (a: any) => a.courseId === course.id || (course.code && String(a.courseId || '').toUpperCase().includes(course.code.toUpperCase()))
+          );
+        } catch {}
+      }
+
+      let courseMeetings: any[] = course.meetings || [];
+      if (courseMeetings.length === 0 && typeof localStorage !== 'undefined') {
+        try {
+          const localMeets = JSON.parse(localStorage.getItem('slh_meetings') || '[]');
+          courseMeetings = localMeets.filter(
+            (m: any) => m.courseId === course.id || (course.code && String(m.courseId || '').toUpperCase().includes(course.code.toUpperCase()))
+          );
+        } catch {}
+      }
+
+      let courseRps = course.rps || null;
+      if (!courseRps && typeof localStorage !== 'undefined') {
+        try {
+          courseRps = JSON.parse(localStorage.getItem(`slh_rps_${course.id}`) || 'null');
+        } catch {}
+      }
+
+      let courseSubmissions: any[] = [];
+      if (typeof localStorage !== 'undefined') {
+        try {
+          const localSubs = JSON.parse(localStorage.getItem('slh_submissions') || '[]');
+          courseSubmissions = localSubs.filter((s: any) =>
+            courseAssignments.some((a: any) => a.id === s.assignmentId)
+          );
+        } catch {}
+      }
+
       const payload = {
         id: course.id,
         user_id: activeUserId,
@@ -149,6 +191,10 @@ export const supabaseDataService = {
           deletionRequest: course.deletionRequest || null,
           color: course.color || 'blue',
           category: course.category || 'Geografi & Komputasi',
+          assignments: courseAssignments,
+          meetings: courseMeetings,
+          rps: courseRps || null,
+          submissions: courseSubmissions,
         },
         updated_at: new Date().toISOString(),
       };
@@ -486,29 +532,38 @@ export const supabaseDataService = {
   },
 
   // =========================================================================
-  // 5. TUGAS & PENGUMPULAN (ASSIGNMENTS & SUBMISSIONS)
+  // =========================================================================
+  // 5. TUGAS & PENGUMPULAN (ASSIGNMENTS & SUBMISSIONS) - Terintegrasi ke courses.data Cloud
   // =========================================================================
   async fetchAssignments(courseId?: string): Promise<Assignment[] | null> {
     if (!isSupabaseConfigured() || !supabase) return null;
     try {
-      let query = supabase.from('assignments').select('*');
-      if (courseId) {
-        query = query.eq('course_id', courseId);
-      }
-      const { data, error } = await query;
+      const { data, error } = await supabase.from('courses').select('id, user_id, data');
       if (error || !data) return null;
 
-      return data.map((row) => ({
-        id: row.id,
-        courseId: row.course_id,
-        title: row.title,
-        description: row.description,
-        deadline: row.deadline,
-        maxScore: row.max_score,
-        attachments: row.attachments || [],
-        createdAt: row.created_at,
-        submissionCount: 0,
-      }));
+      const assignmentMap = new Map<string, Assignment>();
+      data.forEach((row) => {
+        const d = row.data || {};
+        if (d.status === 'deleted' || d.isDeleted) return;
+        const asgs = Array.isArray(d.assignments) ? d.assignments : [];
+        asgs.forEach((asg: any) => {
+          if (asg && asg.id) {
+            assignmentMap.set(asg.id, {
+              ...asg,
+              isPublished: asg.isPublished !== false,
+            });
+          }
+        });
+      });
+
+      const all = Array.from(assignmentMap.values());
+      if (courseId) {
+        return all.filter((a) => {
+          if (a.courseId === courseId) return true;
+          return false;
+        });
+      }
+      return all;
     } catch {
       return null;
     }
@@ -517,20 +572,38 @@ export const supabaseDataService = {
   async saveAssignment(assignment: Assignment): Promise<boolean> {
     if (!isSupabaseConfigured() || !supabase || !assignment.id) return false;
     try {
-      const payload = {
-        id: assignment.id,
-        course_id: assignment.courseId,
-        title: assignment.title,
-        description: assignment.description,
-        deadline: assignment.deadline,
-        max_score: assignment.maxScore || 100,
-        attachments: assignment.attachments || [],
-        updated_at: new Date().toISOString(),
-      };
+      // Find course row in Supabase and pack assignment into courses.data.assignments
+      const { data: rows } = await supabase.from('courses').select('*');
+      if (rows && rows.length > 0) {
+        const matchingRows = rows.filter((r) => {
+          const d = r.data || {};
+          const cCode = String(d.code || '').trim().toUpperCase();
+          const target = String(assignment.courseId || '').trim().toUpperCase();
+          return r.id === assignment.courseId || d.id === assignment.courseId || (cCode && target.includes(cCode)) || (cCode && cCode.includes(target));
+        });
 
-      const { error } = await supabase.from('assignments').upsert(payload);
-      return !error;
-    } catch {
+        for (const row of matchingRows) {
+          const d = row.data || {};
+          const asgs: Assignment[] = Array.isArray(d.assignments) ? d.assignments : [];
+          const idx = asgs.findIndex((a) => a.id === assignment.id);
+          if (idx >= 0) {
+            asgs[idx] = { ...asgs[idx], ...assignment };
+          } else {
+            asgs.push(assignment);
+          }
+          d.assignments = asgs;
+
+          await supabase.from('courses').update({
+            data: d,
+            updated_at: new Date().toISOString(),
+          }).eq('id', row.id).eq('user_id', row.user_id);
+        }
+      }
+
+      this.broadcastChange('assignment_updated', assignment);
+      return true;
+    } catch (err) {
+      console.warn('[SupabaseDataService] saveAssignment failed:', err);
       return false;
     }
   },
@@ -538,8 +611,23 @@ export const supabaseDataService = {
   async deleteAssignment(assignmentId: string): Promise<boolean> {
     if (!isSupabaseConfigured() || !supabase || !assignmentId) return false;
     try {
-      const { error } = await supabase.from('assignments').delete().eq('id', assignmentId);
-      return !error;
+      const { data: rows } = await supabase.from('courses').select('*');
+      if (rows && rows.length > 0) {
+        for (const row of rows) {
+          const d = row.data || {};
+          const asgs: Assignment[] = Array.isArray(d.assignments) ? d.assignments : [];
+          if (asgs.some((a) => a.id === assignmentId)) {
+            d.assignments = asgs.filter((a) => a.id !== assignmentId);
+            await supabase.from('courses').update({
+              data: d,
+              updated_at: new Date().toISOString(),
+            }).eq('id', row.id).eq('user_id', row.user_id);
+          }
+        }
+      }
+
+      this.broadcastChange('assignment_deleted', { id: assignmentId });
+      return true;
     } catch {
       return false;
     }
@@ -548,28 +636,26 @@ export const supabaseDataService = {
   async fetchSubmissions(courseId?: string): Promise<AssignmentSubmission[] | null> {
     if (!isSupabaseConfigured() || !supabase) return null;
     try {
-      let query = supabase.from('submissions').select('*');
-      if (courseId) {
-        query = query.eq('course_id', courseId);
-      }
-      const { data, error } = await query;
+      const { data, error } = await supabase.from('courses').select('id, user_id, data');
       if (error || !data) return null;
 
-      return data.map((row) => ({
-        id: row.id,
-        assignmentId: row.assignment_id,
-        courseId: row.course_id,
-        studentId: row.student_id,
-        studentNim: row.student_nim,
-        studentName: row.student_name,
-        studentEmail: row.student_email,
-        fileUrl: row.file_url,
-        fileName: row.file_name,
-        submittedAt: row.submitted_at,
-        score: row.score !== null ? Number(row.score) : undefined,
-        feedback: row.feedback,
-        status: (row.status || 'submitted') as any,
-      }));
+      const subMap = new Map<string, AssignmentSubmission>();
+      data.forEach((row) => {
+        const d = row.data || {};
+        if (d.status === 'deleted' || d.isDeleted) return;
+        const subs = Array.isArray(d.submissions) ? d.submissions : [];
+        subs.forEach((s: any) => {
+          if (s && s.id) {
+            subMap.set(s.id, s);
+          }
+        });
+      });
+
+      const all = Array.from(subMap.values());
+      if (courseId) {
+        return all.filter((s) => s.courseId === courseId);
+      }
+      return all;
     } catch {
       return null;
     }
@@ -578,25 +664,38 @@ export const supabaseDataService = {
   async saveSubmission(submission: AssignmentSubmission): Promise<boolean> {
     if (!isSupabaseConfigured() || !supabase || !submission.id) return false;
     try {
-      const payload = {
-        id: submission.id,
-        assignment_id: submission.assignmentId,
-        course_id: submission.courseId,
-        student_id: submission.studentId,
-        student_nim: submission.studentNim,
-        student_name: submission.studentName,
-        student_email: submission.studentEmail || '',
-        file_url: submission.fileUrl || '',
-        file_name: submission.fileName || '',
-        submitted_at: submission.submittedAt || new Date().toISOString(),
-        score: submission.score !== undefined ? submission.score : null,
-        feedback: submission.feedback || null,
-        status: submission.status || 'submitted',
-      };
+      const { data: rows } = await supabase.from('courses').select('*');
+      if (rows && rows.length > 0) {
+        const matchingRows = rows.filter((r) => {
+          const d = r.data || {};
+          const cCode = String(d.code || '').trim().toUpperCase();
+          const target = String(submission.courseId || '').trim().toUpperCase();
+          const hasAsg = Array.isArray(d.assignments) && d.assignments.some((a: any) => a.id === submission.assignmentId);
+          return r.id === submission.courseId || d.id === submission.courseId || (cCode && target.includes(cCode)) || hasAsg;
+        });
 
-      const { error } = await supabase.from('submissions').upsert(payload);
-      return !error;
-    } catch {
+        for (const row of matchingRows) {
+          const d = row.data || {};
+          const subs: AssignmentSubmission[] = Array.isArray(d.submissions) ? d.submissions : [];
+          const idx = subs.findIndex((s) => s.id === submission.id);
+          if (idx >= 0) {
+            subs[idx] = { ...subs[idx], ...submission };
+          } else {
+            subs.push(submission);
+          }
+          d.submissions = subs;
+
+          await supabase.from('courses').update({
+            data: d,
+            updated_at: new Date().toISOString(),
+          }).eq('id', row.id).eq('user_id', row.user_id);
+        }
+      }
+
+      this.broadcastChange('submission_created', submission);
+      return true;
+    } catch (err) {
+      console.warn('[SupabaseDataService] saveSubmission failed:', err);
       return false;
     }
   },
@@ -654,6 +753,21 @@ export const supabaseDataService = {
         })
         .on('broadcast', { event: 'invitation_response' }, (msg: any) => {
           onDataChange('courses', msg?.payload);
+        })
+        .on('broadcast', { event: 'assignment_updated' }, (msg: any) => {
+          onDataChange('assignments', msg?.payload);
+        })
+        .on('broadcast', { event: 'assignment_deleted' }, (msg: any) => {
+          onDataChange('assignments', { type: 'delete', ...msg?.payload });
+        })
+        .on('broadcast', { event: 'meeting_updated' }, (msg: any) => {
+          onDataChange('meetings', msg?.payload);
+        })
+        .on('broadcast', { event: 'submission_created' }, (msg: any) => {
+          onDataChange('submissions', msg?.payload);
+        })
+        .on('broadcast', { event: 'submission_graded' }, (msg: any) => {
+          onDataChange('submissions', msg?.payload);
         })
         .on(
           'postgres_changes',

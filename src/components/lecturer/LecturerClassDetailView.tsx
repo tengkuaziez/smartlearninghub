@@ -139,16 +139,26 @@ export const LecturerClassDetailView: React.FC<LecturerClassDetailViewProps> = (
     onDataUpdated();
   };
 
+  // Resilient course matcher (handles ID vs code format differences)
+  const isMatchCourse = (targetCourseId?: string) => {
+    if (!targetCourseId) return false;
+    if (targetCourseId === course.id) return true;
+    const cCode = (course.code || '').toUpperCase();
+    const tCode = targetCourseId.toUpperCase();
+    if (cCode && (tCode.includes(cCode) || cCode.includes(tCode))) return true;
+    return false;
+  };
+
   // Filters for this class
-  const classMeetings = [...meetings.filter((m) => m.courseId === course.id)].sort(
+  const classMeetings = [...meetings.filter((m) => isMatchCourse(m.courseId))].sort(
     (a, b) => a.meetingNumber - b.meetingNumber
   );
-  const classAssignments = assignments.filter((a) => a.courseId === course.id);
+  const classAssignments = assignments.filter((a) => isMatchCourse(a.courseId));
   const classSubmissions = submissions.filter((s) =>
     classAssignments.some((a) => a.id === s.assignmentId)
   );
-  const classAnnouncements = announcements.filter((a) => a.courseId === course.id);
-  const activeMeetingSession = attendanceSessions.find((s) => s.courseId === course.id && s.isOpen);
+  const classAnnouncements = announcements.filter((a) => isMatchCourse(a.courseId));
+  const activeMeetingSession = attendanceSessions.find((s) => isMatchCourse(s.courseId) && s.isOpen);
 
   // Attendance management state
   const [selectedMeetingIdForAttendance, setSelectedMeetingIdForAttendance] = useState<string>(() => {

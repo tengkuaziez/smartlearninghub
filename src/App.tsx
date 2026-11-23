@@ -184,6 +184,20 @@ export default function App() {
         } else {
           studentService.syncStudentsFromSupabase().catch(() => {});
         }
+      } else if (table === 'assignments') {
+        if (payload) {
+          studentService.applyRealtimeAssignmentUpdate(payload);
+        } else {
+          studentService.syncAssignmentsFromSupabase().catch(() => {});
+        }
+      } else if (table === 'meetings') {
+        if (payload) {
+          studentService.applyRealtimeMeetingUpdate(payload);
+        } else {
+          studentService.syncCoursesFromSupabase().catch(() => {});
+        }
+      } else if (table === 'submissions') {
+        studentService.syncAssignmentsFromSupabase().catch(() => {});
       }
       reloadData();
     });

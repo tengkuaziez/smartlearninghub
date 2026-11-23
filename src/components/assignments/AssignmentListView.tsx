@@ -51,7 +51,7 @@ export const AssignmentListView: React.FC<AssignmentListViewProps> = ({
   const enrichedAssignments = useMemo(() => {
     return assignments.map((asg) => {
       const sub = submissions.find((s) => s.assignmentId === asg.id);
-      const course = courses.find((c) => c.id === asg.courseId);
+      const course = courses.find((c) => c.id === asg.courseId || (c.code && asg.courseId && asg.courseId.toUpperCase().includes(c.code.toUpperCase())));
       const status = getAssignmentSubmissionStatus(asg, sub);
       return { asg, sub, course, status };
     });
@@ -78,7 +78,7 @@ export const AssignmentListView: React.FC<AssignmentListViewProps> = ({
       if (activeTab === 'terlambat' && status !== 'terlambat') return false;
 
       // Course filter
-      if (selectedCourseFilter !== 'all' && asg.courseId !== selectedCourseFilter) return false;
+      if (selectedCourseFilter !== 'all' && asg.courseId !== selectedCourseFilter && (!course || course.id !== selectedCourseFilter)) return false;
 
       // Search query
       if (searchQuery.trim()) {

@@ -151,6 +151,8 @@ export interface CourseClass {
   colorScheme: string;
   syllabusUrl?: string;
   rps?: CourseRps; // Dokumen Rencana Pembelajaran Semester resmi
+  assignments?: Assignment[];
+  meetings?: Meeting[];
   enrolledStudentEmails: string[]; // Whitelist email mahasiswa yang didaftarkan dosen
   deletionRequest?: CourseDeletionRequest; // Permohonan penghapusan kelas kolaborasi
 }
