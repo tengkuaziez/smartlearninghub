@@ -37,7 +37,7 @@ import {
 
 import { validateEmailAccess } from '../utils/academicCalculations.ts';
 import { supabase, isSupabaseConfigured } from './supabaseClient.ts';
-import { supabaseDataService, LECTURER_USER_ID, DUMMY_STUDENT_IDS, DUMMY_STUDENT_EMAILS, isDummyStudent } from './supabaseDataService.ts';
+import { supabaseDataService, LECTURER_USER_ID, DUMMY_STUDENT_IDS, DUMMY_STUDENT_EMAILS, isDummyStudent, KNOWN_REGISTERED_STUDENT_EMAILS } from './supabaseDataService.ts';
 
 // Helper sinkronisasi Google Sheets / My Journey yang aman dari circular dependency
 const myJourneySyncService = {
@@ -71,31 +71,86 @@ const STORAGE_KEYS = {
   CUSTOM_ROSTER: 'slh_custom_roster',
 };
 
-const CURRENT_DATA_VERSION = 'v_purge_dummy_students_2026_11_23_v5';
+const CURRENT_DATA_VERSION = 'v_purge_dummy_students_2026_11_23_v6';
 
 // Automatic migration & purge of outdated dummy student data (memulai kosongan & bersih)
 if (typeof window !== 'undefined') {
   try {
     const savedVer = localStorage.getItem(STORAGE_KEYS.DATA_VERSION);
     if (savedVer !== CURRENT_DATA_VERSION) {
-      console.log('[Smart Learning Hub] Membersihkan seluruh data dummy mahasiswa...');
-      // Clear student master database & custom roster
-      [
-        STORAGE_KEYS.MASTER_STUDENTS,
-        STORAGE_KEYS.CUSTOM_ROSTER,
-      ].forEach((key) => localStorage.removeItem(key));
+      console.log('[Smart Learning Hub] Membersihkan seluruh data dummy mahasiswa (v6)...');
 
-      // Clean dummy students from registered users
+      // 1. Bersihkan dummy mahasiswa dari master students, tapi pertahankan mahasiswa valid (Tengku Aziz)
       try {
-        const rawUsers = localStorage.getItem(STORAGE_KEYS.REGISTERED_USERS);
-        if (rawUsers) {
-          const users: RegisteredUser[] = JSON.parse(rawUsers);
-          const cleaned = users.filter((u) => !DUMMY_STUDENT_EMAILS.has(u.email.toLowerCase().trim()) && u.role !== 'mahasiswa');
-          localStorage.setItem(STORAGE_KEYS.REGISTERED_USERS, JSON.stringify(cleaned));
+        const rawMaster = localStorage.getItem(STORAGE_KEYS.MASTER_STUDENTS);
+        let masterList: MasterStudent[] = [];
+        if (rawMaster) {
+          masterList = JSON.parse(rawMaster).filter(
+            (s: MasterStudent) => !isDummyStudent(s.email, s.id) && !DUMMY_STUDENT_EMAILS.has((s.email || '').toLowerCase().trim())
+          );
+        }
+        const tengkuIdx = masterList.findIndex((s) => s.email.toLowerCase().trim() === 'tengku.3222431013@mhs.unimed.ac.id');
+        if (tengkuIdx >= 0) {
+          masterList[tengkuIdx].isRegistered = true;
+          if (!masterList[tengkuIdx].enrolledCourseCodes?.includes('SIGD')) {
+            masterList[tengkuIdx].enrolledCourseCodes = ['SIGD'];
+          }
+        } else {
+          masterList.push({
+            id: 'mstd_1795445518607_xc20o',
+            nim: '3222431013',
+            name: 'Tengku Aziz',
+            email: 'tengku.3222431013@mhs.unimed.ac.id',
+            major: 'Sains Informasi Geografi',
+            classSection: 'Kelas A',
+            isRegistered: true,
+            enrolledCourseCodes: ['SIGD'],
+            avatarUrl: getInitialsAvatar('Tengku Aziz', false),
+          });
+        }
+        localStorage.setItem(STORAGE_KEYS.MASTER_STUDENTS, JSON.stringify(masterList));
+      } catch {}
+
+      // 2. Bersihkan custom roster
+      try {
+        const rawCustom = localStorage.getItem(STORAGE_KEYS.CUSTOM_ROSTER);
+        if (rawCustom) {
+          const custom: Record<string, any> = JSON.parse(rawCustom);
+          Object.keys(custom).forEach((email) => {
+            if (DUMMY_STUDENT_EMAILS.has(email.toLowerCase().trim()) || isDummyStudent(email)) {
+              delete custom[email];
+            }
+          });
+          custom['tengku.3222431013@mhs.unimed.ac.id'] = {
+            name: 'Tengku Aziz',
+            nim: '3222431013',
+            email: 'tengku.3222431013@mhs.unimed.ac.id',
+          };
+          localStorage.setItem(STORAGE_KEYS.CUSTOM_ROSTER, JSON.stringify(custom));
         }
       } catch {}
 
-      // Clean dummy students from enrolled courses
+      // 3. Clean dummy students from registered users & ensure valid student is registered
+      try {
+        const rawUsers = localStorage.getItem(STORAGE_KEYS.REGISTERED_USERS);
+        let users: RegisteredUser[] = rawUsers ? JSON.parse(rawUsers) : [];
+        users = users.filter((u) => !DUMMY_STUDENT_EMAILS.has(u.email.toLowerCase().trim()) && !isDummyStudent(u.email, u.id));
+        if (!users.some((u) => u.email.toLowerCase().trim() === 'tengku.3222431013@mhs.unimed.ac.id')) {
+          users.push({
+            id: 'mstd_1795445518607_xc20o',
+            name: 'Tengku Aziz',
+            email: 'tengku.3222431013@mhs.unimed.ac.id',
+            role: 'mahasiswa',
+            nim: '3222431013',
+            department: 'Sains Informasi Geografi',
+            avatarUrl: getInitialsAvatar('Tengku Aziz', false),
+            registeredAt: new Date().toISOString(),
+          });
+        }
+        localStorage.setItem(STORAGE_KEYS.REGISTERED_USERS, JSON.stringify(users));
+      } catch {}
+
+      // 4. Clean dummy students from enrolled courses
       try {
         const rawCourses = localStorage.getItem(STORAGE_KEYS.COURSES);
         if (rawCourses) {
@@ -112,12 +167,12 @@ if (typeof window !== 'undefined') {
         }
       } catch {}
 
-      // Clear current user if it was a student or dummy student
+      // 5. Clear current user if it was a dummy student
       try {
         const curUserRaw = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
         if (curUserRaw) {
           const curUser = JSON.parse(curUserRaw);
-          if (curUser?.role === 'mahasiswa' || (curUser?.email && DUMMY_STUDENT_EMAILS.has(curUser.email.toLowerCase().trim()))) {
+          if (curUser?.email && DUMMY_STUDENT_EMAILS.has(curUser.email.toLowerCase().trim())) {
             localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
             if (typeof sessionStorage !== 'undefined') {
               sessionStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
@@ -993,6 +1048,9 @@ export const studentService = {
     const rawStudents = getStorage<MasterStudent[]>(STORAGE_KEYS.MASTER_STUDENTS, []);
     const students = rawStudents.filter((s) => {
       if (s.id && DUMMY_STUDENT_IDS.has(s.id)) return false;
+      const cleanEmail = (s.email || '').toLowerCase().trim();
+      if (DUMMY_STUDENT_EMAILS.has(cleanEmail)) return false;
+      if (isDummyStudent(cleanEmail, s.id)) return false;
       return true;
     });
     if (students.length !== rawStudents.length) {
@@ -1003,14 +1061,16 @@ export const studentService = {
 
     // Pastikan mahasiswa yang sudah terdaftar akun otomatis muncul di database dosen (tidak ada celah data hilang)
     registeredUsers.forEach((reg) => {
-      const exists = students.find((s) => s.email.toLowerCase() === reg.email.toLowerCase());
+      const regEmail = reg.email.toLowerCase().trim();
+      if (DUMMY_STUDENT_EMAILS.has(regEmail) || isDummyStudent(regEmail, reg.id)) return;
+      const exists = students.find((s) => s.email.toLowerCase() === regEmail);
       if (!exists) {
         students.push({
           id: reg.id,
           name: reg.name,
           nim: reg.nim || '10123000',
           email: reg.email,
-          major: reg.department || 'Pendidikan Geografi',
+          major: reg.department || 'Sains Informasi Geografi',
           classSection: 'Kelas A',
           enrolledCourseCodes: [],
           avatarUrl: reg.avatarUrl || getInitialsAvatar(reg.name, false),
@@ -1037,8 +1097,9 @@ export const studentService = {
     }
 
     return students.map((std) => {
-      const isReg = registeredUsers.some((u) => u.email.toLowerCase() === std.email.toLowerCase());
       const cleanStdEmail = std.email.toLowerCase().trim();
+      const isReg = registeredUsers.some((u) => u.email.toLowerCase().trim() === cleanStdEmail) ||
+                    KNOWN_REGISTERED_STUDENT_EMAILS.has(cleanStdEmail);
       const courseCodes = new Set<string>();
       courses.forEach((c) => {
         if ((c.enrolledStudentEmails || []).some((e) => e.toLowerCase().trim() === cleanStdEmail)) {
@@ -1051,7 +1112,7 @@ export const studentService = {
 
       return {
         ...std,
-        isRegistered: isReg || !!std.isRegistered,
+        isRegistered: isReg || Boolean(std.isRegistered),
         enrolledCourseCodes: Array.from(courseCodes),
       };
     });
@@ -1703,15 +1764,36 @@ export const studentService = {
           (s) => s.email.toLowerCase() === cleanEmail || s.id === cs.id
         );
 
+        const isRegisteredStatus = Boolean(
+          (idx >= 0 && currentStudents[idx].isRegistered) ||
+          cs.isRegistered ||
+          KNOWN_REGISTERED_STUDENT_EMAILS.has(cleanEmail)
+        );
+
         if (idx >= 0) {
+          const mergedCodes = Array.from(new Set([
+            ...(currentStudents[idx].enrolledCourseCodes || []),
+            ...(cs.enrolledCourseCodes || []),
+          ])).filter((c) => typeof c === 'string' && !c.startsWith('course_') && !c.startsWith('crs_'));
+
           currentStudents[idx] = {
             ...currentStudents[idx],
             ...cs,
-            enrolledCourseCodes: cs.enrolledCourseCodes || currentStudents[idx].enrolledCourseCodes || [],
+            isRegistered: isRegisteredStatus,
+            enrolledCourseCodes: mergedCodes,
           };
         } else {
-          currentStudents.push(cs);
+          currentStudents.push({
+            ...cs,
+            isRegistered: isRegisteredStatus,
+          });
           addedCount++;
+        }
+
+        // Jika akun sudah terkonfirmasi aktif tapi di Supabase masih false, sinkronkan ke Supabase jika login sebagai dosen
+        const curUser = this.getCurrentUser();
+        if (isRegisteredStatus && !cs.isRegistered && curUser?.role === 'dosen') {
+          supabaseDataService.saveStudent(idx >= 0 ? currentStudents[idx] : cs).catch(() => {});
         }
 
         customRoster[cleanEmail] = {
@@ -2051,20 +2133,26 @@ export const studentService = {
 
             json.data.Students.forEach((std: any) => {
               const cleanEmail = (std.email || '').toLowerCase().trim();
-              if (!cleanEmail) return;
+              if (!cleanEmail || DUMMY_STUDENT_EMAILS.has(cleanEmail) || isDummyStudent(cleanEmail, std.id)) return;
 
               const idx = masterStudents.findIndex((m) => m.email.toLowerCase() === cleanEmail);
               const courseCodeStr = String(std.courseCode || '').trim();
               const courseNameStr = String(std.courseName || '').trim().toLowerCase();
 
+              const isRegisteredStatus = Boolean(
+                (idx >= 0 && masterStudents[idx].isRegistered) ||
+                KNOWN_REGISTERED_STUDENT_EMAILS.has(cleanEmail)
+              );
+
               const record: MasterStudent = {
-                id: std.id || `std_${Date.now()}`,
-                nim: String(std.nim || '10123000'),
-                name: std.name || 'Mahasiswa',
+                id: (idx >= 0 && masterStudents[idx].id) ? masterStudents[idx].id : (std.id || `std_${Date.now()}`),
+                nim: String(std.nim || (idx >= 0 ? masterStudents[idx].nim : '10123000')),
+                name: (idx >= 0 && masterStudents[idx].name && masterStudents[idx].name !== 'Mahasiswa') ? masterStudents[idx].name : (std.name || 'Mahasiswa'),
                 email: cleanEmail,
                 major: std.major || 'Sains Informasi Geografi',
                 classSection: std.classSection || 'Kelas A',
                 enrolledCourseCodes: courseCodeStr ? [courseCodeStr] : [],
+                isRegistered: isRegisteredStatus,
                 avatarUrl: getInitialsAvatar(std.name || 'Mahasiswa', false),
               };
 
@@ -2517,6 +2605,16 @@ export const studentService = {
     this.setCurrentUser(newUser);
 
     if (role === 'mahasiswa') {
+      supabaseDataService.broadcastChange('student_registered', {
+        email: normalized,
+        name: cleanName,
+        nim: studentNim,
+        isRegistered: true,
+        registeredAt: new Date().toISOString(),
+      });
+    }
+
+    if (role === 'mahasiswa') {
       this.updateProfile({
         name: newUser.name,
         email: normalized,
@@ -2927,13 +3025,19 @@ export const studentService = {
     const customRoster = getStorage<Record<string, any>>(STORAGE_KEYS.CUSTOM_ROSTER, {});
     const existingIdx = masterStudents.findIndex((m) => m.email.toLowerCase() === cleanEmail);
     const info = customRoster[cleanEmail] || getStudentRosterInfo(cleanEmail);
+    const isRegisteredStatus = Boolean(
+      (existingIdx >= 0 && masterStudents[existingIdx].isRegistered) ||
+      KNOWN_REGISTERED_STUDENT_EMAILS.has(cleanEmail)
+    );
     const studentRecord: MasterStudent = {
       id: existingIdx >= 0 ? masterStudents[existingIdx].id : `std_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       nim: (existingIdx >= 0 && masterStudents[existingIdx].nim) ? masterStudents[existingIdx].nim : (info.nim || `22081010${Math.floor(100 + Math.random() * 900)}`),
       name: (existingIdx >= 0 && masterStudents[existingIdx].name) ? masterStudents[existingIdx].name : (info.name || 'Mahasiswa'),
       email: cleanEmail,
-      major: 'Sains Informasi Geografi',
+      major: (existingIdx >= 0 && masterStudents[existingIdx].major) ? masterStudents[existingIdx].major : 'Sains Informasi Geografi',
       classSection: course.section || 'Kelas A',
+      isRegistered: isRegisteredStatus,
+      registeredAt: existingIdx >= 0 ? masterStudents[existingIdx].registeredAt : undefined,
       enrolledCourseCodes: Array.from(new Set([
         ...(((existingIdx >= 0 && masterStudents[existingIdx].enrolledCourseCodes) || []).filter(
           (c) => typeof c === 'string' && !c.startsWith('course_') && !c.startsWith('crs_')
@@ -3861,9 +3965,11 @@ export const studentService = {
    */
   applyRealtimeStudentUpdate(payload: any): void {
     if (!payload) return;
-    if (payload.student) {
-      const student = payload.student;
+    const student = payload.student || (payload.email ? payload : null);
+    if (student) {
       const cleanEmail = (student.email || '').toLowerCase().trim();
+      if (!cleanEmail || DUMMY_STUDENT_EMAILS.has(cleanEmail) || isDummyStudent(cleanEmail, student.id)) return;
+
       const masterStudents = getStorage<MasterStudent[]>(STORAGE_KEYS.MASTER_STUDENTS, []);
       const idx = masterStudents.findIndex((m) => m.email.toLowerCase() === cleanEmail);
 
@@ -3871,10 +3977,13 @@ export const studentService = {
         (c: any) => typeof c === 'string' && !c.startsWith('course_') && !c.startsWith('crs_')
       );
 
+      const isReg = Boolean(student.isRegistered || (idx >= 0 && masterStudents[idx].isRegistered) || KNOWN_REGISTERED_STUDENT_EMAILS.has(cleanEmail));
+
       const updatedRecord: MasterStudent = {
         ...(idx >= 0 ? masterStudents[idx] : {}),
         ...student,
-        enrolledCourseCodes: cleanCourseCodes,
+        isRegistered: isReg,
+        enrolledCourseCodes: cleanCourseCodes.length > 0 ? cleanCourseCodes : (idx >= 0 ? (masterStudents[idx].enrolledCourseCodes || []) : []),
       };
 
       if (idx >= 0) {
@@ -3903,7 +4012,24 @@ export const studentService = {
           nim: updatedRecord.nim,
           department: updatedRecord.major,
         };
-        setStorage(STORAGE_KEYS.REGISTERED_USERS, regUsers);
+      } else if (isReg) {
+        regUsers.push({
+          id: updatedRecord.id,
+          name: updatedRecord.name,
+          email: cleanEmail,
+          role: 'mahasiswa',
+          nim: updatedRecord.nim,
+          department: updatedRecord.major,
+          avatarUrl: updatedRecord.avatarUrl,
+          registeredAt: updatedRecord.registeredAt || new Date().toISOString(),
+        });
+      }
+      setStorage(STORAGE_KEYS.REGISTERED_USERS, regUsers);
+
+      // Jika tab saat ini adalah dosen aktif, simpan status pendaftaran mahasiswa ke Cloud Supabase!
+      const curUser = this.getCurrentUser();
+      if (curUser?.role === 'dosen') {
+        supabaseDataService.saveStudent(updatedRecord).catch(() => {});
       }
 
       // Sinkronisasi ke profile jika akun ini sedang dibuka di tab ini
@@ -3919,7 +4045,6 @@ export const studentService = {
       }
 
       // Sinkronisasi ke currentUser jika aktif di tab ini
-      const curUser = this.getCurrentUser();
       if (curUser && curUser.email.toLowerCase() === cleanEmail) {
         this.setCurrentUser({
           ...curUser,

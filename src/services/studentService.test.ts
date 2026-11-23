@@ -602,7 +602,7 @@ test('Student Removal & Cloud Sync: Removed student is evicted permanently and n
 });
 
 test('Student Name Sync: editing student in master database propagates to account profile and current user', async () => {
-  const studentEmail = 'altaf.aziz16@student.ac.id';
+  const studentEmail = 'sync.name.test@student.ac.id';
 
   // 1. Pre-register student in master database
   studentService.saveMasterStudent({
@@ -675,7 +675,7 @@ test('Student Name Sync: editing student in master database propagates to accoun
 });
 
 test('Clean Course Badges: enrolledCourseCodes excludes raw IDs like course_...', () => {
-  const testStudentEmail = 'clean.badge.test@student.ac.id';
+  const testStudentEmail = 'badge.test@student.ac.id';
 
   // Create course with specific code
   const course = studentService.createCourse({
