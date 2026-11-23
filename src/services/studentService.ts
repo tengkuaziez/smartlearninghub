@@ -2324,7 +2324,7 @@ export const studentService = {
 
   // Auth: Register dengan dukungan Supabase Auth & Whitelist Check
   async registerAsync(data: {
-    name: string;
+    name?: string;
     email: string;
     role?: UserRole;
     nim?: string;
@@ -2338,9 +2338,6 @@ export const studentService = {
     const normalized = data.email.trim().toLowerCase();
     if (!normalized) {
       return { success: false, message: 'Email wajib diisi.' };
-    }
-    if (!data.name.trim()) {
-      return { success: false, message: 'Nama lengkap wajib diisi.' };
     }
 
     const isLecturerWhitelist = LECTURER_WHITELIST_EMAILS.map((e) => e.toLowerCase()).includes(normalized);
@@ -2357,6 +2354,21 @@ export const studentService = {
       }
     }
 
+    const masterRecord = this.getMasterStudents().find((s) => s.email.toLowerCase() === normalized);
+    const customRoster = getStorage<Record<string, any>>(STORAGE_KEYS.CUSTOM_ROSTER, {});
+    const rosterItem = customRoster[normalized] || getStudentRosterInfo(normalized);
+
+    const resolvedName = (data.name || '').trim() || (
+      isLecturerWhitelist
+        ? (DEFAULT_LECTURERS[normalized]?.name || 'Dosen Pengampu')
+        : (masterRecord?.name || rosterItem?.name || 'Mahasiswa')
+    );
+    const resolvedNim = (data.nim || '').trim() || (
+      role === 'mahasiswa'
+        ? (masterRecord?.nim || rosterItem?.nim || '')
+        : ''
+    );
+
     // Daftarkan juga ke Supabase Auth jika online
     if (isSupabaseConfigured() && supabase && data.password) {
       try {
@@ -2365,9 +2377,9 @@ export const studentService = {
           password: data.password,
           options: {
             data: {
-              full_name: data.name.trim(),
+              full_name: resolvedName,
               role,
-              nim: data.nim?.trim() || '',
+              nim: resolvedNim,
               nidn: data.nidn?.trim() || '',
             },
           },
@@ -2375,12 +2387,16 @@ export const studentService = {
       } catch {}
     }
 
-    return this.register(data);
+    return this.register({
+      ...data,
+      name: resolvedName,
+      nim: resolvedNim || undefined,
+    });
   },
 
   // Auth: Registration
   register(data: {
-    name: string;
+    name?: string;
     email: string;
     role?: UserRole;
     nim?: string;
@@ -2394,9 +2410,6 @@ export const studentService = {
     const normalized = data.email.trim().toLowerCase();
     if (!normalized) {
       return { success: false, message: 'Email wajib diisi.' };
-    }
-    if (!data.name.trim()) {
-      return { success: false, message: 'Nama lengkap wajib diisi.' };
     }
 
     const isLecturerWhitelist = LECTURER_WHITELIST_EMAILS.map((e) => e.toLowerCase()).includes(normalized);
@@ -2413,14 +2426,34 @@ export const studentService = {
       }
     }
 
-    const cleanName = data.name.trim();
+    const masterRecord = this.getMasterStudents().find((s) => s.email.toLowerCase() === normalized);
+    const customRoster = getStorage<Record<string, any>>(STORAGE_KEYS.CUSTOM_ROSTER, {});
+    const rosterItem = customRoster[normalized] || getStudentRosterInfo(normalized);
+
+    let cleanName = (data.name || '').trim();
+    if (!cleanName) {
+      if (isLecturerWhitelist) {
+        cleanName = DEFAULT_LECTURERS[normalized]?.name || 'Dosen Pengampu';
+      } else if (masterRecord?.name) {
+        cleanName = masterRecord.name;
+      } else if (rosterItem?.name) {
+        cleanName = rosterItem.name;
+      } else {
+        cleanName = 'Mahasiswa';
+      }
+    }
+
+    let studentNim = (data.nim || '').trim();
+    if (!studentNim && role === 'mahasiswa') {
+      studentNim = masterRecord?.nim || rosterItem?.nim || '10123000';
+    }
+
     let title: string | undefined;
     let nidn: string | undefined = data.nidn?.trim();
     let department: string | undefined;
     let bio: string | undefined;
     let avatarUrl: string;
 
-    let studentNim = data.nim?.trim();
     let studentMajor: string | undefined;
     let enrolledCodes: string[] = [];
 
@@ -2437,14 +2470,11 @@ export const studentService = {
       avatarUrl = getInitialsAvatar(cleanName, true);
     } else {
       avatarUrl = getInitialsAvatar(cleanName, false);
-      const masterRecord = this.getMasterStudents().find((s) => s.email.toLowerCase() === normalized);
       if (masterRecord) {
-        masterRecord.name = cleanName;
-        if (studentNim) {
-          masterRecord.nim = studentNim;
-        } else if (masterRecord.nim) {
-          studentNim = masterRecord.nim;
-        }
+        if (data.name?.trim()) masterRecord.name = data.name.trim();
+        if (data.nim?.trim()) masterRecord.nim = data.nim.trim();
+        cleanName = masterRecord.name || cleanName;
+        studentNim = masterRecord.nim || studentNim;
         studentMajor = masterRecord.major;
         enrolledCodes = masterRecord.enrolledCourseCodes || [];
         masterRecord.isRegistered = true;
@@ -2456,7 +2486,7 @@ export const studentService = {
           id: `mstd_${Date.now()}`,
           name: cleanName,
           email: normalized,
-          nim: studentNim || data.nim?.trim() || '10123000',
+          nim: studentNim || '10123000',
           major: studentMajor || 'Pendidikan Geografi',
           classSection: 'Kelas A',
           enrolledCourseCodes: [],

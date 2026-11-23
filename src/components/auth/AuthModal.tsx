@@ -3,12 +3,10 @@ import {
   X, 
   Mail, 
   Lock, 
-  User, 
   ArrowRight, 
   CheckCircle2, 
   AlertCircle, 
   KeyRound,
-  Hash,
 } from 'lucide-react';
 import { Logo } from '../common/Logo.tsx';
 import { studentService, type RegisteredUser } from '../../services/studentService.ts';
@@ -33,8 +31,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [name, setName] = useState('');
-  const [identifier, setIdentifier] = useState(''); // Unified NIM / NIDN
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,10 +86,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     try {
       const res = await studentService.registerAsync({
-        name,
         email,
-        nim: identifier.trim() || undefined,
-        nidn: identifier.trim() || undefined,
         password,
       });
 
@@ -285,24 +278,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <form onSubmit={handleRegister} className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Nama Lengkap
-                </label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Nama Lengkap Anda"
-                    className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Email Akun
+                  Email Akun Mahasiswa
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -317,20 +293,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  NIM / NIDN <span className="text-slate-400 font-normal">(Opsional)</span>
-                </label>
-                <div className="relative">
-                  <Hash className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="Nomor Induk Mahasiswa / Dosen"
-                    className="w-full pl-9 pr-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
-                  />
-                </div>
+              <div className="p-2.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/60 text-[11px] text-blue-700 dark:text-blue-300 flex items-start gap-2">
+                <span className="leading-tight">
+                  Nama dan NIM Anda otomatis terhubung dari data resmi yang didaftarkan oleh tim Dosen Pengampu ke dalam kelas.
+                </span>
               </div>
 
               <div className="grid grid-cols-2 gap-2">

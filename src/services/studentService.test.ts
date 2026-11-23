@@ -111,6 +111,28 @@ test('Registration: Pre-authorized student registers successfully and links NIM 
   assert.equal(result.user?.nim, '10123099');
 });
 
+test('Registration: Student registers with only email and password, auto-populating Name and NIM from master database', async () => {
+  studentService.saveMasterStudent({
+    id: 'mstd_test_minimal',
+    nim: '3222431099',
+    name: 'Mahasiswa Otomatis',
+    email: 'mhs.otomatis@student.ac.id',
+    major: 'Sains Informasi Geografi',
+    classSection: 'Kelas A',
+    enrolledCourseCodes: ['GEO-101'],
+  });
+
+  const res = await studentService.registerAsync({
+    email: 'mhs.otomatis@student.ac.id',
+    password: 'passwordRahasia123',
+  });
+
+  assert.equal(res.success, true);
+  assert.equal(res.user?.name, 'Mahasiswa Otomatis');
+  assert.equal(res.user?.nim, '3222431099');
+  assert.equal(res.user?.role, 'mahasiswa');
+});
+
 test('Master Database: saves, searches, and deletes students', () => {
   const countBefore = studentService.getMasterStudents().length;
   studentService.saveMasterStudent({

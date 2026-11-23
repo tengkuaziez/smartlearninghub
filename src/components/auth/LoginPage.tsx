@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   Mail,
   Lock,
-  User,
   ArrowRight,
   ShieldCheck,
   CheckCircle2,
@@ -11,7 +10,6 @@ import {
   Moon,
   Eye,
   EyeOff,
-  Hash,
   Sparkles,
 } from 'lucide-react';
 import { Logo } from '../common/Logo.tsx';
@@ -45,8 +43,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   });
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [identifier, setIdentifier] = useState(''); // NIM or NIDN
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(() => {
     try {
@@ -99,10 +95,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    if (!fullName.trim()) {
-      setErrorMsg('Nama lengkap wajib diisi.');
-      return;
-    }
     if (!email.trim()) {
       setErrorMsg('Alamat email wajib diisi.');
       return;
@@ -126,10 +118,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       }
 
       const res = await studentService.registerAsync({
-        name: fullName,
-        email: email,
-        nim: identifier.trim() || undefined,
-        nidn: identifier.trim() || undefined,
+        email: email.trim(),
         password: password,
       });
 
@@ -361,24 +350,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               <form onSubmit={handleRegister} className="space-y-3.5">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Nama Lengkap
-                  </label>
-                  <div className="relative">
-                    <User className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-                    <input
-                      type="text"
-                      required
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      placeholder="cth. Muhammad Fathurrahman"
-                      className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition-all"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Alamat Email
+                    Alamat Email Mahasiswa
                   </label>
                   <div className="relative">
                     <Mail className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
@@ -388,22 +360,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="nama@kampus.ac.id"
-                      className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition-all"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    NIM / NIDN (Opsional)
-                  </label>
-                  <div className="relative">
-                    <Hash className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-                    <input
-                      type="text"
-                      value={identifier}
-                      onChange={(e) => setIdentifier(e.target.value)}
-                      placeholder="cth. 3222431013 atau 0419058902"
                       className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition-all"
                     />
                   </div>
@@ -448,7 +404,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 <div className="p-2.5 rounded-lg bg-blue-50/70 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/60 text-[11px] text-blue-700 dark:text-blue-300 flex items-start gap-2">
                   <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
                   <span className="leading-tight">
-                    Pendaftaran mahasiswa terverifikasi otomatis dengan basis data kelas dosen. Dosen dapat langsung masuk dengan email resmi terdaftar.
+                    Nama dan NIM Anda akan otomatis terhubung dari data resmi yang telah didaftarkan oleh tim Dosen Pengampu ke dalam kelas.
                   </span>
                 </div>
 
