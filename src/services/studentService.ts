@@ -37,7 +37,7 @@ import {
 
 import { validateEmailAccess } from '../utils/academicCalculations.ts';
 import { supabase, isSupabaseConfigured } from './supabaseClient.ts';
-import { supabaseDataService, LECTURER_USER_ID } from './supabaseDataService.ts';
+import { supabaseDataService, LECTURER_USER_ID, DUMMY_STUDENT_IDS, DUMMY_STUDENT_EMAILS, isDummyStudent } from './supabaseDataService.ts';
 
 // Helper sinkronisasi Google Sheets / My Journey yang aman dari circular dependency
 const myJourneySyncService = {
@@ -71,32 +71,60 @@ const STORAGE_KEYS = {
   CUSTOM_ROSTER: 'slh_custom_roster',
 };
 
-const CURRENT_DATA_VERSION = 'v_reset_fresh_slate_2026_11_15_r3';
+const CURRENT_DATA_VERSION = 'v_purge_dummy_students_2026_11_23_v5';
 
-// Automatic migration & purge of outdated dummy data (memulai kosongan & bersih)
+// Automatic migration & purge of outdated dummy student data (memulai kosongan & bersih)
 if (typeof window !== 'undefined') {
   try {
     const savedVer = localStorage.getItem(STORAGE_KEYS.DATA_VERSION);
     if (savedVer !== CURRENT_DATA_VERSION) {
-      console.log('[Smart Learning Hub] Mengosongkan seluruh data lama untuk memulai kosongan sesuai My Journey...');
-      // Clear old dummy keys to start completely empty
+      console.log('[Smart Learning Hub] Membersihkan seluruh data dummy mahasiswa...');
+      // Clear student master database & custom roster
       [
-        STORAGE_KEYS.COURSES,
         STORAGE_KEYS.MASTER_STUDENTS,
-        STORAGE_KEYS.MEETINGS,
-        STORAGE_KEYS.ASSIGNMENTS,
-        STORAGE_KEYS.SUBMISSIONS,
-        STORAGE_KEYS.ATTENDANCE_SESSIONS,
-        STORAGE_KEYS.ATTENDANCE_RECORDS,
-        STORAGE_KEYS.GRADES,
-        STORAGE_KEYS.ANNOUNCEMENTS,
-        STORAGE_KEYS.NOTIFICATIONS,
-        STORAGE_KEYS.ACTIVITIES,
         STORAGE_KEYS.CUSTOM_ROSTER,
-        STORAGE_KEYS.PROFILE,
-        STORAGE_KEYS.CURRENT_USER,
-        STORAGE_KEYS.REGISTERED_USERS,
       ].forEach((key) => localStorage.removeItem(key));
+
+      // Clean dummy students from registered users
+      try {
+        const rawUsers = localStorage.getItem(STORAGE_KEYS.REGISTERED_USERS);
+        if (rawUsers) {
+          const users: RegisteredUser[] = JSON.parse(rawUsers);
+          const cleaned = users.filter((u) => !DUMMY_STUDENT_EMAILS.has(u.email.toLowerCase().trim()) && u.role !== 'mahasiswa');
+          localStorage.setItem(STORAGE_KEYS.REGISTERED_USERS, JSON.stringify(cleaned));
+        }
+      } catch {}
+
+      // Clean dummy students from enrolled courses
+      try {
+        const rawCourses = localStorage.getItem(STORAGE_KEYS.COURSES);
+        if (rawCourses) {
+          const courses: CourseClass[] = JSON.parse(rawCourses);
+          const cleanedCourses = courses.map((c) => {
+            const cleanEmails = (c.enrolledStudentEmails || []).filter((e) => !DUMMY_STUDENT_EMAILS.has(e.toLowerCase().trim()));
+            return {
+              ...c,
+              enrolledStudentEmails: cleanEmails,
+              enrolledCount: cleanEmails.length,
+            };
+          });
+          localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(cleanedCourses));
+        }
+      } catch {}
+
+      // Clear current user if it was a student or dummy student
+      try {
+        const curUserRaw = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+        if (curUserRaw) {
+          const curUser = JSON.parse(curUserRaw);
+          if (curUser?.role === 'mahasiswa' || (curUser?.email && DUMMY_STUDENT_EMAILS.has(curUser.email.toLowerCase().trim()))) {
+            localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+            if (typeof sessionStorage !== 'undefined') {
+              sessionStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+            }
+          }
+        }
+      } catch {}
 
       localStorage.setItem(STORAGE_KEYS.DATA_VERSION, CURRENT_DATA_VERSION);
     }
@@ -278,6 +306,10 @@ export const studentService = {
       }
       let modified = false;
       const userEmailLower = user.email.toLowerCase().trim();
+      if (user.role === 'mahasiswa' && DUMMY_STUDENT_IDS.has(user.id)) {
+        this.logout();
+        return null;
+      }
       const isAltaf = userEmailLower === 'altaf.aziz16@gmail.com';
       const isMiftah = userEmailLower === 'miftahurridlo.688@gmail.com';
       if (isAltaf) {
@@ -462,8 +494,17 @@ export const studentService = {
   },
 
   getRegisteredUsers(): RegisteredUser[] {
-    const users = getStorage<RegisteredUser[]>(STORAGE_KEYS.REGISTERED_USERS, []);
+    const rawUsers = getStorage<RegisteredUser[]>(STORAGE_KEYS.REGISTERED_USERS, []);
     let modified = false;
+
+    // Bersihkan pengguna dummy mahasiswa
+    const users = rawUsers.filter((u) => {
+      if (u.id && DUMMY_STUDENT_IDS.has(u.id)) return false;
+      return true;
+    });
+    if (users.length !== rawUsers.length) {
+      modified = true;
+    }
 
     // Pastikan 2 akun dasar dosen selalu terdaftar
     const altafEmail = 'altaf.aziz16@gmail.com';
@@ -949,7 +990,14 @@ export const studentService = {
   // MASTER STUDENT DATABASE (Basis Data Mahasiswa Master)
   // =========================================================================
   getMasterStudents(): MasterStudent[] {
-    const students = getStorage<MasterStudent[]>(STORAGE_KEYS.MASTER_STUDENTS, []);
+    const rawStudents = getStorage<MasterStudent[]>(STORAGE_KEYS.MASTER_STUDENTS, []);
+    const students = rawStudents.filter((s) => {
+      if (s.id && DUMMY_STUDENT_IDS.has(s.id)) return false;
+      return true;
+    });
+    if (students.length !== rawStudents.length) {
+      setStorage(STORAGE_KEYS.MASTER_STUDENTS, students);
+    }
     const registeredUsers = this.getRegisteredUsers().filter((u) => u.role === 'mahasiswa');
     const courses = this.getAllCourses();
 
@@ -1624,7 +1672,22 @@ export const studentService = {
   async syncStudentsFromSupabase(): Promise<{ success: boolean; count: number; message: string }> {
     try {
       const cloudStudents = await supabaseDataService.fetchStudents();
-      if (!cloudStudents || cloudStudents.length === 0) {
+      const validCloudStudents = (cloudStudents || []).filter((cs) => {
+        const clean = (cs.email || '').toLowerCase().trim();
+        if (DUMMY_STUDENT_EMAILS.has(clean)) return false;
+        if (cs.id && DUMMY_STUDENT_IDS.has(cs.id)) return false;
+        return true;
+      });
+
+      if (validCloudStudents.length === 0) {
+        // Bersihkan data dummy yang mungkin tersimpan di local storage
+        const currentStudents = getStorage<MasterStudent[]>(STORAGE_KEYS.MASTER_STUDENTS, []);
+        const cleanStudents = currentStudents.filter(
+          (s) => !DUMMY_STUDENT_IDS.has(s.id) && !DUMMY_STUDENT_EMAILS.has((s.email || '').toLowerCase().trim())
+        );
+        if (cleanStudents.length !== currentStudents.length) {
+          setStorage(STORAGE_KEYS.MASTER_STUDENTS, cleanStudents);
+        }
         return { success: true, count: 0, message: 'Tidak ada data mahasiswa di Supabase.' };
       }
 
@@ -1632,7 +1695,7 @@ export const studentService = {
       const customRoster = getStorage<Record<string, any>>(STORAGE_KEYS.CUSTOM_ROSTER, {});
       let addedCount = 0;
 
-      cloudStudents.forEach((cs) => {
+      validCloudStudents.forEach((cs) => {
         const cleanEmail = cs.email.trim().toLowerCase();
         if (!cleanEmail) return;
 
@@ -2056,6 +2119,11 @@ export const studentService = {
     } catch (gasErr) {
       console.warn('[MyJourneySync] Google Apps Script fetch warning:', gasErr);
     }
+
+    // 1.5. Bersihkan data dummy mahasiswa di Cloud Supabase
+    try {
+      await supabaseDataService.purgeDummyStudentsFromCloud();
+    } catch {}
 
     // 2. Tarik Kelas dari Supabase Cloud
     try {
@@ -4021,10 +4089,10 @@ export const studentService = {
     const customRoster = getStorage<Record<string, any>>(STORAGE_KEYS.CUSTOM_ROSTER, {});
     const studentsMap = new Map<string, { email: string; name: string; nim: string; enrolledCourseCodes: string[]; registeredAt?: string }>();
 
-    // 1. Seed from Master Students database (excluding deleted course codes)
+    // 1. Seed from Master Students database (excluding deleted course codes and dummy students)
     masterStudents.forEach((ms) => {
       const clean = ms.email.toLowerCase().trim();
-      if (!clean) return;
+      if (!clean || (ms.id && DUMMY_STUDENT_IDS.has(ms.id))) return;
       const validCodes = (ms.enrolledCourseCodes || []).filter((code) => 
         !deletedIds.includes(code) && 
         !deletedIds.includes(code.toUpperCase())
@@ -5218,6 +5286,7 @@ export const studentService = {
 // =========================================================================
 if (typeof window !== 'undefined') {
   setTimeout(() => {
+    supabaseDataService.purgeDummyStudentsFromCloud().catch(() => {});
     studentService.syncAllFromMyJourneyCloud().catch(() => {});
     supabaseDataService.setupRealtimeSubscription((table) => {
       if (table === 'students') {

@@ -24,6 +24,36 @@ import type {
 export const LECTURER_USER_ID = 'd342423d-fce0-4b54-896f-4c4b27e70dc0';
 export const ALTAF_USER_ID = 'a9e68483-f4fb-4acf-9138-e70470b28833';
 
+// Blacklist ID dan Email Data Dummy Akun Mahasiswa
+export const DUMMY_STUDENT_IDS = new Set([
+  'std_10123000',
+  'std_2208101001',
+  'std_10999999',
+  'std_3222431014',
+  'std_10123099',
+  'std_3222431013',
+  'std_1234567',
+  'std_demo',
+]);
+
+export const DUMMY_STUDENT_EMAILS = new Set([
+  'clean.badge.test@student.ac.id',
+  'budi.santoso@student.ac.id',
+  'mahasiswa.test.del@student.ac.id',
+  'citra.permata@student.ac.id',
+  'altaf.aziz16@student.ac.id',
+  'altaf.aziz.student@gmail.com',
+  'mahasiswa@student.ac.id',
+]);
+
+export function isDummyStudent(email?: string, id?: string): boolean {
+  if (id && DUMMY_STUDENT_IDS.has(id)) return true;
+  if (!email) return false;
+  const clean = email.toLowerCase().trim();
+  if (DUMMY_STUDENT_EMAILS.has(clean)) return true;
+  return false;
+}
+
 export const supabaseDataService = {
   /**
    * Mendapatkan ID user Supabase yang sedang login secara dinamis
@@ -75,6 +105,9 @@ export const supabaseDataService = {
 
       return data.map((row) => {
         const d = row.data || {};
+        const cleanEmails = (d.enrolledStudentEmails || []).filter(
+          (e: string) => typeof e === 'string' && !DUMMY_STUDENT_EMAILS.has(e.toLowerCase().trim())
+        );
         return {
           id: row.id,
           code: d.code || 'KULIAH',
@@ -90,8 +123,8 @@ export const supabaseDataService = {
           category: d.category || 'Geografi & Komputasi',
           color: d.color || 'from-blue-600 to-indigo-700',
           syllabusOverview: d.syllabusOverview || 'Silabus perkuliahan.',
-          enrolledCount: d.enrolledCount || 0,
-          enrolledStudentEmails: d.enrolledStudentEmails || [],
+          enrolledCount: cleanEmails.length,
+          enrolledStudentEmails: cleanEmails,
           completedMeetingsCount: d.completedMeetingsCount || 0,
           totalMeetingsCount: d.totalMeetingsCount || 16,
           progress: d.progress || 0,
@@ -266,7 +299,16 @@ export const supabaseDataService = {
 
       if (!data) return [];
 
-      return data.map((row) => {
+      return data
+        .filter((row) => {
+          const d = row.data || {};
+          const email = (d.email || '').toLowerCase().trim();
+          if (DUMMY_STUDENT_IDS.has(row.id) || (d.id && DUMMY_STUDENT_IDS.has(d.id))) return false;
+          if (DUMMY_STUDENT_EMAILS.has(email)) return false;
+          if (d.status === 'deleted' || d.isDeleted) return false;
+          return true;
+        })
+        .map((row) => {
         const d = row.data || {};
         const rawCodes = d.enrolledCourseCodes || (d.courseCode ? [d.courseCode] : []);
         const cleanCodes = (Array.isArray(rawCodes) ? rawCodes : [rawCodes])
@@ -373,6 +415,45 @@ export const supabaseDataService = {
       return !error;
     } catch {
       return false;
+    }
+  },
+
+  /**
+   * Menghapus seluruh data dummy akun mahasiswa secara permanen dari Cloud Database Supabase
+   * Menghapus baris dummy di tabel students dan membersihkan enrolledStudentEmails di tabel courses
+   */
+  async purgeDummyStudentsFromCloud(): Promise<void> {
+    if (!isSupabaseConfigured() || !supabase) return;
+    try {
+      const dummyIdList = Array.from(DUMMY_STUDENT_IDS);
+      // Hard delete from students table
+      await supabase.from('students').delete().in('id', dummyIdList);
+
+      // Clean enrolled dummy student emails in courses table
+      const { data: courses } = await supabase.from('courses').select('id, user_id, data');
+      if (courses && courses.length > 0) {
+        for (const c of courses) {
+          const d = c.data || {};
+          const origEmails: string[] = d.enrolledStudentEmails || [];
+          const filteredEmails = origEmails.filter((e) => !DUMMY_STUDENT_EMAILS.has(e.toLowerCase().trim()));
+          if (filteredEmails.length !== origEmails.length) {
+            const updatedData = {
+              ...d,
+              enrolledStudentEmails: filteredEmails,
+              enrolledCount: filteredEmails.length,
+            };
+            await supabase
+              .from('courses')
+              .update({
+                data: updatedData,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', c.id);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[SupabaseDataService] purgeDummyStudentsFromCloud warning:', err);
     }
   },
 
